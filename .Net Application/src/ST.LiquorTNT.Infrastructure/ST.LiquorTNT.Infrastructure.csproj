@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <!-- ToTable/HasColumnName live here. Referenced explicitly so the DLL reaches the API output folder. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Pomelo.EntityFrameworkCore.MySql" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ST.LiquorTNT.Business\ST.LiquorTNT.Business.csproj" />
+    <ProjectReference Include="..\ST.LiquorTNT.Domain\ST.LiquorTNT.Domain.csproj" />
+    <ProjectReference Include="..\ST.LiquorTNT.Contracts\ST.LiquorTNT.Contracts.csproj" />
+  </ItemGroup>
+</Project>

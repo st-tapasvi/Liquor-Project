@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <!-- Follows the line application, which is WinForms and therefore Windows-only. -->
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="FluentAssertions" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\ST.LiquorTNT.Desktop\ST.LiquorTNT.Desktop.csproj" />
+    <ProjectReference Include="..\..\src\ST.LiquorTNT.Contracts\ST.LiquorTNT.Contracts.csproj" />
+  </ItemGroup>
+</Project>

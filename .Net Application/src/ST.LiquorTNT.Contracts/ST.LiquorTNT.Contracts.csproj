@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Contracts references NOTHING. These types are the wire format shared with the React app
+       and, later, with the WinForms line application. -->
+</Project>
