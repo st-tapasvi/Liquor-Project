@@ -1,0 +1,1 @@
+export { companyRoutes } from './routes';

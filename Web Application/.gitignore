@@ -1,0 +1,7 @@
+# The repository root .gitignore already covers node_modules, dist, build and .env* files.
+# This file only adds tool output specific to the web app.
+coverage/
+playwright-report/
+test-results/
+*.tsbuildinfo
+.eslintcache

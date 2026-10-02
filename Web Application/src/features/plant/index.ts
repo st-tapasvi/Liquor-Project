@@ -1,0 +1,1 @@
+export { plantRoutes } from './routes';
