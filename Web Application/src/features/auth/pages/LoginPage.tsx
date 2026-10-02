@@ -4,7 +4,7 @@ import { SessionEndedNotice } from '../components/SessionEndedNotice';
 
 export default function LoginPage() {
   return (
-    <AuthCard title="Sign in">
+    <AuthCard>
       <SessionEndedNotice />
       <LoginForm />
     </AuthCard>

@@ -15,6 +15,7 @@ import { useSnackbar } from '@/shared/hooks';
 import { authFeatureApi } from '../api/auth-feature.api';
 import { type ChangePasswordFormValues, changePasswordSchema } from '../auth.schema';
 import { AuthCard } from '../components/AuthCard';
+import { BackToLoginLink } from '../components/BackToLoginLink';
 
 interface ChangePasswordState {
   userName?: string;
@@ -105,10 +106,8 @@ export default function ChangePasswordPage() {
             <Button type="submit" variant="contained" size="large" disabled={change.isPending}>
               Change password
             </Button>
-            <Button type="button" onClick={() => void navigate(PATHS.login)}>
-              Back to sign in
-            </Button>
           </Stack>
+          <BackToLoginLink />
         </form>
       </FormProvider>
     </AuthCard>

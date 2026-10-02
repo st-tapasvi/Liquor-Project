@@ -1,4 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
+import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Link from '@mui/material/Link';
 import Stack from '@mui/material/Stack';
@@ -105,7 +106,7 @@ export function LoginForm() {
     <FormProvider {...form}>
       <form onSubmit={onSubmit} noValidate>
         <FormRootError />
-        <Stack spacing={2}>
+        <Stack spacing={2.5}>
           <FormTextField<LoginFormValues>
             name="userName"
             label="User name"
@@ -120,13 +121,17 @@ export function LoginForm() {
             autoComplete="current-password"
             required
           />
-          <Button type="submit" variant="contained" size="large" disabled={login.isPending}>
-            {login.isPending ? 'Signing in…' : 'Sign in'}
-          </Button>
-          <Link component={RouterLink} to={PATHS.forgotPassword} variant="body2" sx={{ alignSelf: 'center' }}>
+        </Stack>
+
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1.125, mb: 2.25 }}>
+          <Link component={RouterLink} to={PATHS.forgotPassword} sx={{ fontSize: 13.5 }}>
             Forgot password?
           </Link>
-        </Stack>
+        </Box>
+
+        <Button type="submit" variant="contained" fullWidth disabled={login.isPending}>
+          {login.isPending ? 'Logging in…' : 'Log in'}
+        </Button>
       </form>
 
       {limit !== null && (

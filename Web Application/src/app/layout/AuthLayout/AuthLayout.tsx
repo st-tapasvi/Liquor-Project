@@ -5,17 +5,42 @@ import { Outlet } from 'react-router';
 import { appConfig } from '@/core/config';
 import { RequireAnonymous } from '@/core/router';
 
-/** Centered layout for login and recovery screens. */
 export function AuthLayout() {
   return (
     <RequireAnonymous>
-      <Box sx={{ minHeight: '100vh', display: 'grid', placeItems: 'center', p: 2, bgcolor: 'background.default' }}>
-        <Box sx={{ width: '100%', display: 'grid', justifyItems: 'center', gap: 2 }}>
-          <Outlet />
-          <Typography variant="caption" color="text.secondary">
-            {appConfig.name} · v{appConfig.version}
-          </Typography>
-        </Box>
+      <Box
+        sx={{
+          position: 'relative',
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          px: 2,
+          py: 8,
+          bgcolor: 'background.default',
+        }}
+      >
+        <Box
+          aria-hidden
+          sx={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 6,
+            bgcolor: (theme) => theme.palette.error.main,
+          }}
+        />
+
+        <Outlet />
+
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ position: 'absolute', left: 26, bottom: 20, fontSize: 12 }}
+        >
+          v{appConfig.version}
+        </Typography>
       </Box>
     </RequireAnonymous>
   );

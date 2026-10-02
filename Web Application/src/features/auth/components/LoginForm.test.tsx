@@ -51,7 +51,7 @@ async function submitAsFullAccount() {
   const user = userEvent.setup();
   await user.type(screen.getByLabelText(/user name/i), 'full');
   await user.type(screen.getByLabelText(/^password/i), 'Admin@123');
-  await user.click(screen.getByRole('button', { name: /sign in/i }));
+  await user.click(screen.getByRole('button', { name: /log in/i }));
   return user;
 }
 
@@ -63,7 +63,7 @@ describe('LoginForm', () => {
 
     await user.type(screen.getByLabelText(/user name/i), 'admin');
     await user.type(screen.getByLabelText(/^password/i), 'Admin@123');
-    await user.click(screen.getByRole('button', { name: /sign in/i }));
+    await user.click(screen.getByRole('button', { name: /log in/i }));
 
     await waitFor(() => expect(useSessionStore.getState().status).toBe('authenticated'));
     expect(useSessionStore.getState().user?.userName).toBe('admin');
@@ -83,7 +83,7 @@ describe('LoginForm', () => {
 
     await user.type(screen.getByLabelText(/user name/i), 'admin');
     await user.type(screen.getByLabelText(/^password/i), 'wrong');
-    await user.click(screen.getByRole('button', { name: /sign in/i }));
+    await user.click(screen.getByRole('button', { name: /log in/i }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/incorrect/i);
     expect(screen.getByLabelText(/^password/i)).toHaveValue('');
@@ -104,7 +104,7 @@ describe('LoginForm', () => {
 
     await user.type(screen.getByLabelText(/user name/i), 'locked');
     await user.type(screen.getByLabelText(/^password/i), 'whatever');
-    await user.click(screen.getByRole('button', { name: /sign in/i }));
+    await user.click(screen.getByRole('button', { name: /log in/i }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/try again after/i);
   });
@@ -122,7 +122,7 @@ describe('LoginForm', () => {
 
     await user.type(screen.getByLabelText(/user name/i), 'temp');
     await user.type(screen.getByLabelText(/^password/i), 'Temp@12345');
-    await user.click(screen.getByRole('button', { name: /sign in/i }));
+    await user.click(screen.getByRole('button', { name: /log in/i }));
 
     await waitFor(() => expect(router.state.location.pathname).toBe(PATHS.changePassword));
   });
@@ -171,7 +171,7 @@ describe('LoginForm', () => {
   it('validates required fields before calling the API', async () => {
     const login = vi.spyOn(authApi, 'login');
     renderWithProviders(<LoginForm />, { route: PATHS.login, user: null });
-    await userEvent.setup().click(screen.getByRole('button', { name: /sign in/i }));
+    await userEvent.setup().click(screen.getByRole('button', { name: /log in/i }));
     expect(await screen.findByText(/user name is required/i)).toBeInTheDocument();
     expect(login).not.toHaveBeenCalled();
   });

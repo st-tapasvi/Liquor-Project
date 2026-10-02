@@ -17,7 +17,7 @@ test('login, open users, sign out', async ({ page }) => {
 
   await page.getByLabel(/user name/i).fill(USER);
   await page.getByLabel(/^password/i).fill(PASSWORD);
-  await page.getByRole('button', { name: /sign in/i }).click();
+  await page.getByRole('button', { name: /log in/i }).click();
 
   await expect(page).toHaveURL(/\/dashboard$/);
   await expect(page.getByRole('heading', { name: /welcome/i })).toBeVisible();
@@ -35,7 +35,7 @@ test('wrong password shows the API message and stays on login', async ({ page })
   await page.goto('/login');
   await page.getByLabel(/user name/i).fill(USER);
   await page.getByLabel(/^password/i).fill('definitely-wrong');
-  await page.getByRole('button', { name: /sign in/i }).click();
+  await page.getByRole('button', { name: /log in/i }).click();
   await expect(page.getByRole('alert')).toContainText(/incorrect/i);
   await expect(page).toHaveURL(/\/login$/);
 });
@@ -45,7 +45,7 @@ test('deep link to a protected page redirects to login and back', async ({ page 
   await expect(page).toHaveURL(/\/login$/);
   await page.getByLabel(/user name/i).fill(USER);
   await page.getByLabel(/^password/i).fill(PASSWORD);
-  await page.getByRole('button', { name: /sign in/i }).click();
+  await page.getByRole('button', { name: /log in/i }).click();
   await expect(page).toHaveURL(/\/settings\/security$/);
   await expect(page.getByRole('heading', { name: /security settings/i })).toBeVisible();
 });

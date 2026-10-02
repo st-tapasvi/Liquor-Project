@@ -27,6 +27,7 @@ import {
   forgotVerifySchema,
 } from '../auth.schema';
 import { AuthCard } from '../components/AuthCard';
+import { BackToLoginLink } from '../components/BackToLoginLink';
 
 const STEPS = ['User name', 'Security question', 'New password'];
 
@@ -73,9 +74,7 @@ export default function ForgotPasswordPage() {
         />
       )}
 
-      <Button type="button" onClick={() => void navigate(PATHS.login)} sx={{ mt: 2 }}>
-        Back to sign in
-      </Button>
+      <BackToLoginLink />
     </AuthCard>
   );
 }

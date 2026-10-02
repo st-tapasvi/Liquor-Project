@@ -22,7 +22,7 @@ const envSchema = z.object({
       'VITE_API_BASE_URL must be a relative path or an absolute URL',
     ),
   VITE_LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
-  VITE_APP_NAME: z.string().trim().min(1).default('ST.LiquorTNT'),
+  VITE_APP_NAME: z.string().trim().min(1).default('Excise Track & Trace'),
 });
 
 export type Env = z.infer<typeof envSchema>;
