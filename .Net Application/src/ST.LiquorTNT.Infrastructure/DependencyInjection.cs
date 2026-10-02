@@ -22,8 +22,12 @@ public static class DependencyInjection
         var connectionString = configuration.GetConnectionString("Default")
                                ?? throw new InvalidOperationException("ConnectionStrings:Default is missing.");
 
-        services.AddDbContext<AppDbContext>(options =>
+        services.AddSingleton<SqlLoggingInterceptor>();     // logs the runnable query in DETAIL mode
+
+        services.AddDbContext<AppDbContext>((sp, options) =>
         {
+            options.AddInterceptors(sp.GetRequiredService<SqlLoggingInterceptor>());
+
             switch (provider.ToLowerInvariant())
             {
                 case "mysql":

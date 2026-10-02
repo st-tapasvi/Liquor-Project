@@ -2,7 +2,6 @@ using System.Security.Claims;
 using System.Text.Json;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Logging.Abstractions;
 using ST.LiquorTNT.Api.Middleware;
 using Xunit;
 
@@ -22,7 +21,7 @@ public sealed class ExceptionMiddlewareTests
             context.User = user;
         }
 
-        await new ExceptionMiddleware(next, NullLogger<ExceptionMiddleware>.Instance).InvokeAsync(context);
+        await new ExceptionMiddleware(next).InvokeAsync(context);
 
         context.Response.Body.Position = 0;
         using var doc = await JsonDocument.ParseAsync(context.Response.Body);
@@ -45,6 +44,15 @@ public sealed class ExceptionMiddlewareTests
         body.GetProperty("errorCode").GetString().Should().Be(errorCode);
         body.GetProperty("title").GetString().Should().NotBeNullOrWhiteSpace();
         body.GetProperty("detail").GetString().Should().Contain("/api/users/5/unlock");
+    }
+
+    [Fact]
+    public async Task ErrorBody_FixedKeysInOrder()
+    {
+        var (_, body) = await Run(ctx => { ctx.Response.StatusCode = 404; return Task.CompletedTask; });
+
+        body.EnumerateObject().Select(p => p.Name).Should().Equal("type", "status", "errorCode", "title", "detail", "instance", "correlationId");
+        body.GetProperty("type").GetString().Should().Be("https://errors.stliquortnt.local/endpoint_not_found");
     }
 
     [Fact]
@@ -104,7 +112,7 @@ public sealed class ExceptionMiddlewareTests
         cts.Cancel();
         var context = new DefaultHttpContext { RequestAborted = cts.Token, Response = { Body = new MemoryStream() } };
 
-        await new ExceptionMiddleware(_ => throw new OperationCanceledException(), NullLogger<ExceptionMiddleware>.Instance).InvokeAsync(context);
+        await new ExceptionMiddleware(_ => throw new OperationCanceledException()).InvokeAsync(context);
 
         context.Response.Body.Length.Should().Be(0);
     }
@@ -114,7 +122,7 @@ public sealed class ExceptionMiddlewareTests
     {
         var context = new DefaultHttpContext { Response = { Body = new MemoryStream() } };
 
-        await new ExceptionMiddleware(_ => Task.CompletedTask, NullLogger<ExceptionMiddleware>.Instance).InvokeAsync(context);
+        await new ExceptionMiddleware(_ => Task.CompletedTask).InvokeAsync(context);
 
         context.Response.StatusCode.Should().Be(200);
         context.Response.Body.Length.Should().Be(0);

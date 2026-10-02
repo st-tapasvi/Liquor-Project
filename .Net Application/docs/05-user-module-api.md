@@ -42,13 +42,27 @@ message text:
 
 ```json
 {
+  "type": "https://errors.stliquortnt.local/user_locked",
   "status": 403,
   "errorCode": "USER_LOCKED",
-  "title": "This account is temporarily locked.",
-  "detail": "Too many failed attempts. Try again after 2026-09-29 10:07 or ask an administrator to unlock.",
+  "title": "Account locked after 3 failed attempts.",
+  "detail": "Try again after 2026-09-29 10:07 or ask an administrator to unlock.",
+  "instance": "/api/auth/login",
   "correlationId": "6f1c…"
 }
 ```
+
+| Key | Use it for |
+|---|---|
+| `type` | an identifier for the kind of error, as a URL. Not used by the screens yet. |
+| `status` | the HTTP status, repeated in the body |
+| `errorCode` | **the screen logic.** It never changes, while the text may. |
+| `title` | the short message to show the user |
+| `detail` | what to do next. It can be `null` (for example on a wrong password, where saying more would help an attacker). |
+| `instance` | which API failed, handy in a screenshot |
+| `correlationId` | the reference to give support; it finds the call in the server log |
+
+Every error has these seven keys, in this order.
 
 When a form field is wrong, the error also carries `errors`, a list of problems for each field:
 

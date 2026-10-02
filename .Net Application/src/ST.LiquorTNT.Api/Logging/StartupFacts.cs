@@ -10,21 +10,25 @@ namespace ST.LiquorTNT.Api.Logging;
 /// </summary>
 public static class StartupFacts
 {
-    public static IReadOnlyDictionary<string, object?> From(WebApplicationBuilder builder)
+    public static IReadOnlyDictionary<string, object?> From(WebApplication app, IEnumerable<string> urls)
     {
-        var (server, database) = Database(builder.Configuration.GetConnectionString("Default"));
+        var (server, database) = Database(app.Configuration.GetConnectionString("Default"));
 
         return new Dictionary<string, object?>
         {
             ["Version"] = Assembly.GetEntryAssembly()?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion,
-            ["Environment"] = builder.Environment.EnvironmentName,
+            ["Environment"] = app.Environment.EnvironmentName,
             ["Machine"] = System.Environment.MachineName,
-            ["ContentRoot"] = builder.Environment.ContentRootPath,
+            ["Urls"] = urls.ToArray(),
+            ["Database"] = new Dictionary<string, object?>
+            {
+                ["provider"] = app.Configuration["Database:Provider"],
+                ["server"] = server,
+                ["name"] = database,
+            },
+            ["ContentRoot"] = app.Environment.ContentRootPath,
             ["DotNet"] = System.Environment.Version.ToString(),
             ["ProcessId"] = System.Environment.ProcessId,
-            ["DatabaseProvider"] = builder.Configuration["Database:Provider"],
-            ["DatabaseServer"] = server,
-            ["DatabaseName"] = database,
         };
     }
 

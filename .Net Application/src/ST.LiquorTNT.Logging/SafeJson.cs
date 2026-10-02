@@ -73,34 +73,44 @@ public static class SafeJson
         return SecretSuffixes.Any(s => normalised.EndsWith(s, StringComparison.OrdinalIgnoreCase));
     }
 
-    /// <summary>Masks in place (a node already in the tree cannot be re-assigned) and returns the same node.</summary>
+    /// <summary>
+    /// Masks secrets and drops empty fields (null, empty object, empty array) so the log has no clutter —
+    /// every field shown carries a value. Works in place and returns the same node.
+    /// </summary>
     private static JsonNode? Mask(JsonNode? node)
     {
         switch (node)
         {
             case JsonObject obj:
-                foreach (var (name, child) in obj.ToList())
+                foreach (var name in obj.Select(p => p.Key).ToList())
                 {
-                    if (child is not null && IsSecretName(name))
+                    if (obj[name] is not null && IsSecretName(name))
                     {
                         obj[name] = Masked;
+                        continue;
                     }
-                    else
+
+                    Mask(obj[name]);
+
+                    if (IsEmpty(obj[name]))
                     {
-                        Mask(child);
+                        obj.Remove(name);
                     }
                 }
                 break;
             case JsonArray array:
                 foreach (var child in array)
                 {
-                    Mask(child);
+                    Mask(child);        // array positions are kept; only object fields are pruned
                 }
                 break;
         }
 
         return node;
     }
+
+    private static bool IsEmpty(JsonNode? node) =>
+        node is null || node is JsonArray { Count: 0 } || node is JsonObject { Count: 0 };
 
     private static string Cut(string text, int maxLength) =>
         text.Length <= maxLength ? text : string.Concat(text.AsSpan(0, maxLength), "…(truncated)");

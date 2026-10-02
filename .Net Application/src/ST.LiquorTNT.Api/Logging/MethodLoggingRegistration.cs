@@ -1,5 +1,4 @@
 using System.Reflection;
-using ST.LiquorTNT.Logging;
 
 namespace ST.LiquorTNT.Api.Logging;
 
@@ -31,8 +30,7 @@ public static class MethodLoggingRegistration
             services[i] = new ServiceDescriptor(descriptor.ServiceType, provider =>
             {
                 var inner = ActivatorUtilities.CreateInstance(provider, implementationType);
-                var logger = provider.GetRequiredService<ILoggerFactory>().CreateLogger(implementationType);
-                return create.Invoke(null, new[] { inner, logger, provider.GetRequiredService<LogModeSwitch>() })!;
+                return create.Invoke(null, new[] { inner })!;
             }, descriptor.Lifetime);
         }
 

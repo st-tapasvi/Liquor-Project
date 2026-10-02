@@ -78,7 +78,7 @@ public sealed class RequestLoggingMiddlewareTests
     }
 
     [Fact]
-    public async Task Detail_BodiesAsFields_SecretsMasked_ClientAndControllerUnaffected()
+    public async Task Detail_OneEntry_WithRequestResponseAndSteps()
     {
         _mode.Apply(LogMode.Detail);
 
@@ -86,9 +86,12 @@ public sealed class RequestLoggingMiddlewareTests
 
         clientBody.Should().Be(ResponseJson);                 // client gets the real token
         controllerSaw.Should().Be(RequestJson);               // controller gets the real password
+
         var line = _log.Inner.Lines.Should().ContainSingle().Subject;
+        line.Field("Layer").Should().Be("Api");
         line.Field("Request").Should().Be("{\"userName\":\"admin\",\"password\":\"***\"}");
         line.Field("Response").Should().Contain("2026-09-29T10:00:00").And.Contain("\"accessToken\":\"***\"");
+        line.Fields.Should().ContainKey("Steps");             // the tree field is present (empty here — no proxy in this unit test)
         line.All.Should().NotContain("Admin@123").And.NotContain("eyJ.a.b");
     }
 
@@ -105,7 +108,7 @@ public sealed class RequestLoggingMiddlewareTests
 
         await Run(status);
 
-        _log.Inner.Lines.Single().Level.Should().Be(level);
+        _log.Inner.Lines.Last().Level.Should().Be(level);       // the final entry carries the status
     }
 
     [Theory]
@@ -119,8 +122,7 @@ public sealed class RequestLoggingMiddlewareTests
 
         controllerSaw.Should().Be(badJson);
         clientBody.Should().Be(ResponseJson);
-        var line = _log.Inner.Lines.Single();
-        line.Field("Request").Should().StartWith("<body not logged");
-        line.All.Should().NotContain("Admin@123");
+        _log.Inner.Lines.Last().Field("Request").Should().StartWith("<body not logged");
+        _log.Inner.Lines.Should().NotContain(l => l.All.Contains("Admin@123"));
     }
 }

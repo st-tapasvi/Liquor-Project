@@ -285,15 +285,27 @@ Rules:
 
 ```json
 {
-  "type": "https://errors.excise.local/brand-duplicate",
-  "title": "Brand already exists",
+  "type": "https://errors.stliquortnt.local/brand_duplicate",
   "status": 409,
-  "detail": "A brand with ETIN 1234567 already exists for this company.",
   "errorCode": "BRAND_DUPLICATE",
+  "title": "Brand already exists",
+  "detail": "A brand with ETIN 1234567 already exists for this company.",
+  "instance": "/api/brands",
   "correlationId": "6f1c8e2a-...",
   "errors": { "etin": ["Already used"] }
 }
 ```
+
+The same seven keys on every error, in this order:
+- `type`: an RFC 7807 problem-type URI. Today it is `errorCode` as a URL; its real target (for example an error page in the API guide) is still to be decided, so it is kept;
+- `status`;
+- `errorCode`: stable; the client branches on it, never on the text;
+- `title`: short, shown to the user;
+- `detail`: what to do next, or `null`;
+- `instance`: the path that failed;
+- `correlationId`.
+
+`errors` is added for 400. `exceptionType` and `stackTrace` are added for 500.
 
 `errors` is present only for validation failures (400) and maps field → messages so the frontend can place them on the form.
 

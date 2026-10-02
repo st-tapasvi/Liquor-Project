@@ -24,54 +24,56 @@ namespace ST.LiquorTNT.Logging;
 /// that is not already in the message — bodies, inputs and outputs as JSON objects, SQL as a list of lines —
 /// and is <c>null</c> when there is nothing. Framework plumbing (RequestId, ConnectionId …) is left out.
 /// </summary>
-public sealed class AppJsonFormatter : ITextFormatter
+public class AppJsonFormatter : ITextFormatter
 {
     public const string MethodProperty = "Method";
+    public const string LayerProperty = "Layer";
+    public const string SqlProperty = "Sql";
 
     private const string TimeFormat = "yyyy-MM-dd HH:mm:ss.fff";
     private const int MaxStackLines = 20;
 
+    private readonly JsonWriterOptions _writerOptions;
+
+    /// <summary>Indented, readable output (the default).</summary>
+    public AppJsonFormatter() : this(indented: true)
+    {
+    }
+
+    /// <summary>Indented for people, or one line per entry (NDJSON) for tools.</summary>
+    protected AppJsonFormatter(bool indented) =>
+        _writerOptions = new JsonWriterOptions { Indented = indented, Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
+
     /// <summary>Properties that hold JSON text (already masked by <see cref="SafeJson"/>): written as JSON.</summary>
-    private static readonly HashSet<string> JsonProperties = new(StringComparer.Ordinal) { "Request", "Response", "Input", "Output" };
+    private static readonly HashSet<string> JsonProperties = new(StringComparer.Ordinal)
+    {
+        "Request", "Response", "Input", "Output", "Steps", "FailedAt",
+    };
 
     /// <summary>Framework plumbing nobody reads while troubleshooting a call.</summary>
     private static readonly HashSet<string> Hidden = new(StringComparer.Ordinal)
     {
         "RequestId", "RequestPath", "ConnectionId", "SourceContext", "EventId", "ActionId", "ActionName",
-        "TraceId", "SpanId", "ParentId", MethodProperty, LogFields.CorrelationId,
-    };
-
-    private static readonly JsonWriterOptions WriterOptions = new()
-    {
-        Indented = true,
-        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,   // keep "->", quotes and Hindi text readable; still valid JSON
+        "TraceId", "SpanId", "ParentId", MethodProperty, LayerProperty, LogFields.CorrelationId,
     };
 
     private static readonly TimeZoneInfo India = FindIndia();
 
     public void Format(LogEvent logEvent, TextWriter output)
     {
-        var isSql = Source(logEvent) == LogModeSwitch.SqlCategory && logEvent.Properties.ContainsKey("commandText");
-
         using var buffer = new MemoryStream();
-        using (var json = new Utf8JsonWriter(buffer, WriterOptions))
+        using (var json = new Utf8JsonWriter(buffer, _writerOptions))
         {
             json.WriteStartObject();
             json.WriteString("Timestamp", TimeZoneInfo.ConvertTime(logEvent.Timestamp, India).ToString(TimeFormat, CultureInfo.InvariantCulture));
             json.WriteString("Level", LevelName(logEvent.Level));
             json.WriteString("CorrelationId", Text(logEvent, LogFields.CorrelationId));
-            json.WriteString("Method", MethodOf(logEvent, isSql));
+            json.WriteString("Layer", Text(logEvent, LayerProperty));
+            json.WriteString("Method", MethodOf(logEvent));
 
-            if (isSql)
-            {
-                WriteSql(json, logEvent);
-            }
-            else
-            {
-                var inMessage = new HashSet<string>(StringComparer.Ordinal);
-                json.WriteString("Message", Render(logEvent, inMessage));
-                WriteContext(json, logEvent, inMessage);
-            }
+            var inMessage = new HashSet<string>(StringComparer.Ordinal);
+            json.WriteString("Message", Render(logEvent, inMessage));
+            WriteContext(json, logEvent, inMessage);
 
             if (logEvent.Exception is not null)
             {
@@ -86,16 +88,11 @@ public sealed class AppJsonFormatter : ITextFormatter
     }
 
     /// <summary>Who wrote the entry: the Method property when set, otherwise the logging class.</summary>
-    private static string MethodOf(LogEvent logEvent, bool isSql)
+    private static string MethodOf(LogEvent logEvent)
     {
         if (Text(logEvent, MethodProperty) is { Length: > 0 } method)
         {
             return method;
-        }
-
-        if (isSql)
-        {
-            return "SQL";
         }
 
         var source = Source(logEvent);
@@ -123,33 +120,30 @@ public sealed class AppJsonFormatter : ITextFormatter
         foreach (var (name, value) in fields)
         {
             json.WritePropertyName(CamelCase(name));
-            WriteValue(json, value, asJson: JsonProperties.Contains(name));
+
+            if (name == SqlProperty && value is ScalarValue { Value: string sql })
+            {
+                WriteLines(json, sql);       // the runnable query, one array item per line
+            }
+            else
+            {
+                WriteValue(json, value, asJson: JsonProperties.Contains(name));
+            }
         }
         json.WriteEndObject();
     }
 
-    /// <summary>EF's "Executed DbCommand" entry, reshaped: a short message and the SQL as readable lines.</summary>
-    private static void WriteSql(Utf8JsonWriter json, LogEvent logEvent)
+    private static void WriteLines(Utf8JsonWriter json, string text)
     {
-        json.WriteString("Message", $"SQL executed in {Text(logEvent, "elapsed")} ms");
-        json.WriteStartObject("Context");
-
-        json.WriteStartArray("sql");
-        foreach (var line in (Text(logEvent, "commandText") ?? string.Empty).Split('\n'))
+        json.WriteStartArray();
+        foreach (var line in text.Split('\n'))
         {
-            if (line.TrimEnd('\r') is { Length: > 0 } text)
+            if (line.TrimEnd('\r') is { Length: > 0 } trimmed)
             {
-                json.WriteStringValue(text);
+                json.WriteStringValue(trimmed);
             }
         }
         json.WriteEndArray();
-
-        if (Text(logEvent, "parameters") is { Length: > 0 } parameters)
-        {
-            json.WriteString("parameters", parameters);      // names and types only; values are never logged
-        }
-
-        json.WriteEndObject();
     }
 
     private static void WriteException(Utf8JsonWriter json, Exception exception)
@@ -166,9 +160,11 @@ public sealed class AppJsonFormatter : ITextFormatter
         json.WriteString("InnerExceptionType", ReferenceEquals(innermost, exception) ? null : innermost.GetType().FullName);
         json.WriteString("InnerException", ReferenceEquals(innermost, exception) ? null : innermost.Message);
 
-        // Line 0 repeats type + message. The first lines hold the cause (our code first); the tail is
-        // framework plumbing, so it is counted rather than written.
-        var lines = exception.ToString().Split('\n').Skip(1).Select(l => l.Trim()).Where(l => l.Length > 0).ToList();
+        // Line 0 repeats type + message. Keep only our own frames (where a fix would go); the driver and
+        // framework plumbing in between is noise. If a fault is entirely in the framework, keep the top lines.
+        var all = exception.ToString().Split('\n').Skip(1).Select(l => l.Trim()).Where(l => l.Length > 0).ToList();
+        var ours = all.Where(IsAppFrame).ToList();
+        var lines = ours.Count > 0 ? ours : all.Take(MaxStackLines).ToList();
 
         json.WriteStartArray("StackTrace");
         foreach (var line in lines.Take(MaxStackLines))
@@ -183,6 +179,11 @@ public sealed class AppJsonFormatter : ITextFormatter
 
         json.WriteEndObject();
     }
+
+    /// <summary>A stack frame in our own code — where a fix would go — but not the logging proxy, which is on every trace.</summary>
+    private static bool IsAppFrame(string line) =>
+        line.Contains("ST.LiquorTNT.", StringComparison.Ordinal) &&
+        !line.Contains("ST.LiquorTNT.Api.Logging.MethodLoggingProxy", StringComparison.Ordinal);
 
     /// <summary>The message with its values filled in (text unquoted); remembers which properties it used.</summary>
     private static string Render(LogEvent logEvent, HashSet<string> used)

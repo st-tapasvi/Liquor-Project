@@ -13,21 +13,22 @@ public sealed class LogModeSwitchTests
         var mode = new LogModeSwitch();
 
         mode.Mode.Should().Be(LogMode.Normal);
+        mode.IsDetail.Should().BeFalse();
         mode.Application.MinimumLevel.Should().Be(LogEventLevel.Information);
-        mode.Sql.MinimumLevel.Should().Be(LogEventLevel.Warning);        // no SQL in NORMAL
     }
 
     [Fact]
-    public void Detail_ShowsSql_AndBackAgain()
+    public void Detail_LowersLevel_AndBackAgain()
     {
         var mode = new LogModeSwitch();
 
         mode.Apply(LogMode.Detail).Should().BeTrue();
+        mode.IsDetail.Should().BeTrue();
         mode.Application.MinimumLevel.Should().Be(LogEventLevel.Debug);
-        mode.Sql.MinimumLevel.Should().Be(LogEventLevel.Information);   // EF "Executed DbCommand"
 
         mode.Apply(LogMode.Normal).Should().BeTrue();
-        mode.Sql.MinimumLevel.Should().Be(LogEventLevel.Warning);
+        mode.IsDetail.Should().BeFalse();
+        mode.Application.MinimumLevel.Should().Be(LogEventLevel.Information);
     }
 
     [Fact]

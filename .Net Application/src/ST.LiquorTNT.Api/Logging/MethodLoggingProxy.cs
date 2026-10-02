@@ -1,49 +1,44 @@
 using System.Collections.Concurrent;
-using System.Diagnostics;
+using System.Data.Common;
 using System.Reflection;
 using System.Runtime.ExceptionServices;
+using ST.LiquorTNT.Business.Common;
 using ST.LiquorTNT.Business.Common.Exceptions;
-using ST.LiquorTNT.Logging;
 
 namespace ST.LiquorTNT.Api.Logging;
 
 /// <summary>
-/// Wraps a Business service. In DETAIL log mode every call is logged: which method, its input, its output,
-/// how long it took, and the exception if it failed. In NORMAL mode the call goes straight through.
-/// Inputs and outputs pass through <see cref="SafeJson"/>, so passwords, answers and tokens are masked.
+/// Wraps a Business service. Each call becomes a node in the current <see cref="CallTrace"/>: which method,
+/// its input, its output, and — if it threw a business error — where it failed. SQL run inside the call and
+/// any inner steps nest under this node. When there is no active trace (no request, unit tests) the call
+/// goes straight through. It writes nothing to the log itself; the request middleware emits the whole tree once.
 /// </summary>
 public class MethodLoggingProxy<TService> : DispatchProxy where TService : class
 {
-    private static readonly MethodInfo LogTaskOfT =
-        typeof(MethodLoggingProxy<TService>).GetMethod(nameof(LogTaskAsync), BindingFlags.NonPublic | BindingFlags.Instance)!;
+    private static readonly MethodInfo TraceTaskOfT =
+        typeof(MethodLoggingProxy<TService>).GetMethod(nameof(TraceTaskAsync), BindingFlags.NonPublic | BindingFlags.Instance)!;
 
-    // LogTaskAsync<T> closed over each result type once, not on every call.
-    private static readonly ConcurrentDictionary<Type, MethodInfo> LogTaskByResult = new();
+    private static readonly ConcurrentDictionary<Type, MethodInfo> TraceTaskByResult = new();
 
     private TService _inner = null!;
-    private ILogger _logger = null!;
-    private LogModeSwitch _mode = null!;
 
-    public static TService Create(TService inner, ILogger logger, LogModeSwitch mode)
+    public static TService Create(TService inner)
     {
         var proxy = Create<TService, MethodLoggingProxy<TService>>();
-        var self = (MethodLoggingProxy<TService>)(object)proxy;
-        self._inner = inner;
-        self._logger = logger;
-        self._mode = mode;
+        ((MethodLoggingProxy<TService>)(object)proxy)._inner = inner;
         return proxy;
     }
 
     protected override object? Invoke(MethodInfo? method, object?[]? args)
     {
-        if (!_mode.IsDetail)
+        var session = CallTrace.Current;
+        if (session is null)
         {
             return Call(method!, args);
         }
 
         var name = $"{_inner.GetType().Name}.{method!.Name}";
-        var input = Input(method, args);
-        var watch = Stopwatch.StartNew();
+        var step = session.Step("Business", name, session.Detail ? Input(method, args) : null);
 
         object? result;
         try
@@ -52,52 +47,95 @@ public class MethodLoggingProxy<TService> : DispatchProxy where TService : class
         }
         catch (Exception ex)
         {
-            LogFailure(name, input, watch.ElapsedMilliseconds, ex);
+            Failed(session, name, step, ex);
+            step.Dispose();
             throw;
         }
 
         if (result is not Task task)
         {
-            LogSuccess(name, input, watch.ElapsedMilliseconds, result);
+            step.Output(result);
+            step.Dispose();
             return result;
         }
 
         if (!method.ReturnType.IsGenericType)
         {
-            return LogVoidTaskAsync(task, name, input, watch);
+            return TraceVoidTaskAsync(task, session, name, step);
         }
 
-        var logTask = LogTaskByResult.GetOrAdd(method.ReturnType.GetGenericArguments()[0], t => LogTaskOfT.MakeGenericMethod(t));
-        return logTask.Invoke(this, new object[] { task, name, input, watch });
+        var traceTask = TraceTaskByResult.GetOrAdd(method.ReturnType.GetGenericArguments()[0], t => TraceTaskOfT.MakeGenericMethod(t));
+        return traceTask.Invoke(this, new object[] { task, session, name, step })!;
     }
 
-    private async Task<T> LogTaskAsync<T>(Task<T> task, string name, string input, Stopwatch watch)
+    private async Task<T> TraceTaskAsync<T>(Task<T> task, CallSession session, string name, TraceStep step)
     {
         try
         {
             var result = await task;
-            LogSuccess(name, input, watch.ElapsedMilliseconds, result);
+            step.Output(result);
             return result;
         }
         catch (Exception ex)
         {
-            LogFailure(name, input, watch.ElapsedMilliseconds, ex);
+            Failed(session, name, step, ex);
             throw;
+        }
+        finally
+        {
+            step.Dispose();
         }
     }
 
-    private async Task LogVoidTaskAsync(Task task, string name, string input, Stopwatch watch)
+    private async Task TraceVoidTaskAsync(Task task, CallSession session, string name, TraceStep step)
     {
         try
         {
             await task;
-            LogSuccess(name, input, watch.ElapsedMilliseconds, null);
+            step.Output("done");
         }
         catch (Exception ex)
         {
-            LogFailure(name, input, watch.ElapsedMilliseconds, ex);
+            Failed(session, name, step, ex);
             throw;
         }
+        finally
+        {
+            step.Dispose();
+        }
+    }
+
+    /// <summary>An expected business refusal records where it failed; an unexpected one is just marked on the node.</summary>
+    private static void Failed(CallSession session, string name, TraceStep step, Exception ex)
+    {
+        if (ex is AppException app)
+        {
+            session.Fail("Business", name, app.ErrorCode, app.Detail ?? app.Title);
+            step.Output($"throw {app.ErrorCode}");
+        }
+        else
+        {
+            // A database fault (missing table, timeout, constraint) is a DATABASE_ERROR, as ExceptionMiddleware
+            // answers it — not "unexpected". The SQL interceptor usually pins this first (deepest wins); this is
+            // the fallback for a DB fault that did not come through a command (e.g. on connecting).
+            var code = IsDatabaseFailure(ex) ? ErrorCodes.DatabaseError : ErrorCodes.Unexpected;
+            session.Fail("Business", name, code, ex.Message);
+            step.Output($"throw {ex.GetType().Name}");
+        }
+    }
+
+    /// <summary>True if this exception, or any it wraps, is a database error (System.Data.Common.DbException).</summary>
+    private static bool IsDatabaseFailure(Exception ex)
+    {
+        for (var current = (Exception?)ex; current is not null; current = current.InnerException)
+        {
+            if (current is DbException)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /// <summary>Calls the real service; reflection's wrapper exception is removed so callers see the original.</summary>
@@ -114,8 +152,8 @@ public class MethodLoggingProxy<TService> : DispatchProxy where TService : class
         }
     }
 
-    /// <summary>Arguments by parameter name; the CancellationToken is left out.</summary>
-    private static string Input(MethodInfo method, object?[]? args)
+    /// <summary>Arguments by parameter name; the CancellationToken is left out. Masked when the tree is serialised.</summary>
+    private static Dictionary<string, object?> Input(MethodInfo method, object?[]? args)
     {
         var values = new Dictionary<string, object?>();
         var parameters = method.GetParameters();
@@ -128,39 +166,6 @@ public class MethodLoggingProxy<TService> : DispatchProxy where TService : class
             }
         }
 
-        return SafeJson.From(values);
+        return values;
     }
-
-    // Method, Input and Output go in as their own fields (the formatter puts Method at the top and
-    // Input / Output into Context as JSON), not into the message.
-
-    private void LogSuccess(string name, string input, long elapsedMs, object? output)
-    {
-        using (_logger.BeginScope(Fields(name, input, SafeJson.From(output))))
-        {
-            _logger.LogInformation("OK in {DurationMs} ms", elapsedMs);
-        }
-    }
-
-    private void LogFailure(string name, string input, long elapsedMs, Exception ex)
-    {
-        using (_logger.BeginScope(Fields(name, input, output: null)))
-        {
-            if (ex is AppException app)
-            {
-                // an expected business refusal (wrong password, not found …): no stack trace needed
-                _logger.LogWarning("Refused: {ErrorCode} {Reason} ({DurationMs} ms)", app.ErrorCode, app.Detail ?? app.Title, elapsedMs);
-                return;
-            }
-
-            _logger.LogError(ex, "Failed: {Reason} ({DurationMs} ms)", ex.Message, elapsedMs);
-        }
-    }
-
-    private static Dictionary<string, object?> Fields(string name, string input, string? output) => new()
-    {
-        [AppJsonFormatter.MethodProperty] = name,
-        ["Input"] = input,
-        ["Output"] = output,
-    };
 }

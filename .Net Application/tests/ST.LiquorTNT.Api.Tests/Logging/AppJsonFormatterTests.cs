@@ -32,7 +32,7 @@ public sealed class AppJsonFormatterTests
             ("Method", "AuthController.LoginAsync"), ("CorrelationId", "abc123")));
 
         text.Should().StartWith("{" + Environment.NewLine + "  \"Timestamp\"");                // one field per line
-        json.EnumerateObject().Select(p => p.Name).Should().Equal("Timestamp", "Level", "CorrelationId", "Method", "Message", "Context");
+        json.EnumerateObject().Select(p => p.Name).Should().Equal("Timestamp", "Level", "CorrelationId", "Layer", "Method", "Message", "Context");
         json.GetProperty("Timestamp").GetString().Should().Be("2026-09-28 16:41:32.339");    // 11:11 UTC = 16:41 IST
         json.GetProperty("Level").GetString().Should().Be("Warning");
         json.GetProperty("CorrelationId").GetString().Should().Be("abc123");
@@ -80,16 +80,25 @@ public sealed class AppJsonFormatterTests
     }
 
     [Fact]
-    public void Sql_ShortMessage_QueryAsLines()
+    public void Layer_IsItsOwnField()
     {
-        var (_, json) = Format(Event("Executed DbCommand ({elapsed}ms) [Parameters=[{parameters}]]{newLine}{commandText}", null, LogEventLevel.Information,
-            ("SourceContext", LogModeSwitch.SqlCategory), ("elapsed", "2"), ("parameters", "@p0='?'"), ("newLine", "\r\n"),
-            ("commandText", "SELECT `u`.`ID`\r\nFROM `USERS` AS `u`")));
+        var (_, json) = Format(Event("x", null, LogEventLevel.Information, ("Layer", "Business"), ("Method", "AuthService.LoginAsync")));
+
+        json.GetProperty("Layer").GetString().Should().Be("Business");
+        json.GetProperty("Method").GetString().Should().Be("AuthService.LoginAsync");
+    }
+
+    [Fact]
+    public void Sql_WrittenAsArrayOfLines()
+    {
+        var (_, json) = Format(Event("SQL ran in {DurationMs} ms", null, LogEventLevel.Information,
+            ("Layer", "Database"), ("Method", "SQL"), ("DurationMs", 2),
+            ("Sql", "SELECT `u`.`ID`\r\nFROM `USERS` AS `u`\r\nWHERE `u`.`USERNAME` = 'admin'")));
 
         json.GetProperty("Method").GetString().Should().Be("SQL");
-        json.GetProperty("Message").GetString().Should().Be("SQL executed in 2 ms");
+        json.GetProperty("Message").GetString().Should().Be("SQL ran in 2 ms");
         json.GetProperty("Context").GetProperty("sql").EnumerateArray().Select(l => l.GetString())
-            .Should().Equal("SELECT `u`.`ID`", "FROM `USERS` AS `u`");
+            .Should().Equal("SELECT `u`.`ID`", "FROM `USERS` AS `u`", "WHERE `u`.`USERNAME` = 'admin'");
     }
 
     [Fact]

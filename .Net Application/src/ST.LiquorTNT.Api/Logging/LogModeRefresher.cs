@@ -51,14 +51,14 @@ public sealed class LogModeRefresher : BackgroundService
 
             var changed = _mode.Apply(settings.DetailLogging ? LogMode.Detail : LogMode.Normal);
 
-            if (_firstRead || _failing)
+            // The happy path at start-up is silent (the "API started" entry is enough). Only speak up on
+            // recovery after a failure, or when the administrator switches the mode.
+            if (_failing)
             {
-                // At start-up this is the proof that the API can reach its database.
-                _logger.LogInformation("Database reachable. Log mode is {LogMode}.", _mode.Mode);
+                _logger.LogWarning("Database reachable again. Log mode is {LogMode}.", _mode.Mode);
             }
-            else if (changed)
+            else if (!_firstRead && changed)
             {
-                // Warning, so the switch itself is visible in both modes.
                 _logger.LogWarning("Log mode changed to {LogMode}.", _mode.Mode);
             }
 

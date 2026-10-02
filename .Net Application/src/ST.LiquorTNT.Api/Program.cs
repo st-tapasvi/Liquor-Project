@@ -1,4 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
+using Microsoft.AspNetCore.Hosting.Server;
+using Microsoft.AspNetCore.Hosting.Server.Features;
 using ST.LiquorTNT.Api.Extensions;
 using ST.LiquorTNT.Api.Logging;
 using ST.LiquorTNT.Api.Middleware;
@@ -14,11 +16,16 @@ builder.Host.UseAppLogging(builder.Configuration);
 
 try
 {
-    LoggingSetup.LogStartup("API starting", StartupFacts.From(builder));
-
     builder.Services.AddApiServices(builder.Configuration);
 
     var app = builder.Build();
+
+    // One combined "API started" entry once the server is listening (so the URLs are known).
+    app.Lifetime.ApplicationStarted.Register(() =>
+    {
+        var urls = app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()?.Addresses;
+        LoggingSetup.LogStartup("API started", StartupFacts.From(app, urls is { Count: > 0 } ? urls : app.Urls));
+    });
 
     // Correlation first, so every log line and every error carries the same reference.
     // Request logging wraps the exception middleware, so it records the final status and error body.

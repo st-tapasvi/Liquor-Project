@@ -36,26 +36,37 @@ public static class LoggingSetup
                     .MinimumLevel.ControlledBy(mode.Application)
                     .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
                     .MinimumLevel.Override("System", LogEventLevel.Warning)
-                    .MinimumLevel.Override("Microsoft.Hosting.Lifetime", LogEventLevel.Information)   // listening on / started / stopping
-                    .MinimumLevel.Override(LogModeSwitch.SqlCategory, mode.Sql)
+                    // The framework's own "Now listening / Application started / Content root" lines are
+                    // silenced; we emit one combined "API started" entry instead.
+                    .MinimumLevel.Override("Microsoft.Hosting.Lifetime", LogEventLevel.Warning)
+                    // EF Core's own logs are fully silenced (even its error "Failed executing DbCommand" and
+                    // "exception while iterating", which would otherwise add 2 extra entries per failed call):
+                    // the runnable SQL comes from SqlLoggingInterceptor and the failure from the one call entry.
+                    .MinimumLevel.Override("Microsoft.EntityFrameworkCore", LogEventLevel.Fatal)
                     // Framework chatter outside an API call (e.g. the background log-mode check) is noise.
                     .Filter.ByExcluding(e => e.Level < LogEventLevel.Warning
                                              && fromFramework(e)
                                              && !fromHostLifetime(e)
                                              && !e.Properties.ContainsKey(LogFields.CorrelationId))
+                    // The file is one valid JSON array (paste the whole file into any JSON viewer); the
+                    // console (from configuration) stays as readable per-entry objects.
+                    .WriteTo.Sink(new JsonArrayFileSink("logs", new AppJsonFormatter()))
                     .ReadFrom.Configuration(context.Configuration)
                     .ReadFrom.Services(services)
                     .Enrich.FromLogContext();
             });
     }
 
+    private static Serilog.ILogger StartupLogger =>
+        Log.ForContext(AppJsonFormatter.LayerProperty, "Server").ForContext(AppJsonFormatter.MethodProperty, StartupMethod);
+
     /// <summary>A start-up fact sheet (environment, database, version …) as one entry, Method = Startup.</summary>
     public static void LogStartup(string message, IReadOnlyDictionary<string, object?> context)
     {
-        var logger = Log.ForContext(AppJsonFormatter.MethodProperty, StartupMethod);
+        var logger = StartupLogger;
         foreach (var (name, value) in context.Reverse())       // each ForContext goes in front: reverse keeps the given order
         {
-            logger = logger.ForContext(name, value);
+            logger = logger.ForContext(name, value, destructureObjects: true);   // keep arrays and nested objects as JSON
         }
 
         logger.Information(message);
@@ -64,15 +75,14 @@ public static class LoggingSetup
     /// <summary>The API could not start (or stopped on an unhandled error): written and flushed before the process ends.</summary>
     public static void LogStartupFailure(Exception exception)
     {
-        Log.ForContext(AppJsonFormatter.MethodProperty, StartupMethod)
-           .Fatal(exception, "API failed to start: {Reason}", exception.Message);
+        StartupLogger.Fatal(exception, "API failed to start: {Reason}", exception.Message);
         Log.CloseAndFlush();
     }
 
     /// <summary>Normal shutdown: the last entries reach the file.</summary>
     public static void LogStopped()
     {
-        Log.ForContext(AppJsonFormatter.MethodProperty, StartupMethod).Information("API stopped");
+        StartupLogger.Information("API stopped");
         Log.CloseAndFlush();
     }
 }

@@ -162,10 +162,11 @@ Capability interfaces stay narrow and per-behaviour — never one large `IExcise
 **Responses** — success returns the payload itself (`200` read/update/action, `201` + `Location` create). **Every response has a body — never `204`**: an action on a record returns the record after the change, an action with no record returns `MessageResponse` → `{ "message": "..." }`. Lists return `PagedResponse<T>` → `{ items, page, pageSize, totalCount }`. Errors are ProblemDetails, produced only by `ExceptionMiddleware`:
 
 ```json
-{ "title": "Brand already exists", "status": 409, "detail": "...",
-  "errorCode": "BRAND_DUPLICATE", "correlationId": "6f1c...",
+{ "type": "https://errors.stliquortnt.local/brand_duplicate", "status": 409, "errorCode": "BRAND_DUPLICATE",
+  "title": "Brand already exists", "detail": "...", "instance": "/api/brands", "correlationId": "6f1c...",
   "errors": { "etin": ["Already used"] } }
 ```
+Same seven keys on every error, in that order. `type`'s real target is still to be decided.
 
 No `{ success, data, message }` envelope. Exceptions (all derive from `AppException`): `ValidationException` 400, `UnauthorizedException` 401, `ForbiddenException` 403, `NotFoundException` 404, `BusinessException` 409, `IntegrationException` 502 (added with first use) — each carrying a stable `errorCode` from `Business/Common/ErrorCodes.cs`. `DbException` becomes 500 `DATABASE_ERROR`. In every environment (owner decision, ADR 0001) a 500 carries the inner-exception chain in `detail`, plus `exceptionType` and stack frames. Framework refusals also get a body: `ENDPOINT_NOT_FOUND` 404, `METHOD_NOT_ALLOWED` 405, `UNSUPPORTED_MEDIA_TYPE` 415, `FORBIDDEN` 403.
 

@@ -1,10 +1,8 @@
 using FluentAssertions;
-using Microsoft.Extensions.Logging;
 using ST.LiquorTNT.Api.Logging;
 using ST.LiquorTNT.Business.Common;
 using ST.LiquorTNT.Business.Common.Exceptions;
 using ST.LiquorTNT.Contracts.Auth;
-using ST.LiquorTNT.Logging;
 using Xunit;
 
 namespace ST.LiquorTNT.Api.Tests.Logging;
@@ -37,87 +35,91 @@ public sealed class SampleService : ISampleService
     public int Add(int a, int b) => a + b;
 }
 
-/// <summary>DETAIL logs each Business call's input, output and exception; NORMAL logs nothing; results never change.</summary>
-public sealed class MethodLoggingProxyTests
+/// <summary>
+/// The proxy records each Business call as a node in the current trace (input, output, and where it failed);
+/// with no trace (NORMAL, or no request) it just runs the call. Results are never changed.
+/// </summary>
+public sealed class MethodLoggingProxyTests : IDisposable
 {
-    private readonly CapturingLogger _log = new();
-    private readonly LogModeSwitch _mode = new();
-    private readonly ISampleService _service;
+    private readonly ISampleService _service = MethodLoggingProxy<ISampleService>.Create(new SampleService());
 
-    public MethodLoggingProxyTests() => _service = MethodLoggingProxy<ISampleService>.Create(new SampleService(), _log, _mode);
+    public void Dispose() => CallTrace.Current = null;
+
+    private static CallSession StartDetailTrace()
+    {
+        var session = new CallSession(detail: true);
+        CallTrace.Current = session;
+        return session;
+    }
 
     [Fact]
-    public async Task Normal_NothingLogged_ResultUnchanged()
+    public async Task NoTrace_NothingRecorded_ResultUnchanged()
     {
         var response = await _service.LoginAsync(new LoginRequest { UserName = "ravi", Password = "pw" }, CancellationToken.None);
 
         response.User.UserName.Should().Be("ravi");
-        _log.Lines.Should().BeEmpty();
+        CallTrace.Current.Should().BeNull();
     }
 
     [Fact]
-    public async Task Detail_LogsMethodInputOutput_SecretsMasked()
+    public async Task Detail_RecordsMethodInputOutput()
     {
-        _mode.Apply(LogMode.Detail);
+        var session = StartDetailTrace();
 
         var response = await _service.LoginAsync(new LoginRequest { UserName = "ravi", Password = "S3cret!" }, CancellationToken.None);
 
         response.AccessToken.Should().Be("eyJ.secret.token");           // the caller still gets the real value
-        var line = _log.Lines.Should().ContainSingle().Subject;
-        line.Level.Should().Be(LogLevel.Information);
-        line.Field("Method").Should().Be("SampleService.LoginAsync");
-        line.Message.Should().StartWith("OK in");
-        line.Field("Input").Should().Contain("\"userName\":\"ravi\"").And.Contain("\"password\":\"***\"").And.NotContain("\"ct\"");
-        line.Field("Output").Should().Contain("\"accessToken\":\"***\"");
-        line.All.Should().NotContain("S3cret!").And.NotContain("eyJ.secret.token");
+        var node = session.Steps.Should().ContainSingle().Subject;
+        node.Layer.Should().Be("Business");
+        node.Method.Should().Be("SampleService.LoginAsync");
+        node.Output.Should().BeOfType<LoginResponse>();      // the return value; secrets masked later by SafeJson
     }
 
     [Fact]
-    public async Task Detail_UnexpectedException_LoggedAsErrorWithInput_AndRethrown()
+    public async Task Detail_BusinessRefusal_RecordsFailedAt_AndRethrows()
     {
-        _mode.Apply(LogMode.Detail);
+        var session = StartDetailTrace();
+
+        await _service.Invoking(s => s.RefuseAsync(CancellationToken.None)).Should().ThrowAsync<UnauthorizedException>();
+
+        session.FailedAt!.Method.Should().Be("SampleService.RefuseAsync");
+        session.FailedAt.ErrorCode.Should().Be(ErrorCodes.InvalidCredentials);
+        session.Steps.Single().Output.Should().Be("throw INVALID_CREDENTIALS");
+    }
+
+    [Fact]
+    public async Task Detail_UnexpectedException_RecordedAndRethrown()
+    {
+        var session = StartDetailTrace();
 
         await _service.Invoking(s => s.FailAsync(7, CancellationToken.None))
             .Should().ThrowAsync<InvalidOperationException>().WithMessage("boom 7");
 
-        var line = _log.Lines.Should().ContainSingle().Subject;
-        line.Level.Should().Be(LogLevel.Error);
-        line.Exception.Should().BeOfType<InvalidOperationException>();
-        line.Field("Method").Should().Be("SampleService.FailAsync");
-        line.Message.Should().StartWith("Failed: boom 7");
-        line.Field("Input").Should().Be("{\"id\":7}");
+        session.FailedAt!.Method.Should().Be("SampleService.FailAsync");
+        session.Steps.Single().Output.Should().Be("throw InvalidOperationException");
     }
 
     [Fact]
-    public async Task Detail_BusinessRefusal_WarningWithErrorCode_OriginalExceptionType()
+    public void Detail_SyncMethod_Recorded()
     {
-        _mode.Apply(LogMode.Detail);
-
-        await _service.Invoking(s => s.RefuseAsync(CancellationToken.None)).Should().ThrowAsync<UnauthorizedException>();
-
-        var line = _log.Lines.Should().ContainSingle().Subject;
-        line.Level.Should().Be(LogLevel.Warning);
-        line.Message.Should().Contain("INVALID_CREDENTIALS");
-    }
-
-    [Fact]
-    public void Detail_SyncMethod_LoggedToo()
-    {
-        _mode.Apply(LogMode.Detail);
+        var session = StartDetailTrace();
 
         _service.Add(2, 3).Should().Be(5);
 
-        _log.Lines.Should().ContainSingle(l => l.Field("Input") == "{\"a\":2,\"b\":3}" && l.Field("Output") == "5");
+        var node = session.Steps.Single();
+        node.Method.Should().Be("SampleService.Add");
+        node.Output.Should().Be(5);
     }
 
     [Fact]
-    public async Task SwitchBackToNormal_StopsLogging()
+    public async Task Normal_OnlyFailedAtKept_NoStepTree()
     {
-        _mode.Apply(LogMode.Detail);
-        _mode.Apply(LogMode.Normal);
+        var session = new CallSession(detail: false);
+        CallTrace.Current = session;
 
-        await _service.LoginAsync(new LoginRequest { UserName = "ravi", Password = "pw" }, CancellationToken.None);
+        await _service.Invoking(s => s.RefuseAsync(CancellationToken.None)).Should().ThrowAsync<UnauthorizedException>();
 
-        _log.Lines.Should().BeEmpty();
+        session.Steps.Should().BeEmpty();                       // no tree built in NORMAL
+        session.FailedAt!.ErrorCode.Should().Be(ErrorCodes.InvalidCredentials);   // but the failure is still known
     }
 }

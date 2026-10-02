@@ -1,19 +1,25 @@
 using System.Diagnostics;
 using System.Text;
+using ST.LiquorTNT.Business.Common;
 using ST.LiquorTNT.Logging;
 
 namespace ST.LiquorTNT.Api.Middleware;
 
 /// <summary>
 /// One log entry per API call (paths under /api; Swagger, /health and static files are not logged).
-/// NORMAL: method, path, status, error code, duration, user, IP. DETAIL adds the query string and the
-/// request and response bodies (secrets masked, size capped). Sits outside <see cref="ExceptionMiddleware"/>,
-/// so it sees the final status and the error body. Logging never changes what the client receives.
+/// Sets up the call trace so the method proxy and the SQL interceptor can record what each step did, then
+/// emits the whole call as a single entry: method, path, status, error code, duration, user, IP, and — in
+/// DETAIL — the request and response bodies and the full step tree (secrets masked, size capped).
+/// Sits outside <see cref="ExceptionMiddleware"/>, so it sees the final status and the error body.
+/// Logging never changes what the client receives.
 /// </summary>
 public sealed class RequestLoggingMiddleware
 {
     /// <summary>Set by <see cref="ExceptionMiddleware"/> when it answers with an error; shown in the entry.</summary>
     public const string ErrorCodeItem = "LogErrorCode";
+
+    /// <summary>Set by <see cref="ExceptionMiddleware"/> for a 500: the exception, written inside this call's one entry.</summary>
+    public const string ExceptionItem = "LogException";
 
     private const int MaxBodyLength = 8000;          // what one entry may hold, after masking
     private const int MaxCaptureBytes = 256 * 1024;  // read/kept so the JSON can still be parsed and masked
@@ -38,33 +44,18 @@ public sealed class RequestLoggingMiddleware
         }
 
         var watch = Stopwatch.StartNew();
-        var details = new Dictionary<string, object?>
-        {
-            ["UserId"] = null,
-            ["IpAddress"] = context.Connection.RemoteIpAddress?.ToString(),
-        };
+        var detail = _mode.IsDetail;
+        var session = new CallSession(detail);
+        CallTrace.Current = session;
 
-        if (!_mode.IsDetail)
+        string requestBody = string.Empty;
+        CaptureStream? capture = null;
+        if (detail)
         {
-            try
-            {
-                await _next(context);
-            }
-            finally
-            {
-                Write(context, watch.ElapsedMilliseconds, details);
-            }
-
-            return;
+            requestBody = await TryReadRequestBodyAsync(context.Request);
+            capture = new CaptureStream(context.Response.Body, MaxCaptureBytes);
+            context.Response.Body = capture;
         }
-
-        details["Query"] = context.Request.QueryString.Value;
-        details["Request"] = await TryReadRequestBodyAsync(context.Request);
-
-        // Written through to the client as it is produced (HasStarted, streaming and aborts behave as
-        // without logging); only the first MaxCaptureBytes are kept for the log.
-        var capture = new CaptureStream(context.Response.Body, MaxCaptureBytes);
-        context.Response.Body = capture;
 
         try
         {
@@ -72,28 +63,58 @@ public sealed class RequestLoggingMiddleware
         }
         finally
         {
-            context.Response.Body = capture.Inner;
-            details["Response"] = SafeJson.FromText(capture.Captured(), MaxBodyLength);
-            Write(context, watch.ElapsedMilliseconds, details);
+            if (capture is not null)
+            {
+                context.Response.Body = capture.Inner;
+            }
+
+            Write(context, watch.ElapsedMilliseconds, session, requestBody, capture);
+            CallTrace.Current = null;
         }
     }
 
-    private void Write(HttpContext context, long elapsedMs, Dictionary<string, object?> details)
+    private void Write(HttpContext context, long elapsedMs, CallSession session, string requestBody, CaptureStream? capture)
     {
-        details[AppJsonFormatter.MethodProperty] = ActionName(context);
-        details["UserId"] = context.User.FindFirst("sub")?.Value;       // known only after authentication ran
         var errorCode = context.Items.TryGetValue(ErrorCodeItem, out var code) ? code as string : null;
+        var exception = context.Items.TryGetValue(ExceptionItem, out var ex) ? ex as Exception : null;
+        var failed = session.FailedAt is not null || exception is not null || errorCode is not null;
 
-        using (_logger.BeginScope(details))
+        // Order matters: the viewer shows Context top-down. Put what you read first at the top —
+        // result, the failure (if any), then the request and response — and the deep step tree last.
+        var fields = new Dictionary<string, object?>
         {
+            [AppJsonFormatter.LayerProperty] = "Api",
+            [AppJsonFormatter.MethodProperty] = ActionName(context),
+            ["Result"] = failed ? "FAILED" : "OK",
+            ["FailedAt"] = session.FailedAt is null ? null : SafeJson.From(session.FailedAt),
+        };
+
+        if (session.Detail)
+        {
+            fields["Request"] = requestBody;
+            fields["Response"] = SafeJson.FromText(capture?.Captured() ?? string.Empty, MaxBodyLength);
+        }
+
+        fields["UserId"] = context.User.FindFirst("sub")?.Value;        // known only after authentication ran
+        fields["IpAddress"] = context.Connection.RemoteIpAddress?.ToString();
+
+        if (session.Detail)
+        {
+            fields["Query"] = context.Request.QueryString.Value;
+            fields["Steps"] = SafeJson.From(session.Steps);             // the full tree, last
+        }
+
+        using (_logger.BeginScope(fields))
+        {
+            var level = LevelFor(context.Response.StatusCode);
             if (errorCode is null)
             {
-                _logger.Log(LevelFor(context.Response.StatusCode), "{HttpMethod} {Path} -> {StatusCode} in {DurationMs} ms",
+                _logger.Log(level, exception, "{HttpMethod} {Path} -> {StatusCode} in {DurationMs} ms",
                     context.Request.Method, context.Request.Path.Value, context.Response.StatusCode, elapsedMs);
             }
             else
             {
-                _logger.Log(LevelFor(context.Response.StatusCode), "{HttpMethod} {Path} -> {StatusCode} {ErrorCode} in {DurationMs} ms",
+                _logger.Log(level, exception, "{HttpMethod} {Path} -> {StatusCode} {ErrorCode} in {DurationMs} ms",
                     context.Request.Method, context.Request.Path.Value, context.Response.StatusCode, errorCode, elapsedMs);
             }
         }

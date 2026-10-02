@@ -23,13 +23,8 @@ public sealed class ExceptionMiddleware
     };
 
     private readonly RequestDelegate _next;
-    private readonly ILogger<ExceptionMiddleware> _logger;
 
-    public ExceptionMiddleware(RequestDelegate next, ILogger<ExceptionMiddleware> logger)
-    {
-        _next = next;
-        _logger = logger;
-    }
+    public ExceptionMiddleware(RequestDelegate next) => _next = next;
 
     public async Task InvokeAsync(HttpContext context)
     {
@@ -53,7 +48,6 @@ public sealed class ExceptionMiddleware
         catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
         {
             // The client went away (tab closed, timeout). Not a server fault, and nobody is left to read a body.
-            _logger.LogInformation("{HttpMethod} {Path} cancelled by the client", context.Request.Method, context.Request.Path.Value);
         }
         catch (BadHttpRequestException ex)
         {
@@ -64,16 +58,15 @@ public sealed class ExceptionMiddleware
         }
         catch (Exception ex) when (ex is DbException or Microsoft.EntityFrameworkCore.DbUpdateException)
         {
-            _logger.LogError(ex, "Database error in {HttpMethod} {Path}: {Reason}", context.Request.Method, context.Request.Path.Value, ex.Message);
-
+            // No log call here: RequestLoggingMiddleware writes the one entry for this call, with this exception.
+            context.Items[RequestLoggingMiddleware.ExceptionItem] = ex;
             await WriteAsync(context, StatusCodes.Status500InternalServerError,
                 "The database could not serve this request.", Describe(ex), ErrorCodes.DatabaseError,
                 errors: null, exception: ex);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error in {HttpMethod} {Path}: {Reason}", context.Request.Method, context.Request.Path.Value, ex.Message);
-
+            context.Items[RequestLoggingMiddleware.ExceptionItem] = ex;
             await WriteAsync(context, StatusCodes.Status500InternalServerError,
                 "An unexpected error occurred.", Describe(ex), ErrorCodes.Unexpected,
                 errors: null, exception: ex);
@@ -142,15 +135,26 @@ public sealed class ExceptionMiddleware
         foreach (var item in chain)
         {
             lines.Add($"[{item.GetType().FullName}]");
-            lines.AddRange((item.StackTrace ?? string.Empty)
+
+            var frames = (item.StackTrace ?? string.Empty)
                 .Split('\n')
                 .Select(line => line.TrimEnd('\r').Trim())
                 .Where(line => line.Length > 0 && !line.StartsWith("---", StringComparison.Ordinal))
-                .Take(MaxStackFrames));
+                .ToList();
+
+            // Keep only our own frames (where a fix would go); if the fault is entirely in the driver or the
+            // framework, fall back to its top frames so the trail is not empty.
+            var ours = frames.Where(IsAppFrame).ToList();
+            lines.AddRange((ours.Count > 0 ? ours : frames).Take(MaxStackFrames));
         }
 
         return lines;
     }
+
+    /// <summary>A stack frame in our own code — but not the logging proxy, which is on every trace.</summary>
+    private static bool IsAppFrame(string line) =>
+        line.Contains("ST.LiquorTNT.", StringComparison.Ordinal) &&
+        !line.Contains("ST.LiquorTNT.Api.Logging.MethodLoggingProxy", StringComparison.Ordinal);
 
     private static async Task WriteAsync(
         HttpContext context,
@@ -175,14 +179,16 @@ public sealed class ExceptionMiddleware
             ? value as string
             : null;
 
+        // Same keys on every error, so the client code stays simple. "type" is kept for RFC 7807; what it
+        // should point to (e.g. an error-code page in the API guide) is still to be decided.
         var payload = new Dictionary<string, object?>
         {
             ["type"] = $"https://errors.stliquortnt.local/{errorCode.ToLowerInvariant()}",
-            ["title"] = title,
             ["status"] = status,
+            ["errorCode"] = errorCode,
+            ["title"] = title,
             ["detail"] = string.IsNullOrWhiteSpace(detail) ? null : detail,
             ["instance"] = context.Request.Path.Value,
-            ["errorCode"] = errorCode,
             ["correlationId"] = correlationId,
         };
 
