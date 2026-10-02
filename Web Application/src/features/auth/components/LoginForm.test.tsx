@@ -1,10 +1,50 @@
-import { useSessionStore } from '@/core/auth';
+import type { ActiveSessionSummary, IstDateTime, LoginResponse } from '@/core/api';
+import { authApi, useSessionStore } from '@/core/auth';
+import { ApiError, SessionLimitError } from '@/core/errors';
 import { PATHS } from '@/core/router';
 
-import { mockAuthState } from '@/test/msw/handlers';
+import { makeCurrentUser } from '@/test/factories/user.factory';
 import { renderWithProviders, screen, userEvent, waitFor, within } from '@/test/render';
 
 import { LoginForm } from './LoginForm';
+
+const LOGIN_RESPONSE: LoginResponse = {
+  expiresAt: '2026-10-01T09:00:00' as IstDateTime,
+  idleTimeoutMinutes: 60,
+  user: makeCurrentUser(),
+};
+
+const OPEN_SESSIONS: readonly ActiveSessionSummary[] = [
+  {
+    id: 71,
+    loginAt: '2026-09-28T08:00:00' as IstDateTime,
+    lastActivityAt: '2026-09-28T09:30:00' as IstDateTime,
+    expiresAt: '2026-09-29T08:00:00' as IstDateTime,
+    ipAddress: '192.168.1.20',
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/141.0.0.0 Safari/537.36',
+  },
+  {
+    id: 72,
+    loginAt: '2026-09-27T17:45:00' as IstDateTime,
+    lastActivityAt: null,
+    expiresAt: '2026-09-28T17:45:00' as IstDateTime,
+    ipAddress: '192.168.1.55',
+    userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Safari/605.1.15',
+  },
+];
+
+function sessionLimit(canEndOther: boolean): SessionLimitError {
+  return new SessionLimitError({
+    status: 409,
+    code: 'SESSION_LIMIT_REACHED',
+    title: 'Maximum active sessions reached.',
+    detail: canEndOther
+      ? 'Choose a signed-in device to end, or log out there first.'
+      : 'Log out on one of the signed-in devices first.',
+    sessions: OPEN_SESSIONS,
+    canEndOther,
+  });
+}
 
 /** Signs in as the account that is already on two devices. */
 async function submitAsFullAccount() {
@@ -17,6 +57,7 @@ async function submitAsFullAccount() {
 
 describe('LoginForm', () => {
   it('signs the user in', async () => {
+    vi.spyOn(authApi, 'login').mockResolvedValue(LOGIN_RESPONSE);
     renderWithProviders(<LoginForm />, { route: PATHS.login, user: null });
     const user = userEvent.setup();
 
@@ -30,6 +71,13 @@ describe('LoginForm', () => {
   });
 
   it('shows the API message on wrong credentials and clears the password', async () => {
+    vi.spyOn(authApi, 'login').mockRejectedValue(
+      new ApiError({
+        status: 401,
+        code: 'INVALID_CREDENTIALS',
+        title: 'User name or password is incorrect.',
+      }),
+    );
     renderWithProviders(<LoginForm />, { route: PATHS.login, user: null });
     const user = userEvent.setup();
 
@@ -43,6 +91,14 @@ describe('LoginForm', () => {
   });
 
   it('shows the lock detail from the API', async () => {
+    vi.spyOn(authApi, 'login').mockRejectedValue(
+      new ApiError({
+        status: 403,
+        code: 'USER_LOCKED',
+        title: 'This account is temporarily locked.',
+        detail: 'Try again after 10:07.',
+      }),
+    );
     renderWithProviders(<LoginForm />, { route: PATHS.login, user: null });
     const user = userEvent.setup();
 
@@ -54,6 +110,13 @@ describe('LoginForm', () => {
   });
 
   it('sends a user with a temporary password to the change-password screen', async () => {
+    vi.spyOn(authApi, 'login').mockRejectedValue(
+      new ApiError({
+        status: 403,
+        code: 'PASSWORD_CHANGE_REQUIRED',
+        title: 'A new password must be set.',
+      }),
+    );
     const { router } = renderWithProviders(<LoginForm />, { route: PATHS.login, user: null });
     const user = userEvent.setup();
 
@@ -66,6 +129,7 @@ describe('LoginForm', () => {
 
   describe('when the account is signed in on too many devices', () => {
     it('lists the devices instead of a bare refusal', async () => {
+      vi.spyOn(authApi, 'login').mockRejectedValue(sessionLimit(true));
       renderWithProviders(<LoginForm />, { route: PATHS.login, user: null });
       await submitAsFullAccount();
 
@@ -78,6 +142,10 @@ describe('LoginForm', () => {
     });
 
     it('signs the chosen device out and completes the login', async () => {
+      const login = vi
+        .spyOn(authApi, 'login')
+        .mockRejectedValueOnce(sessionLimit(true))
+        .mockResolvedValueOnce(LOGIN_RESPONSE);
       renderWithProviders(<LoginForm />, { route: PATHS.login, user: null });
       const user = await submitAsFullAccount();
 
@@ -85,12 +153,12 @@ describe('LoginForm', () => {
       await user.click(within(panel).getAllByRole('button', { name: /sign out and continue/i })[0]!);
 
       await waitFor(() => expect(useSessionStore.getState().status).toBe('authenticated'));
-      expect(mockAuthState.openSessions.map((s) => s.id)).toEqual([72]);
+      expect(login).toHaveBeenLastCalledWith({ userName: 'full', password: 'Admin@123', endSessionId: 71 });
       expect(screen.queryByRole('region', { name: /signed-in devices/i })).not.toBeInTheDocument();
     });
 
     it('keeps the list read-only when the server does not allow ending a session', async () => {
-      mockAuthState.canEndOtherSession = false;
+      vi.spyOn(authApi, 'login').mockRejectedValue(sessionLimit(false));
       renderWithProviders(<LoginForm />, { route: PATHS.login, user: null });
       await submitAsFullAccount();
 
@@ -101,8 +169,10 @@ describe('LoginForm', () => {
   });
 
   it('validates required fields before calling the API', async () => {
+    const login = vi.spyOn(authApi, 'login');
     renderWithProviders(<LoginForm />, { route: PATHS.login, user: null });
     await userEvent.setup().click(screen.getByRole('button', { name: /sign in/i }));
     expect(await screen.findByText(/user name is required/i)).toBeInTheDocument();
+    expect(login).not.toHaveBeenCalled();
   });
 });

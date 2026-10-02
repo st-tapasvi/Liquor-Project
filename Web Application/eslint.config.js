@@ -26,7 +26,6 @@ export default tseslint.config(
       'dist/**',
       'coverage/**',
       'node_modules/**',
-      'public/mockServiceWorker.js',
       'src/core/api/generated/**',
       'playwright-report/**',
       'test-results/**',
@@ -206,7 +205,7 @@ export default tseslint.config(
 
   // The single place that owns the HTTP client.
   {
-    files: ['src/core/api/http.ts', 'src/core/api/interceptors/**'],
+    files: ['src/core/api/http.ts', 'src/core/api/http.test.ts', 'src/core/api/interceptors/**'],
     rules: { 'no-restricted-imports': 'off' },
   },
   // The grid wrapper may import MUI X.
@@ -229,7 +228,7 @@ export default tseslint.config(
     files: ['src/shared/hooks/**', 'src/core/auth/**'],
     rules: { 'react-refresh/only-export-components': 'off' },
   },
-  // Tests: relaxed typing, MSW handlers may build any shape.
+  // Tests: relaxed typing for focused component and unit test fixtures.
   {
     files: ['src/**/*.test.{ts,tsx}', 'src/test/**', 'e2e/**'],
     rules: {

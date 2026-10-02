@@ -1,21 +1,13 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
-import { afterAll, afterEach, beforeAll } from 'vitest';
+import { afterEach } from 'vitest';
 
 import { useReauthStore, useSessionStore } from '@/core/auth';
 import { useModuleFlagsStore } from '@/core/modules';
 import { useTenantStore } from '@/core/tenant';
 
-import { mockAuthState, mockPlatformState } from './msw/handlers';
-import { server } from './msw/server';
-
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-
 afterEach(() => {
   cleanup();
-  server.resetHandlers();
-  mockAuthState.reset();
-  mockPlatformState.reset();
   useSessionStore.setState({
     status: 'unknown',
     user: null,
@@ -36,8 +28,6 @@ afterEach(() => {
     loaded: false,
   });
 });
-
-afterAll(() => server.close());
 
 // jsdom lacks matchMedia, which MUI's useMediaQuery needs.
 Object.defineProperty(window, 'matchMedia', {

@@ -5,7 +5,7 @@ import type { IstDateTime } from './common';
  * application serve eleven excises without excise-specific code (specification §8).
  *
  * They are not implemented by the API yet; docs/backend-changes.md specifies them. Until they exist the
- * MSW handlers answer them, and the app degrades safely: no flags means every flagged module is off.
+ * Until the API implements them, the app degrades safely: no flags means every flagged module is off.
  */
 
 /** GET /api/app/modules — which flagged modules this installation has (§8.2 feature flags). */

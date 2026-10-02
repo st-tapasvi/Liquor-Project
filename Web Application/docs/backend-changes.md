@@ -102,7 +102,7 @@ The earlier draft of this patch was reviewed line by line against the current so
 
 ## Platform endpoints required by the merged architecture
 
-Three endpoints make one application serve eleven excises (Frontend Architecture Specification §8, §9). None exist yet; the React app calls them at start-up, MSW answers them in development and tests, and the app degrades safely without them — every optional module stays hidden and no tenant headers are sent.
+Three endpoints make one application serve eleven excises (Frontend Architecture Specification §8, §9). None exist yet; the React app calls the real API at start-up and degrades safely when they fail — every optional module stays hidden and no tenant headers are sent. They must be implemented before tenant-scoped workflows can be used.
 
 | Endpoint                                 | Answers                                                                                                                                        | Used for                                                                                                                                    |
 | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |

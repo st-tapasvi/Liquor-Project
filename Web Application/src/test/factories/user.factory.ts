@@ -36,7 +36,7 @@ export function makeCurrentUser(overrides: Partial<CurrentUserResponse> = {}): C
     forcePasswordChange: false,
     passwordExpiresAt: null,
     isAdministrator: true,
-    // The mock admin holds every right, mirroring the API's single admin role today.
+    // The test admin holds every right, mirroring the API's single admin role today.
     permissions: [...PERMISSION_KEYS],
     ...overrides,
   };

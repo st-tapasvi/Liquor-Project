@@ -24,7 +24,7 @@ interface RenderWithProvidersOptions extends Omit<RenderOptions, 'wrapper'> {
 
 /**
  * The ONLY render used in component tests. Provides theme, query client, router, snackbar, confirm
- * and a session. Tests assert on what the user sees; the API is mocked with MSW, never with vi.mock.
+ * and a session. Tests assert on what the user sees and mock only the API function they exercise.
  */
 export function renderWithProviders(
   ui: ReactElement,

@@ -1,8 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
 
 /**
- * End-to-end tests run against a real API (staging) or against the dev server with mocks.
- * Set E2E_BASE_URL to point at a deployed instance; otherwise the Vite dev server is started.
+ * End-to-end tests always use a real API. Set E2E_BASE_URL to point at a deployed instance; otherwise
+ * the local Vite server starts and proxies /api to VITE_DEV_API_TARGET (the API must already be running).
  */
 export default defineConfig({
   testDir: './e2e',

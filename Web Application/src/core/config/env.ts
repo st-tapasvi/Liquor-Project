@@ -21,10 +21,6 @@ const envSchema = z.object({
       (v) => v.startsWith('/') || /^https?:\/\//.test(v),
       'VITE_API_BASE_URL must be a relative path or an absolute URL',
     ),
-  VITE_USE_MOCKS: z
-    .string()
-    .optional()
-    .transform((v) => v === 'true'),
   VITE_LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
   VITE_APP_NAME: z.string().trim().min(1).default('ST.LiquorTNT'),
 });
@@ -38,7 +34,6 @@ function readEnv(): Env {
     DEV: raw['DEV'],
     PROD: raw['PROD'],
     VITE_API_BASE_URL: raw['VITE_API_BASE_URL'],
-    VITE_USE_MOCKS: raw['VITE_USE_MOCKS'],
     VITE_LOG_LEVEL: raw['VITE_LOG_LEVEL'],
     VITE_APP_NAME: raw['VITE_APP_NAME'],
   });
@@ -46,10 +41,6 @@ function readEnv(): Env {
   if (!result.success) {
     const problems = result.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ');
     throw new Error(`Invalid build configuration: ${problems}`);
-  }
-
-  if (result.data.PROD && result.data.VITE_USE_MOCKS) {
-    throw new Error('VITE_USE_MOCKS must not be enabled in a production build.');
   }
 
   if (result.data.PROD && result.data.VITE_API_BASE_URL.startsWith('http://')) {

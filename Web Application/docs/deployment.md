@@ -7,7 +7,7 @@ npm ci
 npm run build        # typecheck + vite build → dist/
 ```
 
-`dist/` contains `index.html`, the content-hashed `assets/*.js` and `*.css`, `favicon.svg`, `robots.txt` and `mockServiceWorker.js`. Source maps (`*.map`) are generated with `sourcemap: 'hidden'`: the bundle does not reference them, so browsers never request them. Keep them for symbolising client log stack traces, but **do not copy `*.map` or `mockServiceWorker.js` to the web root**.
+`dist/` contains `index.html`, the content-hashed `assets/*.js` and `*.css`, `favicon.svg` and `robots.txt`. Source maps (`*.map`) are generated with `sourcemap: 'hidden'`: the bundle does not reference them, so browsers never request them. Keep them for symbolising client log stack traces, but **do not copy `*.map` files to the web root**.
 
 Environment is baked in at build time from `.env.production` (`VITE_API_BASE_URL=/api`, mocks off). There are no runtime secrets; a different API address needs a different build, or a reverse-proxy rule, never an edit to the built files.
 
@@ -19,7 +19,7 @@ The API serves the React app at the root URL and the JSON endpoints under `/api`
 # from the repository root, after `dotnet publish` of the API
 Remove-Item -Recurse -Force ".Net Application\src\ST.LiquorTNT.Api\wwwroot\*" -ErrorAction Ignore
 Copy-Item -Recurse "Web Application\dist\*" ".Net Application\src\ST.LiquorTNT.Api\wwwroot\"
-Get-ChildItem ".Net Application\src\ST.LiquorTNT.Api\wwwroot" -Recurse -Include *.map, mockServiceWorker.js | Remove-Item
+Get-ChildItem ".Net Application\src\ST.LiquorTNT.Api\wwwroot" -Recurse -Include *.map | Remove-Item
 ```
 
 The API side (static files with cache headers, the SPA fallback that serves `index.html` for any non-`/api` path so deep links reload, security headers and CSP) is described in [backend-changes.md](backend-changes.md).

@@ -1,11 +1,15 @@
 import { expect, test } from '@playwright/test';
 
 /**
- * Smoke flow against the dev server with the mock API (VITE_USE_MOCKS=true) or against a staging API
- * (E2E_BASE_URL + E2E_USER / E2E_PASSWORD). Covers: login → dashboard → users grid → sign out.
+ * Smoke flow against a real local or deployed API. Credentials are mandatory and are never committed.
+ * Covers: login → dashboard → users grid → sign out.
  */
-const USER = process.env['E2E_USER'] ?? 'admin';
-const PASSWORD = process.env['E2E_PASSWORD'] ?? 'Admin@123';
+const USER = process.env['E2E_USER'] ?? '';
+const PASSWORD = process.env['E2E_PASSWORD'] ?? '';
+
+test.beforeEach(() => {
+  test.skip(!USER || !PASSWORD, 'Set E2E_USER and E2E_PASSWORD for a real API account.');
+});
 
 test('login, open users, sign out', async ({ page }) => {
   await page.goto('/');

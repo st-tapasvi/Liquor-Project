@@ -18,7 +18,6 @@ Adopt the newest major of each framework that is mature (released for roughly th
 | Vite         | 8.3.1                      | 7.3.6 (line ended June 2026)                                                                              |
 | TypeScript   | 6.0.3                      | 7.0.2 (native compiler, July 2026; typescript-eslint still requires `< 6.1`)                              |
 | Vitest       | 4.1.11                     | 5.0.2 (Sept 2026, too new)                                                                                |
-| MSW          | 2.15.0                     | 3.0.0 (released 2026-09-28)                                                                               |
 | ESLint       | 10.11.0                    | 9.x (maintenance)                                                                                         |
 
 ## Consequences
@@ -27,4 +26,4 @@ The standards document must be amended (section 2) to name these versions, with 
 
 ## Alternatives considered
 
-Staying on the standards' versions was rejected: it would ship a new codebase on lines that already need a major upgrade for security, front-loading the exact work the standard tries to avoid. Taking every latest major (TS 7, Vitest 5, MSW 3, RR 8) was rejected: weeks-old majors have no track record and, in TypeScript's case, incompatible tooling.
+Staying on the standards' versions was rejected: it would ship a new codebase on lines that already need a major upgrade for security, front-loading the exact work the standard tries to avoid. Taking every latest major (TS 7, Vitest 5, RR 8) was rejected: weeks-old majors have no track record and, in TypeScript's case, incompatible tooling.
