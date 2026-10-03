@@ -9,6 +9,7 @@ import { renderWithProviders, screen, userEvent, waitFor, within } from '@/test/
 import { LoginForm } from './LoginForm';
 
 const LOGIN_RESPONSE: LoginResponse = {
+  accessToken: 'eyJ.test.token',
   expiresAt: '2026-10-01T09:00:00' as IstDateTime,
   idleTimeoutMinutes: 60,
   user: makeCurrentUser(),

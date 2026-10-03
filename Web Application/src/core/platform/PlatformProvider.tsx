@@ -1,6 +1,7 @@
 import { type ReactNode, useEffect } from 'react';
 
 import { useSessionStore } from '../auth/session.store';
+import { appConfig } from '../config';
 import { logger } from '../logging/logger';
 import { platformApi, useModuleFlagsStore } from '../modules';
 import { useTenantStore } from '../tenant';
@@ -36,6 +37,13 @@ export function PlatformProvider({ children, fallback }: PlatformProviderProps) 
   // Why an effect: a one-time network call whose result decides what the shell may render.
   useEffect(() => {
     if (status !== 'authenticated' || (flagsLoaded && tenantLoaded)) return;
+
+    if (!appConfig.platformApiAvailable) {
+      setFlags([]);
+      setTenantContext({ companies: [], plants: [], companyId: null, plantId: null });
+      return;
+    }
+
     const controller = new AbortController();
 
     void (async () => {

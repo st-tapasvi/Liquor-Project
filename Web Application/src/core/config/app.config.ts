@@ -13,4 +13,5 @@ export const appConfig = {
   requestTimeoutMs: 30_000,
   /** Warn the user this many minutes before the hard session limit. */
   sessionWarningMinutes: 10,
+  platformApiAvailable: false as boolean,
 } as const;

@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 
 import type { FieldConfig, ScreenConfigResponse } from '../api/contracts';
+import { appConfig } from '../config';
 import { platformApi } from '../modules';
 import { useTenantStore } from '../tenant';
 
@@ -19,8 +20,8 @@ export function useScreenConfig(screenKey: ScreenKey) {
   return useQuery({
     queryKey: screenConfigKeys.byScreen(exciseCode ?? '', screenKey),
     queryFn: ({ signal }) => platformApi.screenConfig(screenKey, signal),
-    // No company selected means no excise, so there is nothing meaningful to ask for yet.
-    enabled: exciseCode !== null,
+    // No company selected means no excise, so there is nothing meaningful to ask for yet
+    enabled: appConfig.platformApiAvailable && exciseCode !== null,
     staleTime: 30 * 60_000,
     gcTime: 60 * 60_000,
   });

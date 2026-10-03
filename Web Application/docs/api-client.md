@@ -31,7 +31,7 @@ and a backend change becomes a TypeScript compile error rather than a runtime su
 
 ## Request conventions the client applies
 
-Every request carries `X-Requested-With: XMLHttpRequest` (CSRF, see security.md) and a fresh `X-Correlation-Id`; the API echoes the id and it is shown to users on errors. The session cookie is attached by the browser (`withCredentials: true`). Timeouts default to 30 s; a long report or import passes its own `timeout`. Query arrays are serialised as repeated keys. Only 2xx is success; everything else reaches the error interceptor and becomes a typed error (docs/architecture.md, "Errors").
+Every request carries `X-Requested-With: XMLHttpRequest` (CSRF, see security.md) and a fresh `X-Correlation-Id`; the API echoes the id and it is shown to users on errors. The bearer token from login is added by `auth.interceptor.ts` (`Authorization: Bearer …`, read from `core/auth/token.store.ts`); see security.md for why it is not a cookie today. Timeouts default to 30 s; a long report or import passes its own `timeout`. Query arrays are serialised as repeated keys. Only 2xx is success; everything else reaches the error interceptor and becomes a typed error (docs/architecture.md, "Errors").
 
 ## Per-request flags
 

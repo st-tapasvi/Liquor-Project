@@ -40,15 +40,13 @@ export interface CurrentUserResponse {
   companyId: number | null;
   forcePasswordChange: boolean;
   passwordExpiresAt: IstDateTime | null;
-  isAdministrator: boolean;
-  permissions: string[];
+  isAdministrator?: boolean;
+  permissions?: string[];
 }
 
-/**
- * Login answer for the browser. The token itself is NOT in the body: the API sets the
- * `jwt` cookie (HttpOnly, Secure, SameSite=Lax) which the browser attaches automatically.
- */
 export interface LoginResponse {
+  /** The JWT to send as `Authorization: Bearer …`. Kept in core/auth/token.store, nowhere else. */
+  accessToken: string;
   /** Hard limit of this session (IST). After it every call answers 401 SESSION_EXPIRED. */
   expiresAt: IstDateTime;
   /** Minutes without any API call after which the session ends with 401 SESSION_TIMED_OUT. */

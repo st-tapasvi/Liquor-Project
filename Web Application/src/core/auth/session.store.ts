@@ -2,18 +2,19 @@ import { create } from 'zustand';
 
 import type { CurrentUserResponse, IstDateTime } from '../api/contracts';
 
-import { type PermissionKey, toPermissionSet } from './permissions';
+import { type PermissionKey, interimRights, toPermissionSet } from './permissions';
+import { tokenStore } from './token.store';
 
 /**
- * Session state as the browser knows it. It holds NO credential: the `jwt` cookie is HttpOnly and the
- * browser attaches it on its own. This store is only a cache of "who is logged in" for rendering.
+ * Session state as the browser knows it. It holds no credential — the bearer token lives in
+ * `token.store`, read only by the HTTP client. This store is a cache of "who is logged in" for rendering.
  *
  * - `unknown`       app just started; AuthProvider is asking GET /api/auth/me
  * - `anonymous`     no valid session (never logged in, logged out, timed out, revoked)
  * - `authenticated` the API confirmed the session
  *
- * The store is in memory only and is never persisted (no localStorage). A page reload goes through
- * `unknown` → /me again, which is exactly the check the server-side session needs.
+ * The store is in memory only and is never persisted. A page reload goes through `unknown` → /me
+ * again (with the restored token), which is exactly the check the server-side session needs.
  */
 export type SessionStatus = 'unknown' | 'anonymous' | 'authenticated';
 
@@ -51,6 +52,10 @@ interface SessionState {
 }
 
 export function toSessionUser(dto: CurrentUserResponse): SessionUser {
+  const fallback = interimRights(dto.roleId);
+  const isAdministrator = dto.isAdministrator ?? fallback.isAdministrator;
+  const permissions = dto.permissions ?? fallback.permissions;
+
   return {
     userId: dto.userId,
     userName: dto.userName,
@@ -59,8 +64,8 @@ export function toSessionUser(dto: CurrentUserResponse): SessionUser {
     companyId: dto.companyId,
     forcePasswordChange: dto.forcePasswordChange,
     passwordExpiresAt: dto.passwordExpiresAt,
-    isAdministrator: dto.isAdministrator,
-    permissions: toPermissionSet(dto.permissions),
+    isAdministrator,
+    permissions: toPermissionSet(permissions),
   };
 }
 
@@ -80,8 +85,10 @@ export const useSessionStore = create<SessionState>()((set) => ({
       endReason: null,
     })),
 
-  setAnonymous: (reason) =>
-    set({ status: 'anonymous', user: null, expiresAt: null, idleTimeoutMinutes: null, endReason: reason }),
+  setAnonymous: (reason) => {
+    tokenStore.clear(); // whatever ended the session, the token must not outlive it
+    set({ status: 'anonymous', user: null, expiresAt: null, idleTimeoutMinutes: null, endReason: reason });
+  },
 
   renew: (session) => set({ expiresAt: session.expiresAt, idleTimeoutMinutes: session.idleTimeoutMinutes }),
 

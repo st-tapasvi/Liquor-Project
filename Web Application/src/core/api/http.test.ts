@@ -2,6 +2,7 @@ import { AxiosError, AxiosHeaders, type AxiosAdapter, type AxiosResponse } from 
 
 import { reauthStore, useReauthStore } from '../auth/reauth.store';
 import { sessionStore, useSessionStore } from '../auth/session.store';
+import { tokenStore } from '../auth/token.store';
 import { ApiError, NetworkError, ValidationError } from '../errors';
 
 import { http } from './http';
@@ -37,6 +38,7 @@ function problem(status: number, errorCode: string, title: string, errors?: Reco
 afterEach(() => {
   if (originalAdapter === undefined) delete http.defaults.adapter;
   else http.defaults.adapter = originalAdapter;
+  tokenStore.clear();
 });
 
 describe('http client', () => {
@@ -49,6 +51,27 @@ describe('http client', () => {
     await http.get('/ping');
     expect(seen?.get('x-requested-with')).toBe('XMLHttpRequest');
     expect(seen?.get('x-correlation-id')).toMatch(/^[0-9a-f]{32}$/);
+  });
+
+  it('sends the bearer token once the session has one, and nothing before', async () => {
+    let seen: AxiosHeaders | undefined;
+    http.defaults.adapter = (config) => {
+      seen = config.headers;
+      return Promise.resolve(reply(config, { ok: true }));
+    };
+
+    await http.get('/anonymous');
+    expect(seen?.has('Authorization')).toBe(false);
+
+    tokenStore.set('eyJ.test.token');
+    await http.get('/secure');
+    expect(seen?.get('Authorization')).toBe('Bearer eyJ.test.token');
+  });
+
+  it('forgets the token when the session ends', () => {
+    tokenStore.set('eyJ.test.token');
+    sessionStore.setAnonymous('logout');
+    expect(tokenStore.has()).toBe(false);
   });
 
   it('maps 400 VALIDATION_FAILED to ValidationError', async () => {

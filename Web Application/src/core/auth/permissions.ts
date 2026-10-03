@@ -65,6 +65,17 @@ export function toPermissionSet(values: readonly string[] | undefined): Readonly
   return set;
 }
 
+export const EVERYONE_PERMISSIONS: readonly PermissionKey[] = ['dashboard.view', 'sessions.manage'];
+export const INTERIM_ADMIN_ROLE_ID = 1;
+
+export function interimRights(roleId: number | null): {
+  isAdministrator: boolean;
+  permissions: readonly PermissionKey[];
+} {
+  const isAdministrator = roleId === INTERIM_ADMIN_ROLE_ID;
+  return { isAdministrator, permissions: isAdministrator ? PERMISSION_KEYS : EVERYONE_PERMISSIONS };
+}
+
 export function hasPermission(rights: ReadonlySet<PermissionKey>, key: PermissionKey): boolean {
   return rights.has(key);
 }

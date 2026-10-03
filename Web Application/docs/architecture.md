@@ -50,6 +50,8 @@ Three mechanisms, all in `core/`:
 | Screen configuration | `core/screen-config` — `GET /api/app/screen-config/{screenKey}` | Which fields a screen has, and whether each is visible, mandatory or read-only. `schemaFromFields` builds the Zod schema from the same data, and `DynamicFormFields` renders it, so one screen serves every excise (§8.1). |
 | Dedicated modules    | `features/<module>` + a flag                                    | A genuinely distinct workflow, such as the Chhattisgarh dispatch cycle (§8.2).                                                                                                                                             |
 
+The three platform endpoints (`/api/app/modules`, `/api/app/tenant`, `/api/app/screen-config/{key}`) are still to be built by the backend team. `appConfig.platformApiAvailable` is `false` until then: `PlatformProvider` sets "no optional modules, no tenant" without a request, `useScreenConfig` stays disabled and no `X-Company-Id` / `X-Plant-Id` header is sent. Flip the flag when the API ships them.
+
 ## Tenant isolation
 
 `core/tenant` holds the selected company, plant and excise. `tenant.interceptor.ts` attaches `X-Company-Id` and `X-Plant-Id` to every request in one place, so no screen can forget them or override them — the API validates the scope against the session regardless. Switching company calls `queryClient.clear()`, and every cache key is additionally scoped by company id (`name.keys.ts`), so one company's rows cannot be rendered under another even if the wipe were removed (§9).
