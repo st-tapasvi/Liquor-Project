@@ -17,9 +17,9 @@ The API serves the React app at the root URL and the JSON endpoints under `/api`
 
 ```powershell
 # from the repository root, after `dotnet publish` of the API
-Remove-Item -Recurse -Force ".Net Application\src\ST.LiquorTNT.Api\wwwroot\*" -ErrorAction Ignore
-Copy-Item -Recurse "Web Application\dist\*" ".Net Application\src\ST.LiquorTNT.Api\wwwroot\"
-Get-ChildItem ".Net Application\src\ST.LiquorTNT.Api\wwwroot" -Recurse -Include *.map | Remove-Item
+Remove-Item -Recurse -Force "src\ST.LiquorTNT.Api\wwwroot\*" -ErrorAction Ignore
+Copy-Item -Recurse "src\ST.LiquorTNT.WebApplication\dist\*" "src\ST.LiquorTNT.Api\wwwroot\"
+Get-ChildItem "src\ST.LiquorTNT.Api\wwwroot" -Recurse -Include *.map | Remove-Item
 ```
 
 The API side (static files with cache headers, the SPA fallback that serves `index.html` for any non-`/api` path so deep links reload, security headers and CSP) is described in [backend-changes.md](backend-changes.md).

@@ -13,7 +13,7 @@ Liquor_Application/
 ├─ db/mysql/                    User-module schema scripts (003–005), run once in order
 ├─ docs/                        architecture standard, solution map, AI coding guide
 ├─ src/
-│  ├─ ST.LiquorTNT.WebApplication   React (Vite + TS) - NOT in the solution
+│  ├─ ST.LiquorTNT.WebApplication   React (Vite + TS) - in the solution as an .esproj
 │  ├─ ST.LiquorTNT.Domain           entities (named after their tables) + rules; references nothing
 │  ├─ ST.LiquorTNT.Business         use cases; declares the interfaces it needs
 │  ├─ ST.LiquorTNT.Contracts        request/response types; references nothing

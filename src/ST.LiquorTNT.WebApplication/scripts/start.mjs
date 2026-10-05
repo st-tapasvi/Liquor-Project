@@ -1,14 +1,14 @@
 /**
  * `npm run start` - the whole stack for local development in one terminal:
  *
- *   [api]  dotnet run --project ../.Net Application/src/ST.LiquorTNT.Api   (https://localhost:7180, http://localhost:5180)
- *   [web]  vite                                                               (http://localhost:5173, proxies /api -> :5180)
+ *   [api]  dotnet run --project ../ST.LiquorTNT.Api   (https://localhost:7180, http://localhost:5180)
+ *   [web]  vite                                       (http://localhost:5173, proxies /api -> :5180)
  *
  * Output of both is prefixed so it can be told apart; Ctrl+C stops both; if one of them exits, the other
  * is stopped too and this script exits with that code. No extra npm dependency - plain child_process.
  *
  * Overrides (environment variables):
- *   API_PROJECT  path to the API project folder or .csproj (default: ../.Net Application/src/ST.LiquorTNT.Api)
+ *   API_PROJECT  path to the API project folder or .csproj (default: ../ST.LiquorTNT.Api, the sibling project in src/)
  *   API_PROFILE  launchSettings profile to use (default: the project's default profile)
  */
 import { spawn } from 'node:child_process';
@@ -17,7 +17,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const apiProject = resolve(webRoot, process.env.API_PROJECT ?? '../.Net Application/src/ST.LiquorTNT.Api');
+const apiProject = resolve(webRoot, process.env.API_PROJECT ?? '../ST.LiquorTNT.Api');
 const isWindows = process.platform === 'win32';
 
 if (!existsSync(apiProject)) {
@@ -32,7 +32,7 @@ const children = new Map();
 let shuttingDown = false;
 
 function run(name, command, args, options = {}) {
-  // With a shell, an argument with spaces (".Net Application") must be quoted by hand.
+  // With a shell, an argument with spaces (e.g. "Liquor Application" in the path) must be quoted by hand.
   const quoted = isWindows ? args.map((a) => (/\s/.test(a) ? `"${a}"` : a)) : args;
   const child = spawn(command, quoted, {
     cwd: options.cwd ?? webRoot,

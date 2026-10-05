@@ -7,12 +7,12 @@ project depends on, split by application. Keep this file at the repository root 
 | | |
 |---|---|
 | Repository | `D:\TAPASVI\Project\Liquor Application` (git root) |
-| Register version | 1.0.1 |
-| Last updated | 2026-09-30 |
+| Register version | 1.0.2 |
+| Last updated | 2026-10-05 |
 | Updated by | Dax Padaliya |
 
 **How to read this file.** Section 1 is the .NET application (API, desktop line app, tests).
-Section 2 is the Web Application (React). Section 3 is the shared database. Section 4 is the
+Section 2 is the web application (React, `src\ST.LiquorTNT.WebApplication\`). Section 3 is the shared database. Section 4 is the
 history of this register. Anything marked `TBD` is not yet decided or not yet installed.
 
 **Rule.** Versions are never typed directly into a `.csproj` or `package.json` dependency
@@ -23,7 +23,7 @@ for the web app it will be `package.json` + `package-lock.json`.
 
 ## 1. .NET Application
 
-Folder: `.Net Application\`  
+Folder: repository root (the folder that holds `ST.LiquorTNT.sln`)  
 Solution: `ST.LiquorTNT.sln`  
 Application version: **1.0.0** (default - no `<Version>` is set yet; see "Recommended next step" below)
 
@@ -59,8 +59,8 @@ Application version: **1.0.0** (default - no `<Version>` is set yet; see "Recomm
 | `tests/ST.LiquorTNT.Edge.Tests` | Microsoft.NET.Sdk | **net8.0-windows** | xUnit | Follows Desktop (WinForms) |
 | `tests/ST.LiquorTNT.Infrastructure.Tests` | Microsoft.NET.Sdk | net8.0 | xUnit | Needs the MySQL dev database |
 
-`src/ST.LiquorTNT.WebApplication` is a README placeholder only. It is **not** a .NET project
-and is not in the solution; the real React app lives in `Web Application\` (Section 2).
+`src/ST.LiquorTNT.WebApplication` is the React app. It is **not** a .NET project: it is a Visual
+Studio JavaScript project (`ST.LiquorTNT.WebApplication.esproj`) in the solution (Section 2).
 
 ### 1.3 NuGet packages
 
@@ -149,10 +149,10 @@ To move the whole solution to a newer .NET, change `<TargetFramework>` in
 
 ---
 
-## 2. Web Application (React)
+## 2. Web application (React)
 
-Folder: `Web Application\`  
-Status: **scaffolded and running** - this section is still the pre-scaffold plan and is OUT OF DATE; regenerate it from `Web Application\package.json` and `package-lock.json`.  
+Folder: `src\ST.LiquorTNT.WebApplication\` (`ST.LiquorTNT.WebApplication.esproj`, in the solution)  
+Status: **scaffolded and running** - this section is still the pre-scaffold plan and is OUT OF DATE; regenerate it from `src\ST.LiquorTNT.WebApplication\package.json` and `package-lock.json`.  
 Application version: **0.0.0** (to be set in `package.json` → `"version"` when the app is created)
 
 ### 2.1 Planned toolchain (from `ST.LiquorTNT.WebApplication/README.md` and the frontend standards)
@@ -175,7 +175,7 @@ Application version: **0.0.0** (to be set in `package.json` → `"version"` when
 
 ### 2.2 Dependencies (fill in after scaffolding)
 
-Once the app exists, run this in `Web Application\` and paste the result into the tables below:
+Once the app exists, run this in `src\ST.LiquorTNT.WebApplication\` and paste the result into the tables below:
 
 ```
 npm ls --depth=0
@@ -216,7 +216,7 @@ database connection.
 | Dev server | `192.168.1.99:3306`, database `st_tnt_liquor` |
 | Secondary supported provider | SQL Server (wiring planned, not yet in the solution) |
 
-**Schema scripts** (`.Net Application\db\mysql\`, run once, in order)
+**Schema scripts** (`db\mysql\`, run once, in order)
 
 | Script | Purpose |
 |---|---|
@@ -238,3 +238,4 @@ you create it.
 |---|---|---|---|---|
 | 2026-09-30 | 1.0.0 | all | First version. Captured .NET 8 solution, all NuGet versions from `Directory.Packages.props`, MySQL 8.0.36, schema scripts 003-007. Web Application not yet scaffolded. | Dax Padaliya |
 | 2026-09-30 | 1.0.1 | Database | Added schema script `008_session_full_behaviour.sql`; schema level is now 008. Section 2 still describes the pre-scaffold plan and needs regenerating from the shipped `package.json` / `package-lock.json`. | Dax Padaliya |
+| 2026-10-05 | 1.0.2 | all | Folder layout changed: the solution now sits at the repository root (the `.Net Application\` level was removed) and the React app moved from `Web Application\` into the solution as `src\ST.LiquorTNT.WebApplication\` (`.esproj`). Paths in this file updated; no versions changed. | Dax Padaliya |

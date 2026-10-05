@@ -44,7 +44,7 @@ Contracts → nothing                    wire format shared by Api, Business, De
 
 | File | Purpose |
 |---|---|
-| `ST.LiquorTNT.sln` | 13 projects under solution folders `src` and `tests` |
+| `ST.LiquorTNT.sln` | 14 projects (13 .NET + the React `.esproj`) under solution folders `src` and `tests` |
 | `Directory.Build.props` | `net8.0`, `LangVersion latest`, `Nullable enable`, `ImplicitUsings enable`, `TreatWarningsAsErrors` **only in Release** |
 | `Directory.Packages.props` | `ManagePackageVersionsCentrally=true` — every package version lives here. ⛔ `Version=` on a `PackageReference` |
 | `README.md` | run instructions, endpoints, error codes |
@@ -143,7 +143,7 @@ Next here: `Database/Interceptors/` (tenant filter), `Queries/<Provider>/`, `Scr
 
 ### `ST.LiquorTNT.Logging`, `ST.LiquorTNT.Desktop`, `ST.LiquorTNT.WebApplication`
 
-Logging: `LoggingSetup` (Serilog sinks from configuration, levels bound to `LogModeSwitch`), `LogModeSwitch` (NORMAL / DETAIL, switched live), `AppJsonFormatter` (one JSON object per line, IST `time`, readable `message`), `SafeJson` (masks password / answer / token / hash before anything is logged), `LogFields`. Log files: `logs/stliquortnt-YYYYMMDD.json`, rolled daily and at 100 MB, 30 kept. Desktop: WinForms shell referencing `Contracts` only; React placeholder (not in the `.sln`).
+Logging: `LoggingSetup` (Serilog sinks from configuration, levels bound to `LogModeSwitch`), `LogModeSwitch` (NORMAL / DETAIL, switched live), `AppJsonFormatter` (one JSON object per line, IST `time`, readable `message`), `SafeJson` (masks password / answer / token / hash before anything is logged), `LogFields`. Log files: `logs/stliquortnt-YYYYMMDD.json`, rolled daily and at 100 MB, 30 kept. Desktop: WinForms shell referencing `Contracts` only; WebApplication: the React app (Vite + TypeScript) as `ST.LiquorTNT.WebApplication.esproj` in the `.sln`; its own docs are in `src/ST.LiquorTNT.WebApplication/README.md` and `docs/`.
 
 ---
 

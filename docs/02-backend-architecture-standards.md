@@ -18,7 +18,7 @@
 |---|---|
 | Style | Modular monolith, ASP.NET Core Web API (.NET 8 LTS). Not microservices. |
 | Layers | `Api → Business → Domain`; `Infrastructure` implements interfaces declared in Business (dependency inverted). **Domain declares no interfaces.** |
-| Project names | `ST.LiquorTNT.<Layer>` — `Api`, `Business`, `Domain`, `Contracts`, `Infrastructure`, `Logging`, `Desktop`; React lives in `src/ST.LiquorTNT.WebApplication/` (not a .NET project). The business layer is called **Business**, not "Application". |
+| Project names | `ST.LiquorTNT.<Layer>` — `Api`, `Business`, `Domain`, `Contracts`, `Infrastructure`, `Logging`, `Desktop`; React lives in `src/ST.LiquorTNT.WebApplication/` (a Visual Studio JavaScript project, `.esproj`, in the `.sln` — not a .NET project). The business layer is called **Business**, not "Application". |
 | Deferred / dropped | `ST.LiquorTNT.Integration` (portal clients as a separate project) is **not created yet** — portal code starts under `Infrastructure/Portal/` and is split out only if that project earns its keep. `ST.LiquorTNT.Shared` was **dropped**: Contracts covers the wire format, `Business/Common` covers cross-cutting types. |
 | Database | **MySQL 8.0.46 primary**, **SQL Server supported**. One customer runs one provider, chosen by configuration. |
 | Data access | EF Core for normal work; **stored procedures, views and triggers used freely where the use case calls for them** |
@@ -94,11 +94,11 @@ A read that only filters and pages **MAY** skip Business. A write **MUST NOT**.
 
 ## 3. Solution structure
 
-This is the **real** solution as it exists today, not a target sketch. Everything is .NET 8; the React frontend is a plain folder inside `src/` and is not part of the `.sln`.
+This is the **real** solution as it exists today, not a target sketch. Everything is .NET 8 except the React frontend, which is an `.esproj` (Vite + TypeScript) inside `src/` and part of the `.sln`.
 
 ```
 C:\Projects\Liquor_Application\              repository root
-├─ ST.LiquorTNT.sln                          13 projects, solution folders "src" and "tests"
+├─ ST.LiquorTNT.sln                          14 projects (13 .NET + 1 .esproj), solution folders "src" and "tests"
 ├─ Directory.Build.props                     net8.0, nullable, ImplicitUsings, TreatWarningsAsErrors (Release only)
 ├─ Directory.Packages.props                  central package versions — ⛔ Version= on a PackageReference
 ├─ README.md                                 run instructions
@@ -111,7 +111,7 @@ C:\Projects\Liquor_Application\              repository root
 │  ├─ ST.LiquorTNT.Infrastructure/           EF Core, MySQL/SQL Server, identity, (later) portals, files, outbox
 │  ├─ ST.LiquorTNT.Logging/                  Serilog host setup, JSON formatter, log-mode switch, secret masking
 │  ├─ ST.LiquorTNT.Desktop/                  WinForms line application (net8.0-windows) — references Contracts only
-│  └─ ST.LiquorTNT.WebApplication/           React (Vite + TypeScript) — not in the .sln
+│  └─ ST.LiquorTNT.WebApplication/           React (Vite + TypeScript) — `.esproj`, in the .sln
 └─ tests/
    ├─ ST.LiquorTNT.Domain.Tests/             entity rules, no DB
    ├─ ST.LiquorTNT.Business.Tests/           services with fakes, no DB

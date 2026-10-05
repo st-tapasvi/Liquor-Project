@@ -31,7 +31,7 @@ C:\Projects\Liquor_Application\          repository root
 │  ├─ ST.LiquorTNT.Infrastructure/  EF Core, MySQL/SQL Server, SP/views, identity, portals, files, outbox
 │  ├─ ST.LiquorTNT.Logging/         Serilog host setup only
 │  ├─ ST.LiquorTNT.Desktop/         WinForms line application — references Contracts only
-│  └─ ST.LiquorTNT.WebApplication/  React (not in the .sln)
+│  └─ ST.LiquorTNT.WebApplication/  React (`.esproj`, in the .sln)
 └─ tests/  Domain.Tests · Business.Tests · Infrastructure.Tests · Api.Tests · Edge.Tests · Architecture.Tests
 ```
 

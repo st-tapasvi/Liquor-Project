@@ -1,6 +1,6 @@
 # Backend changes required by the web application
 
-The React app assumes four things from `ST.LiquorTNT.Api` that the API (as of 2026-09-30) does not do yet. The code for all four was written directly into `.Net Application/src` and `tests` on 2026-09-30 (15 files, listed below). It was written against the current source but **could not be compiled where it was written** (no .NET SDK there), so the first thing to do is `dotnet build ST.LiquorTNT.sln` and `dotnet test ST.LiquorTNT.sln`, and review the diff in git.
+The React app assumes four things from `ST.LiquorTNT.Api` that the API (as of 2026-09-30) does not do yet. The code for all four was written directly into `src` and `tests` on 2026-09-30 (15 files, listed below). It was written against the current source but **could not be compiled where it was written** (no .NET SDK there), so the first thing to do is `dotnet build ST.LiquorTNT.sln` and `dotnet test ST.LiquorTNT.sln`, and review the diff in git.
 
 | #   | Change                                                                                                                                                                          | Why the web app needs it                                                |
 | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
@@ -34,7 +34,7 @@ Nothing in the database changes and nothing in the session logic changes: the JW
 ## How to verify
 
 ```powershell
-cd ".Net Application"
+# from the repository root (the folder that holds ST.LiquorTNT.sln)
 git status                            # the 15 changed/new files
 dotnet build ST.LiquorTNT.sln
 dotnet test  ST.LiquorTNT.sln          # Api and Infrastructure tests need the dev MySQL

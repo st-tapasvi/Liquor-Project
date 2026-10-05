@@ -1,6 +1,6 @@
-# ST.LiquorTNT — Web Application
+# ST.LiquorTNT.WebApplication
 
-React + TypeScript front end of the Liquor Track & Trace platform. It is served by the ASP.NET Core Web API (`.Net Application/src/ST.LiquorTNT.Api`) at the root URL, talks to that API under `/api`, and is authenticated by a JWT carried in an HttpOnly `jwt` cookie (backed by a server-side session row).
+React + TypeScript front end of the Liquor Track & Trace platform. It is served by the ASP.NET Core Web API (`src/ST.LiquorTNT.Api`, the sibling project in the same solution) at the root URL, talks to that API under `/api`, and is authenticated by a JWT carried in an HttpOnly `jwt` cookie (backed by a server-side session row).
 
 |         |                                                                                                                                                                                                                                                           |
 | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -21,7 +21,7 @@ npm ci                  # exact versions from package-lock.json; install scripts
 npm run prepare         # installs the git pre-commit hook (husky)
 
 # every day
-npm run start           # API (dotnet run ../.Net Application/src/ST.LiquorTNT.Api) + Vite, one terminal
+npm run start           # API (dotnet run --project ../ST.LiquorTNT.Api) + Vite, one terminal
 npm run dev             # Vite only - when the API is already running (http://localhost:5180)
 ```
 
