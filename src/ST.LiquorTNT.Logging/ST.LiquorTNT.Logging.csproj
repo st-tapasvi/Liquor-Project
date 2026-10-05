@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Host logging setup, the live log-mode switch and secret masking. No business types, no EF.
+       The audit / user log is a business feature and lives in Infrastructure, not here. -->
+  <ItemGroup>
+    <PackageReference Include="Serilog.AspNetCore" />
+    <PackageReference Include="Serilog.Sinks.File" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <!-- WinForms needs the Windows-specific target. This is the line application: camera, printer,
+         PLC and scanning stay here; it talks to the API over HTTP and never touches the database. -->
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <OutputType>WinExe</OutputType>
+    <UseWindowsForms>true</UseWindowsForms>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Only the wire format. No Business, no Infrastructure, no DbContext - ever. -->
+    <ProjectReference Include="..\ST.LiquorTNT.Contracts\ST.LiquorTNT.Contracts.csproj" />
+  </ItemGroup>
+</Project>

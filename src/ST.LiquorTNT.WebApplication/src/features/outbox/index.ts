@@ -1,0 +1,1 @@
+export { outboxRoutes } from './routes';

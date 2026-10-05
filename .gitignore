@@ -1,0 +1,251 @@
+# =====================================================================
+#  ST.LiquorTNT solution .gitignore
+#  Lives next to ST.LiquorTNT.sln and covers everything under it:
+#    src/ST.LiquorTNT.*            (ASP.NET Core API, libraries, desktop)
+#    src/ST.LiquorTNT.WebApplication (React + Vite, .esproj)
+#    tests/
+#  Patterns are relative / unanchored, so this file keeps working if the
+#  solution folder is moved up one level later.
+# =====================================================================
+
+
+# ---------------------------------------------------------------------
+#  .NET / Visual Studio
+# ---------------------------------------------------------------------
+
+## Build output
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Ll]og/
+[Ll]ogs/
+artifacts/
+publish/
+PublishProfiles/
+*.publishsettings
+
+## Visual Studio / Rider / VS Code workspace state
+.vs/
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.userprefs
+*.rsuser
+*.swp
+*~
+
+## Test results and coverage
+[Tt]est[Rr]esult*/
+TestResults/
+*.trx
+*.coverage
+*.coveragexml
+coverage*.json
+coverage*.xml
+coverage*.info
+*.opencover.xml
+BenchmarkDotNet.Artifacts/
+
+## NuGet
+*.nupkg
+*.snupkg
+**/[Pp]ackages/*
+!**/[Pp]ackages/build/
+*.nuget.props
+*.nuget.targets
+project.lock.json
+project.fragment.lock.json
+
+## Generated / cache files
+*.cache
+*.pdb
+*.ilk
+*.meta
+*.iobj
+*.ipdb
+*.tlog
+*.log
+*.vspscc
+*.vssscc
+*.pidb
+*.svclog
+*.scc
+*.tmp
+*.tmp_proj
+*_i.c
+*_p.c
+*_h.h
+*.aps
+*.ncb
+*.opendb
+*.opensdf
+*.sdf
+*.VC.db
+*.VC.VC.opendb
+_ReSharper*/
+*.DotSettings.user
+.mfractor/
+.localhistory/
+.builds
+*.pfx
+*.psess
+*.vsp
+*.vspx
+*.sap
+*.e2e
+*.dbmdl
+*.dbproj.schemaview
+*.jfm
+*.publishproj
+node_modules/
+*.mdf
+*.ldf
+*.ndf
+ClientBin/
+Generated\ Files/
+GeneratedArtifacts/
+ServiceFabricBackup/
+*.rptproj.bak
+*.rdl.data
+*.bim.layout
+*.bim_*.settings
+*.rptproj.rsuser
+*- [Bb]ackup.rdl
+*- [Bb]ackup ([0-9]).rdl
+*- [Bb]ackup ([0-9][0-9]).rdl
+FakesAssemblies/
+*.GhostDoc.xml
+.ntvs_analysis.dat
+.paket/paket.exe
+paket-files/
+.fake/
+__pycache__/
+*.pyc
+.cr/personal
+*.binlog
+*.dsp
+*.dsw
+.ionide/
+.tabularsolution/
+
+## Local-only configuration and secrets
+## (appsettings.json and appsettings.Development.json stay tracked as
+##  templates - keep real secrets in the files below or in user-secrets)
+appsettings.*.local.json
+appsettings.Local.json
+appsettings.Production.json
+secrets.json
+*.secrets.json
+.env
+.env.*
+!.env.example
+
+## Local runtime data
+*.sqlite
+*.sqlite3
+*.db
+*.db-shm
+*.db-wal
+*.bak
+*.orig
+*.rej
+
+
+# ---------------------------------------------------------------------
+#  React / Node  (src/ST.LiquorTNT.WebApplication/)
+# ---------------------------------------------------------------------
+
+## Dependencies
+node_modules/
+.pnp
+.pnp.js
+.pnp.cjs
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+.pnpm-store/
+jspm_packages/
+bower_components/
+
+## Build output
+dist/
+dist-ssr/
+build/
+out/
+.output/
+.next/
+.nuxt/
+.svelte-kit/
+storybook-static/
+*.local
+
+## Caches and tool state
+.cache/
+.parcel-cache/
+.turbo/
+.eslintcache
+.stylelintcache
+.vite/
+*.tsbuildinfo
+.npm/
+.yarn-integrity
+.node_repl_history
+.rpt2_cache/
+.rts2_cache_*/
+
+## Coverage / test output
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+playwright/.cache/
+cypress/videos/
+cypress/screenshots/
+
+## Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+logs/
+
+## Environment files (keep .env.example if you add one)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+!.env.example
+
+
+# ---------------------------------------------------------------------
+#  Operating system / editor junk
+# ---------------------------------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+*.stackdump

@@ -1,0 +1,20 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
+    <PackageReference Include="Swashbuckle.AspNetCore" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ST.LiquorTNT.Business\ST.LiquorTNT.Business.csproj" />
+    <ProjectReference Include="..\ST.LiquorTNT.Contracts\ST.LiquorTNT.Contracts.csproj" />
+    <ProjectReference Include="..\ST.LiquorTNT.Logging\ST.LiquorTNT.Logging.csproj" />
+    <!-- Infrastructure is referenced ONLY so ApiServiceExtensions can register it.
+         No Infrastructure type may be used anywhere else in this project. -->
+    <ProjectReference Include="..\ST.LiquorTNT.Infrastructure\ST.LiquorTNT.Infrastructure.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Runtime log files (logs/*.json) are output, not content: never copied on build or publish. -->
+    <Content Remove="logs\**" />
+    <None Remove="logs\**" />
+  </ItemGroup>
+</Project>

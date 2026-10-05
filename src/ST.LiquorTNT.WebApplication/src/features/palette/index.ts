@@ -1,0 +1,1 @@
+export { paletteRoutes } from './routes';

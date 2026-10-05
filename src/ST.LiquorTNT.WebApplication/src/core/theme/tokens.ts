@@ -1,0 +1,26 @@
+export const tokens = {
+  color: {
+    primary: '#2E3035',
+    primaryDark: '#1C1D21',
+    secondary: '#818286',
+    secondaryDark: '#6C6D72',
+    accent: '#ED1B24',
+    accentDark: '#930708',
+    accentTint: '#FDEAEB',
+    success: '#147D43',
+    successTint: '#E7F4EC',
+    warning: '#ed6c02',
+    error: '#c62828',
+    info: '#0277bd',
+    background: '#F4F4F6',
+    surface: '#FFFFFF',
+    border: '#DCDDE0',
+    head: '#F1F1F3',
+    textPrimary: '#1C1C1E',
+    textSecondary: '#6C6D72',
+  },
+  radius: 6,
+  fontFamily: ['"Segoe UI"', 'system-ui', '-apple-system', '"Helvetica Neue"', 'Roboto', 'Arial', 'sans-serif'].join(
+    ',',
+  ),
+} as const;
