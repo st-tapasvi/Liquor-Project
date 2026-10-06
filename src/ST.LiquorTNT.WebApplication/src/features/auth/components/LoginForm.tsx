@@ -12,15 +12,16 @@ import type { LoginRequest } from '@/core/api';
 import { authApi, useSessionStore } from '@/core/auth';
 import {
   applyServerErrors,
-  describeError,
   isApiError,
+  isNetworkError,
   isSessionLimitError,
   type SessionLimitError,
 } from '@/core/errors';
 import { logger } from '@/core/logging';
 import { PATHS } from '@/core/router';
 
-import { FormRootError, FormTextField } from '@/shared/components/forms';
+import { FormTextField } from '@/shared/components/forms';
+import { useSnackbar } from '@/shared/hooks';
 
 import { type LoginFormValues, loginSchema } from '../auth.schema';
 
@@ -36,8 +37,12 @@ interface DeviceLimit {
   values: LoginFormValues;
 }
 
+/** One id for every login outcome, so a retry replaces the last message instead of stacking toasts. */
+const LOGIN_TOAST_ID = 'login';
+
 export function LoginForm() {
   const navigate = useNavigate();
+  const snackbar = useSnackbar();
   const setAuthenticated = useSessionStore((s) => s.setAuthenticated);
 
   const [limit, setLimit] = useState<DeviceLimit | null>(null);
@@ -64,6 +69,7 @@ export function LoginForm() {
     try {
       const result = await login.mutateAsync(request);
       setLimit(null);
+      snackbar.dismiss(LOGIN_TOAST_ID);
       setAuthenticated(result.user, { expiresAt: result.expiresAt, idleTimeoutMinutes: result.idleTimeoutMinutes });
       logger.info('login succeeded', { endedAnotherSession: endSessionId !== undefined });
       // No navigate here: RequireAnonymous (AuthLayout) reacts to the session and sends the user on.
@@ -71,7 +77,7 @@ export function LoginForm() {
       if (isSessionLimitError(error)) {
         // Keep the password: the panel's buttons re-submit this same login with a session to end.
         setLimit({ error, values });
-        form.clearErrors('root.submit');
+        snackbar.dismiss(LOGIN_TOAST_ID);
         logger.info('login refused: device limit reached', { deviceCount: error.sessions.length });
         return;
       }
@@ -85,8 +91,15 @@ export function LoginForm() {
         return;
       }
 
+      // Server down: the persistent "offline" toast already says so, and the password is kept so the user
+      // can simply press Log in again once it is back.
+      if (isNetworkError(error) && !error.isTimeout) {
+        snackbar.dismiss(LOGIN_TOAST_ID);
+        return;
+      }
+
       form.resetField('password');
-      form.setError('root.submit', { type: 'server', message: describeError(error) });
+      snackbar.errorFrom(error, { id: LOGIN_TOAST_ID });
     } finally {
       setEndingSessionId(null);
     }
@@ -105,7 +118,6 @@ export function LoginForm() {
   return (
     <FormProvider {...form}>
       <form onSubmit={onSubmit} noValidate>
-        <FormRootError />
         <Stack spacing={2.5}>
           <FormTextField<LoginFormValues>
             name="userName"

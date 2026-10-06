@@ -12,7 +12,8 @@ import { defineConfig } from 'vite';
  *   emitted, so browsers never download them. Do not deploy the `.map` files to the web root.
  * - Manual chunks keep the vendor code cacheable across releases and the initial bundle small.
  * - The dev-server proxy forwards `/api` to the API so the browser sees ONE origin in development too:
- *   the session cookie is first-party, CORS is not needed, and dev behaves like production.
+ *   the session cookie is first-party, CORS is not needed, and dev behaves like production. `/health` is
+ *   forwarded too, for the client's connectivity probe.
  */
 const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version: string };
 
@@ -31,6 +32,13 @@ export default defineConfig({
     strictPort: true,
     proxy: {
       '/api': {
+        target: process.env['VITE_DEV_API_TARGET'] ?? 'http://localhost:5180',
+        changeOrigin: false,
+        secure: false,
+      },
+      // The connectivity monitor probes the API's anonymous /health endpoint while the API is unreachable.
+      // When the API is down, Vite answers 502 text/plain, which the client treats as "offline".
+      '/health': {
         target: process.env['VITE_DEV_API_TARGET'] ?? 'http://localhost:5180',
         changeOrigin: false,
         secure: false,

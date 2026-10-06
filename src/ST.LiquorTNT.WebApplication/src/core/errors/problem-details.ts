@@ -114,9 +114,11 @@ export function toApiError(status: number, body: unknown, fallbackCorrelationId?
 }
 
 function defaultTitle(status: number): string {
-  if (status === 401) return 'Authentication is required.';
-  if (status === 403) return 'You are not allowed to do this.';
-  if (status === 404) return 'Not found.';
-  if (status >= 500) return 'The server could not complete the request.';
-  return 'The request was refused.';
+  if (status === 401) return 'You need to log in again.';
+  if (status === 403)
+    return `The server refused this action (HTTP 403). If you think this is wrong, contact your administrator.`;
+  if (status === 404) return 'What you asked for was not found (HTTP 404).';
+  if (status === 429) return 'Too many requests. Wait a moment and try again.';
+  if (status >= 500) return `The server could not complete the request (HTTP ${status}). Try again in a moment.`;
+  return `The server refused the request (HTTP ${status}).`;
 }

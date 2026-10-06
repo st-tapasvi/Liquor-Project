@@ -197,6 +197,7 @@ export default tseslint.config(
           paths: [
             { name: 'axios', message: 'Only src/core/api/http.ts may import axios. Use the api functions / hooks.' },
             { name: '@mui/x-data-grid', message: 'Use AppDataGrid from @/shared/components/data-grid.' },
+            { name: 'react-hot-toast', message: 'Use useSnackbar() from @/shared/hooks.' },
           ],
         },
       ],
@@ -214,7 +215,27 @@ export default tseslint.config(
     rules: {
       'no-restricted-imports': [
         'error',
-        { paths: [{ name: 'axios', message: 'Only core/api/http.ts may import axios.' }] },
+        {
+          paths: [
+            { name: 'axios', message: 'Only core/api/http.ts may import axios.' },
+            { name: 'react-hot-toast', message: 'Use useSnackbar() from @/shared/hooks.' },
+          ],
+        },
+      ],
+    },
+  },
+  // The toast wrapper and the connectivity toast are the only users of react-hot-toast.
+  {
+    files: ['src/shared/hooks/useSnackbar.tsx', 'src/shared/components/feedback/ConnectivityToasts.tsx', 'src/test/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            { name: 'axios', message: 'Only core/api/http.ts may import axios.' },
+            { name: '@mui/x-data-grid', message: 'Use AppDataGrid from @/shared/components/data-grid.' },
+          ],
+        },
       ],
     },
   },

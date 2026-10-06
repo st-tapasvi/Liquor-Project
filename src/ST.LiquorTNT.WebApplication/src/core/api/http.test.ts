@@ -3,6 +3,7 @@ import { AxiosError, AxiosHeaders, type AxiosAdapter, type AxiosResponse } from 
 import { reauthStore, useReauthStore } from '../auth/reauth.store';
 import { sessionStore, useSessionStore } from '../auth/session.store';
 import { ApiError, NetworkError, ValidationError } from '../errors';
+import { useConnectivityStore } from '../network';
 
 import { http } from './http';
 
@@ -88,6 +89,46 @@ describe('http client', () => {
   it('turns a connection failure into NetworkError', async () => {
     http.defaults.adapter = (config) => Promise.reject(new AxiosError('Network Error', AxiosError.ERR_NETWORK, config));
     await expect(http.get('/down')).rejects.toBeInstanceOf(NetworkError);
+  });
+
+  describe('connectivity', () => {
+    const status = () => useConnectivityStore.getState().status;
+
+    it('marks the API offline when a request gets no answer', async () => {
+      http.defaults.adapter = (config) =>
+        Promise.reject(new AxiosError('Network Error', AxiosError.ERR_NETWORK, config));
+      await expect(http.get('/down')).rejects.toBeInstanceOf(NetworkError);
+      expect(status()).toBe('offline');
+    });
+
+    it('treats a bare 502 from the dev proxy as unreachable, not as an API error', async () => {
+      http.defaults.adapter = (config) => Promise.reject(failure(config, 502, ''));
+      const err = await http.get('/auth/me').catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(NetworkError);
+      expect(status()).toBe('offline');
+    });
+
+    it('keeps a 503 that carries a ProblemDetails body as an ApiError (the API itself answered)', async () => {
+      useConnectivityStore.setState({ status: 'offline', offlineSince: 1 });
+      http.defaults.adapter = (config) =>
+        Promise.reject(failure(config, 503, problem(503, 'SERVICE_UNAVAILABLE', 'Database is down.')));
+      await expect(http.get('/thing')).rejects.toBeInstanceOf(ApiError);
+      expect(status()).toBe('online');
+    });
+
+    it('marks the API online again on any answer', async () => {
+      useConnectivityStore.setState({ status: 'offline', offlineSince: 1 });
+      http.defaults.adapter = (config) => Promise.resolve(reply(config, { ok: true }));
+      await http.get('/ping');
+      expect(status()).toBe('online');
+    });
+
+    it('does not call a timeout "offline" by itself', async () => {
+      http.defaults.adapter = (config) => Promise.reject(new AxiosError('timeout', 'ECONNABORTED', config));
+      const err = await http.get('/slow').catch((e: unknown) => e);
+      expect((err as NetworkError).isTimeout).toBe(true);
+      expect(status()).toBe('online');
+    });
   });
 
   it('ends the session on 401 SESSION_TIMED_OUT', async () => {

@@ -1,13 +1,17 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
+import toast from 'react-hot-toast';
 import { afterEach } from 'vitest';
 
 import { useReauthStore, useSessionStore } from '@/core/auth';
 import { useModuleFlagsStore } from '@/core/modules';
+import { useConnectivityStore } from '@/core/network';
 import { useTenantStore } from '@/core/tenant';
 
 afterEach(() => {
   cleanup();
+  toast.remove();
+  useConnectivityStore.setState({ status: 'online', offlineSince: null });
   useSessionStore.setState({
     status: 'unknown',
     user: null,

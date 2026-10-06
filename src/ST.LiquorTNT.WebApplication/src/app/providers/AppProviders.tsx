@@ -5,11 +5,14 @@ import { type ReactNode, useEffect } from 'react';
 
 import { queryClient, setGlobalMutationErrorListener } from '@/core/api';
 import { AuthProvider } from '@/core/auth';
+import { isNetworkError } from '@/core/errors';
 import { ErrorBoundary } from '@/core/logging';
+import { startConnectivityMonitor, useConnectivityStore } from '@/core/network';
 import { PlatformProvider } from '@/core/platform';
 import { LoadingFallback } from '@/core/router';
 import { theme } from '@/core/theme';
 
+import { ConnectivityToasts } from '@/shared/components/feedback';
 import { ConfirmProvider, SnackbarProvider, useSnackbar } from '@/shared/hooks';
 
 import { AppCrash } from '../layout/ErrorPages/AppCrash';
@@ -30,6 +33,8 @@ export function AppProviders({ children }: { children: ReactNode }) {
           <SnackbarProvider>
             <ConfirmProvider>
               <GlobalErrorBridge />
+              <ConnectivityBridge />
+              <ConnectivityToasts />
               <AuthProvider fallback={<LoadingFallback label="Checking your session…" />}>
                 <PlatformProvider fallback={<LoadingFallback label="Loading your workspace…" />}>
                   {children}
@@ -48,8 +53,28 @@ function GlobalErrorBridge() {
   const snackbar = useSnackbar();
   // Why an effect: registers a listener on a module-level singleton and removes it on unmount.
   useEffect(() => {
-    setGlobalMutationErrorListener((error) => snackbar.errorFrom(error));
+    setGlobalMutationErrorListener((error) => {
+      if (isNetworkError(error) && !error.isTimeout) return;
+      snackbar.errorFrom(error);
+    });
     return () => setGlobalMutationErrorListener(null);
   }, [snackbar]);
+  return null;
+}
+
+function ConnectivityBridge() {
+  // Why an effect: starts a background watcher (timers, window listeners) and stops it on unmount.
+  useEffect(() => {
+    const stop = startConnectivityMonitor();
+    const unsubscribe = useConnectivityStore.subscribe((state, previous) => {
+      if (state.status === 'online' && previous.status === 'offline') {
+        void queryClient.refetchQueries({ predicate: (query) => query.state.status === 'error' });
+      }
+    });
+    return () => {
+      unsubscribe();
+      stop();
+    };
+  }, []);
   return null;
 }

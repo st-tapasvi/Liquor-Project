@@ -1,6 +1,6 @@
 import type { ActiveSessionSummary, IstDateTime, LoginResponse } from '@/core/api';
 import { authApi, useSessionStore } from '@/core/auth';
-import { ApiError, SessionLimitError } from '@/core/errors';
+import { ApiError, NetworkError, SessionLimitError } from '@/core/errors';
 import { PATHS } from '@/core/router';
 
 import { makeCurrentUser } from '@/test/factories/user.factory';
@@ -71,7 +71,7 @@ describe('LoginForm', () => {
     expect(useSessionStore.getState().expiresAt).toBe('2026-10-01T09:00:00');
   });
 
-  it('shows the API message on wrong credentials and clears the password', async () => {
+  it('shows the API message as a toast on wrong credentials and clears the password', async () => {
     vi.spyOn(authApi, 'login').mockRejectedValue(
       new ApiError({
         status: 401,
@@ -91,7 +91,7 @@ describe('LoginForm', () => {
     expect(useSessionStore.getState().status).toBe('anonymous');
   });
 
-  it('shows the lock detail from the API', async () => {
+  it('shows both the reason and the next step for a locked account', async () => {
     vi.spyOn(authApi, 'login').mockRejectedValue(
       new ApiError({
         status: 403,
@@ -107,7 +107,44 @@ describe('LoginForm', () => {
     await user.type(screen.getByLabelText(/^password/i), 'whatever');
     await user.click(screen.getByRole('button', { name: /log in/i }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/try again after/i);
+    const toast = await screen.findByRole('alert');
+    expect(toast).toHaveTextContent(/temporarily locked/i); // the API's title: what happened
+    expect(toast).toHaveTextContent(/try again after 10:07/i); // its detail: what to do next
+  });
+
+  it('shows the message in a toast, not above the fields, and replaces it on a second failure', async () => {
+    vi.spyOn(authApi, 'login').mockRejectedValue(
+      new ApiError({ status: 401, code: 'INVALID_CREDENTIALS', title: 'User name or password is incorrect.' }),
+    );
+    const { container } = renderWithProviders(<LoginForm />, { route: PATHS.login, user: null });
+    const user = userEvent.setup();
+
+    await user.type(screen.getByLabelText(/user name/i), 'admin');
+    await user.type(screen.getByLabelText(/^password/i), 'wrong');
+    await user.click(screen.getByRole('button', { name: /log in/i }));
+    await screen.findByText(/incorrect/i);
+
+    await user.type(screen.getByLabelText(/^password/i), 'wrong-again');
+    await user.click(screen.getByRole('button', { name: /log in/i }));
+    await waitFor(() => expect(authApi.login).toHaveBeenCalledTimes(2));
+
+    expect(screen.getAllByText(/incorrect/i)).toHaveLength(1);
+    expect(container.querySelector('form')).not.toHaveTextContent(/incorrect/i);
+    expect(screen.queryByText(/ref:/i)).not.toBeInTheDocument(); // no correlation id for a 4xx
+  });
+
+  it('keeps the password and adds no error toast when the server cannot be reached', async () => {
+    vi.spyOn(authApi, 'login').mockRejectedValue(new NetworkError('Network Error'));
+    renderWithProviders(<LoginForm />, { route: PATHS.login, user: null });
+    const user = userEvent.setup();
+
+    await user.type(screen.getByLabelText(/user name/i), 'admin');
+    await user.type(screen.getByLabelText(/^password/i), 'Admin@123');
+    await user.click(screen.getByRole('button', { name: /log in/i }));
+
+    await waitFor(() => expect(screen.getByRole('button', { name: /log in/i })).toBeEnabled());
+    expect(screen.getByLabelText(/^password/i)).toHaveValue('Admin@123');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it('sends a user with a temporary password to the change-password screen', async () => {

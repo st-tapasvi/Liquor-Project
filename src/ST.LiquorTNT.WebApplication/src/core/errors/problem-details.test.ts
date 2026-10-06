@@ -35,4 +35,10 @@ describe('problem details mapping', () => {
     expect(p?.errors?.['a']).toEqual(['ok']);
     expect(p).not.toHaveProperty('stackTrace');
   });
+
+  it('still tells the user what happened when the body is missing', () => {
+    const error = toApiError(403, '');
+    expect(error.code).toBe('UNKNOWN');
+    expect(error.title).toMatch(/refused this action \(HTTP 403\)/);
+  });
 });

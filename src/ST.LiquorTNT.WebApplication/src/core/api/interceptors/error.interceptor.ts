@@ -3,8 +3,9 @@ import { type AxiosError, type AxiosInstance, type InternalAxiosRequestConfig, i
 import { reauthStore } from '../../auth/reauth.store';
 import { sessionStore } from '../../auth/session.store';
 import { appConfig } from '../../config';
-import { NetworkError, SESSION_ENDED_CODES, SESSION_EXPIRED_CODE, toApiError } from '../../errors';
+import { NetworkError, parseProblemDetails, SESSION_ENDED_CODES, SESSION_EXPIRED_CODE, toApiError } from '../../errors';
 import { logger } from '../../logging/logger';
+import { connectivity, requestConnectivityCheck } from '../../network';
 
 /** Per-request flags. Set with `http.get(url, { meta: { … } })`. */
 export interface RequestMeta {
@@ -22,16 +23,12 @@ declare module 'axios' {
   }
 }
 
-/**
- * Turns every failure into one of the AppError classes and implements the session rules:
- *
- *  - SESSION_EXPIRED (hard limit): park the request, open the password dialog, retry after re-login.
- *  - SESSION_TIMED_OUT / SESSION_INVALID / UNAUTHENTICATED: end the session; the router shows login.
- *  - Everything else: ApiError / ValidationError / NetworkError for the caller.
- */
 export function installErrorInterceptor(http: AxiosInstance): void {
   http.interceptors.response.use(
-    (response) => response,
+    (response) => {
+      connectivity.markOnline();
+      return response;
+    },
     async (error: unknown) => {
       if (isCancel(error)) throw error instanceof Error ? error : new Error('Request cancelled');
       if (!isAxiosError(error)) throw error instanceof Error ? error : new Error(String(error));
@@ -42,10 +39,31 @@ export function installErrorInterceptor(http: AxiosInstance): void {
       if (!axiosError.response) {
         const isTimeout = axiosError.code === 'ECONNABORTED' || axiosError.code === 'ETIMEDOUT';
         logger.warn('network error', { url: config?.url, code: axiosError.code });
+        if (isTimeout) requestConnectivityCheck();
+        else connectivity.markOffline();
         throw new NetworkError(axiosError.message, { cause: axiosError, isTimeout });
       }
 
       const { status, data, headers } = axiosError.response;
+
+      if (isGatewayFailure(status, data)) {
+        logger.warn('API unreachable behind a proxy', { url: config?.url, status });
+        connectivity.markOffline();
+        throw new NetworkError(`The API did not answer (HTTP ${status} from the proxy).`, { cause: axiosError });
+      }
+      connectivity.markOnline();
+
+      const problem = parseProblemDetails(data);
+      if (problem?.title === undefined && problem?.errorCode === undefined) {
+        logger.warn('error response without a readable ProblemDetails body', {
+          url: config?.url,
+          status,
+          contentType: String(headers['content-type'] ?? ''),
+          bodyType: typeof data,
+          bodyPreview: typeof data === 'string' ? data.slice(0, 300) : undefined,
+        });
+      }
+
       const echoed: unknown = headers[appConfig.correlationHeader.toLowerCase()];
       const apiError = toApiError(status, data, typeof echoed === 'string' ? echoed : undefined, axiosError);
 
@@ -83,4 +101,10 @@ export function installErrorInterceptor(http: AxiosInstance): void {
       throw apiError;
     },
   );
+}
+
+function isGatewayFailure(status: number, body: unknown): boolean {
+  if (status !== 502 && status !== 503 && status !== 504) return false;
+  const problem = parseProblemDetails(body);
+  return problem?.title === undefined && problem?.errorCode === undefined;
 }

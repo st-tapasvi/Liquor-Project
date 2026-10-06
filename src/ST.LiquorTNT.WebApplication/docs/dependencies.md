@@ -4,19 +4,20 @@ The project is meant to live 15–20 years. Every dependency is a liability with
 
 ## Runtime dependencies
 
-| Package                              | Version         | Job                                           | Notes                                                     |
-| ------------------------------------ | --------------- | --------------------------------------------- | --------------------------------------------------------- |
-| react, react-dom                     | 19.2.8 (exact)  | UI runtime                                    | 19.x since Dec 2024; the current patch line.              |
-| react-router                         | 7.18.4 (exact)  | Routing (library mode, `createBrowserRouter`) | v8 (June 2026) held until it has a few months of patches. |
-| @tanstack/react-query                | 5.104.0 (exact) | Server state                                  | v5 since Oct 2023.                                        |
-| zustand                              | 5.0.15 (exact)  | Session / UI state                            |                                                           |
-| @mui/material, @mui/icons-material   | 9.4.0 (exact)   | UI components                                 | v9 since Apr 2026.                                        |
-| @mui/x-data-grid                     | 9.14.0 (exact)  | Data grid (Community)                         | Only imported in `shared/components/data-grid`.           |
-| @emotion/react, @emotion/styled      | ^11             | MUI's styling engine (peer)                   |                                                           |
-| react-hook-form, @hookform/resolvers | ^7.89, ^5.9     | Forms                                         |                                                           |
-| zod                                  | ^4.6            | Schemas: forms and env validation             |                                                           |
-| axios                                | ^1.20           | HTTP client with interceptors                 | Only imported in `core/api/http.ts`.                      |
-| dayjs                                | ^1.11           | Date parsing/formatting                       | 2 kB; no moment.                                          |
+| Package                              | Version         | Job                                           | Notes                                                                     |
+| ------------------------------------ | --------------- | --------------------------------------------- | ------------------------------------------------------------------------- |
+| react, react-dom                     | 19.2.8 (exact)  | UI runtime                                    | 19.x since Dec 2024; the current patch line.                              |
+| react-router                         | 7.18.4 (exact)  | Routing (library mode, `createBrowserRouter`) | v8 (June 2026) held until it has a few months of patches.                 |
+| @tanstack/react-query                | 5.104.0 (exact) | Server state                                  | v5 since Oct 2023.                                                        |
+| zustand                              | 5.0.15 (exact)  | Session / UI state                            |                                                                           |
+| @mui/material, @mui/icons-material   | 9.4.0 (exact)   | UI components                                 | v9 since Apr 2026.                                                        |
+| @mui/x-data-grid                     | 9.14.0 (exact)  | Data grid (Community)                         | Only imported in `shared/components/data-grid`.                           |
+| @emotion/react, @emotion/styled      | ^11             | MUI's styling engine (peer)                   |                                                                           |
+| react-hook-form, @hookform/resolvers | ^7.89, ^5.9     | Forms                                         |                                                                           |
+| zod                                  | ^4.6            | Schemas: forms and env validation             |                                                                           |
+| axios                                | ^1.20           | HTTP client with interceptors                 | Only imported in `core/api/http.ts`.                                      |
+| dayjs                                | ^1.11           | Date parsing/formatting                       | 2 kB; no moment.                                                          |
+| react-hot-toast                      | 2.6.1 (exact)   | Toast messages (MIT, ~5 kB, 1 dep: goober)    | Only imported in `shared/hooks/useSnackbar.tsx` and `ConnectivityToasts`. |
 
 ## Development dependencies
 
