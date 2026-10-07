@@ -23,9 +23,9 @@ public sealed class UserRepository : IUserRepository
     public Task<bool> UserNameExistsAsync(string userName, CancellationToken ct) =>
         _db.USERS.AnyAsync(u => u.UserName == userName, ct);
 
-    public async Task<PagedResponse<UserResponse>> GetPageAsync(string? search, int page, int pageSize, CancellationToken ct)
+    public async Task<PagedResponse<UserResponse>> GetPageAsync(int? companyId, string? search, int page, int pageSize, CancellationToken ct)
     {
-        var query = _db.USERS.AsNoTracking();
+        var query = _db.USERS.AsNoTracking().Where(u => companyId == null || u.CompanyId == companyId);
 
         if (!string.IsNullOrWhiteSpace(search))
         {

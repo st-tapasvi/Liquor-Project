@@ -8,7 +8,6 @@ public sealed class UserResponse
     public string? Email { get; set; }
     public string? Phone { get; set; }
     public string? EmployeeCode { get; set; }
-    public int? RoleId { get; set; }
     public int? CompanyId { get; set; }
     public bool IsActive { get; set; }
     public bool IsBlocked { get; set; }

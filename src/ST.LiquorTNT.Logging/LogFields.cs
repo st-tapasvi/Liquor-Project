@@ -7,7 +7,7 @@ public static class LogFields
     public const string UserId        = "UserId";
     public const string UserName      = "UserName";
     public const string CompanyId     = "CompanyId";
-    public const string PlantId       = "PlantId";
+    public const string SupplierCodeId = "SupplierCodeId";
     public const string ExciseCode    = "ExciseCode";
     public const string Operation     = "Operation";
     public const string DurationMs    = "DurationMs";

@@ -1,4 +1,5 @@
 using FluentValidation;
+using ST.LiquorTNT.Business.Access;
 using ST.LiquorTNT.Business.Auth;
 using ST.LiquorTNT.Business.Common;
 using ST.LiquorTNT.Business.Common.Abstractions;
@@ -12,6 +13,7 @@ namespace ST.LiquorTNT.Business.Users;
 /// <summary>
 /// User management. Every state change is audited in the same commit as the change itself
 /// (the log writer stages the row; SaveChanges writes both).
+/// Company scope and admin-user protection come from <see cref="UserAccessRules"/>.
 /// </summary>
 public sealed class UserService : IUserService
 {
@@ -20,35 +22,41 @@ public sealed class UserService : IUserService
     private const string EntityName = "USERS";
 
     private readonly IUserRepository _users;
+    private readonly IUserAccessRepository _userAccess;
     private readonly ISessionRepository _sessions;
     private readonly IReferenceLookup _lookup;
+    private readonly UserAccessRules _rules;
+    private readonly CurrentAccess _access;
     private readonly PasswordRules _passwordRules;
     private readonly IPasswordHasher _hasher;
     private readonly IClock _clock;
-    private readonly ICurrentUser _currentUser;
     private readonly IUserLogWriter _log;
     private readonly IValidator<CreateUserRequest> _createValidator;
     private readonly IValidator<UpdateUserRequest> _updateValidator;
 
     public UserService(
         IUserRepository users,
+        IUserAccessRepository userAccess,
         ISessionRepository sessions,
         IReferenceLookup lookup,
+        UserAccessRules rules,
+        CurrentAccess access,
         PasswordRules passwordRules,
         IPasswordHasher hasher,
         IClock clock,
-        ICurrentUser currentUser,
         IUserLogWriter log,
         IValidator<CreateUserRequest> createValidator,
         IValidator<UpdateUserRequest> updateValidator)
     {
         _users = users;
+        _userAccess = userAccess;
         _sessions = sessions;
         _lookup = lookup;
+        _rules = rules;
+        _access = access;
         _passwordRules = passwordRules;
         _hasher = hasher;
         _clock = clock;
-        _currentUser = currentUser;
         _log = log;
         _createValidator = createValidator;
         _updateValidator = updateValidator;
@@ -65,17 +73,26 @@ public sealed class UserService : IUserService
             throw new BusinessException(ErrorCodes.UserNameTaken, "User name is already in use.");
         }
 
-        await EnsureReferencesExistAsync(request.RoleId, request.CompanyId, ct);
+        // The new user joins the caller's company. Only Super Admin may name another company (or none).
+        var companyId = await _access.IsSuperAdminAsync(ct)
+            ? request.CompanyId ?? await _access.CompanyScopeAsync(ct)
+            : await _access.CompanyScopeAsync(ct);
 
-        var policy = await _passwordRules.RequirePolicyAsync(request.RoleId, ct);
+        if (companyId.HasValue && !await _lookup.CompanyExistsAsync(companyId.Value, ct))
+        {
+            throw new NotFoundException("Company");
+        }
+
+        var roles = await _rules.ValidateRolesAsync(companyId, request.Roles, ct);
+
+        var policy = await _passwordRules.RequirePolicyAsync(roles.Select(r => r.RoleId).ToList(), ct);
         _passwordRules.EnsureAcceptable(request.Password, userName, policy, Array.Empty<string>());
 
         var now = _clock.IndiaNow;
         var user = USERS.Create(
             userName,
             _hasher.Hash(request.Password),
-            request.RoleId,
-            request.CompanyId,
+            companyId,
             request.FullName,
             request.Email,
             request.Phone,
@@ -83,56 +100,46 @@ public sealed class UserService : IUserService
             request.ForcePasswordChange,
             policy.ExpiryFrom(now),
             now,
-            _currentUser.UserId);
+            _access.UserId);
 
-        // The audit row needs the generated Id, so create is the one operation with two commits.
+        // The roles and the audit row need the generated Id, so create is the one operation with two commits.
         await _users.AddAsync(user, ct);
         await _users.SaveChangesAsync(ct);
+
+        await _userAccess.ReplaceRolesAsync(user.Id, roles, now, _access.UserId, ct);
 
         var response = UserProjections.Map(user);
         await _log.WriteAsync(UserLogEntry.Success(
             UserLogActions.UserCreated, UserLogModules.Users, EntityName, user.Id.ToString(),
-            $"User '{user.UserName}' created.", newValue: response), ct);
+            $"User '{user.UserName}' created with {roles.Count} role(s).", newValue: new { user = response, roles }), ct);
         await _users.SaveChangesAsync(ct);
 
         return response;
     }
 
     public async Task<UserResponse> GetByIdAsync(int id, CancellationToken ct) =>
-        UserProjections.Map(await RequireUserAsync(id, ct));
+        UserProjections.Map(await _rules.RequireUserAsync(id, ct));
 
-    public Task<PagedResponse<UserResponse>> GetPageAsync(UserListRequest request, CancellationToken ct)
+    public async Task<PagedResponse<UserResponse>> GetPageAsync(UserListRequest request, CancellationToken ct)
     {
         var page = request.Page < 1 ? 1 : request.Page;
         var pageSize = request.PageSize < 1 ? DefaultPageSize : Math.Min(request.PageSize, MaxPageSize);
         var search = string.IsNullOrWhiteSpace(request.Search) ? null : request.Search.Trim();
 
-        return _users.GetPageAsync(search, page, pageSize, ct);
+        // Company users see their own company only; Super Admin without a supplier code sees everyone.
+        return await _users.GetPageAsync(await _access.CompanyScopeAsync(ct), search, page, pageSize, ct);
     }
 
     public async Task<UserResponse> UpdateAsync(int id, UpdateUserRequest request, CancellationToken ct)
     {
         (await _updateValidator.ValidateAsync(request, ct)).EnsureValid();
 
-        var user = await RequireUserAsync(id, ct);
-        await EnsureReferencesExistAsync(request.RoleId, request.CompanyId, ct);
-
-        if (request.RoleId != user.RoleId)
-        {
-            if (id == _currentUser.UserId)
-            {
-                throw new BusinessException(ErrorCodes.CannotChangeOwnRole, "You cannot change your own role.");
-            }
-
-            // Same guarantee as create: a user must never end up on a role that has no password policy.
-            await _passwordRules.RequirePolicyAsync(request.RoleId, ct);
-        }
+        var user = await _rules.RequireUserAsync(id, ct);
+        await _rules.EnsureCanManageUserAsync(user, ct);
 
         var before = UserProjections.Map(user);
 
-        user.UpdateProfile(
-            request.FullName, request.Email, request.Phone, request.EmployeeCode,
-            request.RoleId, request.CompanyId, _clock.IndiaNow, _currentUser.UserId);
+        user.UpdateProfile(request.FullName, request.Email, request.Phone, request.EmployeeCode, _clock.IndiaNow, _access.UserId);
 
         var after = UserProjections.Map(user);
         await _log.WriteAsync(UserLogEntry.Success(
@@ -145,8 +152,10 @@ public sealed class UserService : IUserService
 
     public async Task<UserResponse> ActivateAsync(int id, CancellationToken ct)
     {
-        var user = await RequireUserAsync(id, ct);
-        user.Activate(_clock.IndiaNow, _currentUser.UserId);
+        var user = await _rules.RequireUserAsync(id, ct);
+        await _rules.EnsureCanManageUserAsync(user, ct);
+
+        user.Activate(_clock.IndiaNow, _access.UserId);
 
         await _log.WriteAsync(UserLogEntry.Success(
             UserLogActions.UserActivated, UserLogModules.Users, EntityName, user.Id.ToString(),
@@ -158,15 +167,16 @@ public sealed class UserService : IUserService
 
     public async Task<UserResponse> DeactivateAsync(int id, CancellationToken ct)
     {
-        if (id == _currentUser.UserId)
+        if (id == _access.UserId)
         {
             throw new BusinessException(ErrorCodes.CannotDeactivateSelf, "You cannot deactivate your own account.");
         }
 
-        var user = await RequireUserAsync(id, ct);
-        var now = _clock.IndiaNow;
+        var user = await _rules.RequireUserAsync(id, ct);
+        await _rules.EnsureCanManageUserAsync(user, ct);
 
-        user.Deactivate(now, _currentUser.UserId);
+        var now = _clock.IndiaNow;
+        user.Deactivate(now, _access.UserId);
 
         // A deactivated user must lose access immediately, not at their next login.
         foreach (var session in await _sessions.GetActiveForUserAsync(user.Id, now, ct))
@@ -185,8 +195,10 @@ public sealed class UserService : IUserService
 
     public async Task<UserResponse> UnlockAsync(int id, CancellationToken ct)
     {
-        var user = await RequireUserAsync(id, ct);
-        user.Unlock(_clock.IndiaNow, _currentUser.UserId);
+        var user = await _rules.RequireUserAsync(id, ct);
+        await _rules.EnsureCanManageUserAsync(user, ct);
+
+        user.Unlock(_clock.IndiaNow, _access.UserId);
 
         await _log.WriteAsync(UserLogEntry.Success(
             UserLogActions.AccountUnlocked, UserLogModules.Users, EntityName, user.Id.ToString(),
@@ -194,21 +206,5 @@ public sealed class UserService : IUserService
         await _users.SaveChangesAsync(ct);
 
         return UserProjections.Map(user);
-    }
-
-    private async Task<USERS> RequireUserAsync(int id, CancellationToken ct) =>
-        await _users.GetByIdAsync(id, ct) ?? throw new NotFoundException("User");
-
-    private async Task EnsureReferencesExistAsync(int roleId, int? companyId, CancellationToken ct)
-    {
-        if (!await _lookup.RoleExistsAsync(roleId, ct))
-        {
-            throw new NotFoundException("Role");
-        }
-
-        if (companyId.HasValue && !await _lookup.CompanyExistsAsync(companyId.Value, ct))
-        {
-            throw new NotFoundException("Company");
-        }
     }
 }

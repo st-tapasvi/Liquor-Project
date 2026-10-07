@@ -10,7 +10,7 @@ internal sealed class FakeUserRepository : IUserRepository
 {
     public List<USERS> Users { get; } = new();
     public int SaveCount { get; private set; }
-    public (string? Search, int Page, int PageSize)? LastPageQuery { get; private set; }
+    public (int? CompanyId, string? Search, int Page, int PageSize)? LastPageQuery { get; private set; }
 
     public FakeUserRepository(params USERS[] users) => Users.AddRange(users);
 
@@ -23,9 +23,9 @@ internal sealed class FakeUserRepository : IUserRepository
     public Task<bool> UserNameExistsAsync(string userName, CancellationToken ct) =>
         Task.FromResult(Users.Any(u => string.Equals(u.UserName, userName, StringComparison.OrdinalIgnoreCase)));
 
-    public Task<PagedResponse<UserResponse>> GetPageAsync(string? search, int page, int pageSize, CancellationToken ct)
+    public Task<PagedResponse<UserResponse>> GetPageAsync(int? companyId, string? search, int page, int pageSize, CancellationToken ct)
     {
-        LastPageQuery = (search, page, pageSize);
+        LastPageQuery = (companyId, search, page, pageSize);
         var items = Users.OrderBy(u => u.UserName).Skip((page - 1) * pageSize).Take(pageSize).Select(UserProjections.Map).ToList();
         return Task.FromResult(new PagedResponse<UserResponse> { Items = items, Page = page, PageSize = pageSize, TotalCount = Users.Count });
     }
@@ -83,8 +83,15 @@ internal sealed class FakePasswordPolicyRepository : IPasswordPolicyRepository
         }
     }
 
-    public Task<PASSWORD_POLICY?> GetForRoleAsync(int roleId, CancellationToken ct) =>
-        Task.FromResult(ByRole.TryGetValue(roleId, out var p) ? p : null);
+    /// <summary>Roles of each user. A user missing here holds role 1 (the role most tests give a policy to).</summary>
+    public Dictionary<int, List<int>> UserRoles { get; } = new();
+
+    public Task<IReadOnlyDictionary<int, PASSWORD_POLICY>> GetForRolesAsync(IReadOnlyCollection<int> roleIds, CancellationToken ct) =>
+        Task.FromResult<IReadOnlyDictionary<int, PASSWORD_POLICY>>(
+            ByRole.Where(p => roleIds.Contains(p.Key)).ToDictionary(p => p.Key, p => p.Value));
+
+    public Task<IReadOnlyList<int>> GetRoleIdsForUserAsync(int userId, CancellationToken ct) =>
+        Task.FromResult<IReadOnlyList<int>>(UserRoles.TryGetValue(userId, out var roles) ? roles : new List<int> { 1 });
 
     public Task<PASSWORD_POLICY?> GetByIdAsync(int id, CancellationToken ct) =>
         Task.FromResult(Policies.FirstOrDefault(p => p.Id == id));

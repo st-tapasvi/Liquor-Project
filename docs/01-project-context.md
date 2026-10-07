@@ -41,7 +41,7 @@ Agreed principle: **~80% common core + ~20% per-excise capability.** State diffe
 
 ## 4. Tenancy and deployment
 
-- **Customer** = distillery. One plant can produce for **several states**; one installation can hold **several companies**. Tenancy is **Company → Plant → Excise**, and all three come **only from the JWT** (`company_id`, `plant_id`, `excise_code`) — never from a request.
+- **Customer** = distillery (`COMPANY`). A customer holds **several supplier codes** (`SUPPLIER_CODE` = excise + code + liquor category, e.g. RJ CL 550) across **several states**; one installation can hold **several companies**. Tenancy is **Company → Excise → Supplier Code**: the user picks one supplier code after login, it is kept in the server-side session, and company / supplier code / excise **never** come from a request. (There is no separate plant entity; "Plant Admin" / "Plant Manager" are only role names.)
 - **Everything runs on the customer's own server (on-premise)**: one API, one database, one React build served from the same host. Often no IT staff, sometimes no internet.
 - Multiple production lines write into the same local API simultaneously.
 
@@ -90,8 +90,8 @@ Agreed principle: **~80% common core + ~20% per-excise capability.** State diffe
 **Next, in order**
 1. Build green on the developer machine (`dotnet build ST.LiquorTNT.sln`), run login against `192.168.1.99`.
 2. Decide whether login maps to the legacy `user` table or keeps `tnt_user` (needs `SHOW CREATE TABLE user;`).
-3. `[HasPermission]` attribute + policy; audit/user-log interceptor; tenant-filter interceptor.
-4. First real module (Companies → Plants → Users → Brands), each following the checklist in the standards §19.
+3. ~~`[HasPermission]` attribute + policy~~ (done: roles & rights module, docs/06); audit/user-log interceptor; tenant-filter interceptor.
+4. First real module (Companies → Users → Brands), each following the checklist in the standards §19.
 5. Line API contract (block allocation of case codes, idempotency keys, bulk aggregation, build check, heartbeat).
 6. EF migrations replacing hand-run SQL; SQL Server provider package + Testcontainers matrix.
 7. Screen-config model, feature flags/licensing, Dispatch design, outbox + workers, portals per state.

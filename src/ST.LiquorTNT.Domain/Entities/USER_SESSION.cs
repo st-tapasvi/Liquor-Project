@@ -9,6 +9,10 @@ namespace ST.LiquorTNT.Domain.Entities;
 /// </list>
 /// A session is usable while <see cref="Status"/> is ACTIVE and <see cref="ExpiresAt"/> is in the future;
 /// logout, admin revocation and expiry each end it with a distinct status for the audit trail.
+/// <para>
+/// <see cref="ActiveSupplierCodeId"/> is the supplier code the user picked after login (switchable). Rights and data of
+/// every call are scoped to it; it is kept here, on the server, and never taken from the request.
+/// </para>
 /// </summary>
 public class USER_SESSION
 {
@@ -25,6 +29,7 @@ public class USER_SESSION
 
     public int Id { get; private set; }
     public int UserId { get; private set; }
+    public int? ActiveSupplierCodeId { get; private set; }
     public string SessionTokenHash { get; private set; }
     public DateTime LoginAt { get; private set; }
     public DateTime? LastActivityAt { get; private set; }
@@ -83,6 +88,9 @@ public class USER_SESSION
         var idleDeadline = now.AddMinutes(idleMinutes);
         ExpiresAt = idleDeadline < AbsoluteExpiresAt ? idleDeadline : AbsoluteExpiresAt;
     }
+
+    /// <summary>The user picked (or switched to) a supplier code. The caller has already checked the user really holds it.</summary>
+    public void SelectSupplierCode(int supplierCodeId) => ActiveSupplierCodeId = supplierCodeId;
 
     public void Logout(DateTime now) => End(StatusLoggedOut, now);
 

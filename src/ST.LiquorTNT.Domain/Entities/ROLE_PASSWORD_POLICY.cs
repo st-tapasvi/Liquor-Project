@@ -14,4 +14,21 @@ public class ROLE_PASSWORD_POLICY
     public DateTime CreatedAt { get; private set; }
     public int? UpdatedBy { get; private set; }
     public DateTime UpdatedAt { get; private set; }
+
+    public static ROLE_PASSWORD_POLICY Create(int roleId, int passwordPolicyId, DateTime now, int? createdBy) => new()
+    {
+        RoleId = roleId,
+        PasswordPolicyId = passwordPolicyId,
+        CreatedAt = now,
+        CreatedBy = createdBy,
+        UpdatedAt = now,
+        UpdatedBy = createdBy,
+    };
+
+    public void ChangePolicy(int passwordPolicyId, DateTime now, int? updatedBy)
+    {
+        PasswordPolicyId = passwordPolicyId;
+        UpdatedAt = now;
+        UpdatedBy = updatedBy;
+    }
 }

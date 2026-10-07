@@ -65,6 +65,18 @@ public static class UserLogActions
 
     public const string SecurityConfigChanged = "SECURITY_CONFIG_CHANGED";
     public const string PasswordPolicyChanged = "PASSWORD_POLICY_CHANGED";
+
+    public const string SupplierCodeSelected = "SUPPLIER_CODE_SELECTED";
+    public const string RoleCreated = "ROLE_CREATED";
+    public const string RoleUpdated = "ROLE_UPDATED";
+    public const string RoleDeleted = "ROLE_DELETED";
+    public const string RoleRightsChanged = "ROLE_RIGHTS_CHANGED";
+    public const string RoleTemplatesCopied = "ROLE_TEMPLATES_COPIED";
+    public const string UserRolesChanged = "USER_ROLES_CHANGED";
+    public const string UserRightsChanged = "USER_RIGHTS_CHANGED";
+
+    public const string MasterCreated = "MASTER_CREATED";
+    public const string MasterUpdated = "MASTER_UPDATED";
 }
 
 public static class UserLogModules
@@ -72,4 +84,6 @@ public static class UserLogModules
     public const string Users = "Users";
     public const string Auth = "Auth";
     public const string Security = "Security";
+    public const string Roles = "Roles";
+    public const string Masters = "Masters";
 }

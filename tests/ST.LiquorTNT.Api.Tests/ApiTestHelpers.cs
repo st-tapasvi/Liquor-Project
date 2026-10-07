@@ -19,6 +19,7 @@ internal static class ApiTestHelpers
     public const string AdminUser = "admin";
     public const string AdminPassword = "Admin@123";
     public const string StrongPassword = "E2e!Str0ngPass#1";     // satisfies the HARD policy
+    public const int SuperAdminRoleId = 1;                       // seeded by db/mysql/009
 
     /// <summary>Earlier runs may have left admin sessions open (limit is 2) or a lock; start clean.</summary>
     public static async Task ResetAdminAsync(WebApplicationFactory<Program> factory)
@@ -60,7 +61,8 @@ internal static class ApiTestHelpers
     {
         var response = await PostJson(client, "/api/users", new CreateUserRequest
         {
-            UserName = userName, Password = StrongPassword, RoleId = 1, FullName = "E2E User", ForcePasswordChange = forcePasswordChange,
+            UserName = userName, Password = StrongPassword, FullName = "E2E User", ForcePasswordChange = forcePasswordChange,
+            Roles = new() { new UserRoleAssignment { RoleId = SuperAdminRoleId } },     // throw-away users do not need a company
         }, adminToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Created, await response.Content.ReadAsStringAsync());

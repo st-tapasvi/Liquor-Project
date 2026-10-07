@@ -1,10 +1,16 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using ST.LiquorTNT.Business.Access;
 using ST.LiquorTNT.Business.Auth;
+using ST.LiquorTNT.Business.Companies;
+using ST.LiquorTNT.Business.Excises;
 using ST.LiquorTNT.Business.Common;
 using ST.LiquorTNT.Business.Common.Abstractions;
+using ST.LiquorTNT.Business.LiquorCategories;
+using ST.LiquorTNT.Business.Roles;
 using ST.LiquorTNT.Business.SecurityConfig;
+using ST.LiquorTNT.Business.SupplierCodes;
 using ST.LiquorTNT.Business.Users;
 using ST.LiquorTNT.Infrastructure.Audit;
 using ST.LiquorTNT.Infrastructure.Common;
@@ -48,8 +54,12 @@ public static class DependencyInjection
             }
         });
 
+        // Access: effective rights and supplier codes
+        services.AddScoped<IAccessRepository, AccessRepository>();
+
         // Users
         services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<IUserAccessRepository, UserAccessRepository>();
         services.AddScoped<IReferenceLookup, ReferenceLookup>();
         services.AddScoped<IPasswordPolicyRepository, PasswordPolicyRepository>();
 
@@ -62,6 +72,13 @@ public static class DependencyInjection
 
         // Security administration
         services.AddScoped<ISecurityConfigRepository, SecurityConfigRepository>();
+
+        // Roles and masters
+        services.AddScoped<IRoleRepository, RoleRepository>();
+        services.AddScoped<ILiquorCategoryRepository, LiquorCategoryRepository>();
+        services.AddScoped<ISupplierCodeRepository, SupplierCodeRepository>();
+        services.AddScoped<ICompanyRepository, CompanyRepository>();
+        services.AddScoped<IExciseRepository, ExciseRepository>();
 
         // cross-cutting
         services.AddScoped<ISecurityConfigProvider, SecurityConfigProvider>();

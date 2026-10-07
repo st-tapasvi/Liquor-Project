@@ -10,13 +10,20 @@ public sealed class PasswordPolicyRepository : IPasswordPolicyRepository
 
     public PasswordPolicyRepository(AppDbContext db) => _db = db;
 
-    public Task<PASSWORD_POLICY?> GetForRoleAsync(int roleId, CancellationToken ct) =>
-        (from map in _db.ROLE_PASSWORD_POLICY
-         join policy in _db.PASSWORD_POLICY on map.PasswordPolicyId equals policy.Id
-         where map.RoleId == roleId && policy.Status
-         select policy)
-        .AsNoTracking()
-        .FirstOrDefaultAsync(ct);
+    public async Task<IReadOnlyDictionary<int, PASSWORD_POLICY>> GetForRolesAsync(IReadOnlyCollection<int> roleIds, CancellationToken ct)
+    {
+        var rows = await (from map in _db.ROLE_PASSWORD_POLICY
+                          join policy in _db.PASSWORD_POLICY on map.PasswordPolicyId equals policy.Id
+                          where roleIds.Contains(map.RoleId) && policy.Status
+                          select new { map.RoleId, Policy = policy })
+                         .AsNoTracking()
+                         .ToListAsync(ct);
+
+        return rows.ToDictionary(r => r.RoleId, r => r.Policy);
+    }
+
+    public async Task<IReadOnlyList<int>> GetRoleIdsForUserAsync(int userId, CancellationToken ct) =>
+        await _db.USER_ROLES.AsNoTracking().Where(r => r.UserId == userId).Select(r => r.RoleId).Distinct().ToListAsync(ct);
 
     public Task<PASSWORD_POLICY?> GetByIdAsync(int id, CancellationToken ct) =>
         _db.PASSWORD_POLICY.FirstOrDefaultAsync(p => p.Id == id, ct);

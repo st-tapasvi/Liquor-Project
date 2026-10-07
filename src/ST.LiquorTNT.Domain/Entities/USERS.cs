@@ -25,8 +25,7 @@ public class USERS
     public string? Phone { get; private set; }
     public string? EmployeeCode { get; private set; }
 
-    // access assignment (role-wise password policy uses RoleId; company is the home customer)
-    public int? RoleId { get; private set; }
+    // home company (customer). Roles and rights live in USER_ROLES / USER_RIGHTS, not on this row.
     public int? CompanyId { get; private set; }
 
     // credential
@@ -63,7 +62,6 @@ public class USERS
     public static USERS Create(
         string userName,
         string passwordHash,
-        int roleId,
         int? companyId,
         string? fullName,
         string? email,
@@ -82,7 +80,6 @@ public class USERS
         var user = new USERS
         {
             UserName = userName.Trim(),
-            RoleId = roleId,
             CompanyId = companyId,
             FullName = Clean(fullName),
             Email = Clean(email),
@@ -104,8 +101,6 @@ public class USERS
         string? email,
         string? phone,
         string? employeeCode,
-        int roleId,
-        int? companyId,
         DateTime now,
         int? updatedBy)
     {
@@ -113,8 +108,6 @@ public class USERS
         Email = Clean(email);
         Phone = Clean(phone);
         EmployeeCode = Clean(employeeCode);
-        RoleId = roleId;
-        CompanyId = companyId;
         Touch(now, updatedBy);
     }
 

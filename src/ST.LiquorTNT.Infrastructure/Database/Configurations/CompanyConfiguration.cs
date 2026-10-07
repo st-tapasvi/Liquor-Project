@@ -13,6 +13,8 @@ public sealed class CompanyConfiguration : IEntityTypeConfiguration<COMPANY>
         builder.HasKey(c => c.Id);
         builder.Property(c => c.Id).HasColumnName("ID");
         builder.Property(c => c.CompanyName).HasColumnName("COMPANY_NAME").HasMaxLength(500);
+        builder.Property(c => c.AliasName).HasColumnName("ALIAS_NAME").HasMaxLength(500);
+        builder.Property(c => c.City).HasColumnName("CITY").HasMaxLength(50);
         builder.Property(c => c.IsActive).HasColumnName("IS_ACTIVE");
     }
 }

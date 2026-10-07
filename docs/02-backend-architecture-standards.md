@@ -127,9 +127,9 @@ C:\Projects\Liquor_Application\              repository root
 
 ```
 ST.LiquorTNT.Api/
-├─ Controllers/          AuthController.cs today. Grows to: Company, Plant, User, Brand, Batch, Plan,
+├─ Controllers/          Auth, Users, Roles, Pages, SupplierCodes, LiquorCategories today. Grows to: Company, Brand, Batch, Plan,
 │                        CodePool, Palette, Case, Aggregation, Dispatch, PortalSync, Outbox, Report,
-│                        Setting, License, ScreenConfig; Line/ for the line-app endpoints
+│                        Setting, Supplier code, ScreenConfig; Line/ for the line-app endpoints
 ├─ Middleware/           CorrelationMiddleware.cs → ExceptionMiddleware.cs  (RequestLogging later)
 ├─ Security/             CurrentUser.cs, TenantContext.cs — read claims from the JWT, nothing else
 ├─ Extensions/           ApiServiceExtensions.cs — the ONLY file that references Infrastructure
@@ -151,8 +151,8 @@ ST.LiquorTNT.Business/
 │  │                     ForbiddenException, NotFoundException, BusinessException
 │  └─ Abstractions/      ONLY cross-module interfaces that Infrastructure implements (IPasswordHasher today)
 ├─ DependencyInjection.cs   AddBusiness()
-└─ (next) Brands/ Batches/ Companies/ Plants/ Users/ Plans/ CodePool/ Palette/ Production/ Aggregation/
-          CaseData/ Dispatch/ PortalSync/ Outbox/ Reports/ Settings/ License/ ScreenConfig/ FeatureFlags/ Line/
+└─ (next) Brands/ Batches/ Companies/ Plans/ CodePool/ Palette/ Production/ Aggregation/
+          CaseData/ Dispatch/ PortalSync/ Outbox/ Reports/ Settings/ Supplier code/ ScreenConfig/ FeatureFlags/ Line/
           Excise/  IBrandProvider ICaseCodeGenerator IBottleCodeValidator IPortalProcessor
                    IDispatchProcessor IExciseRules IExciseCapabilityResolver
                    RJ/ JK/ MP/ UP/ DL/ CG/ AS/ HP/ TN/ KL/ MG/  Common/
@@ -162,7 +162,7 @@ ST.LiquorTNT.Business/
 
 ```
 ST.LiquorTNT.Domain/
-├─ Entities/             User.cs, UserRight.cs today; then Company, Plant, Excise, Brand, Batch, Bottle,
+├─ Entities/             USERS, ROLES, ROLE_RIGHTS, USER_ROLES, USER_RIGHTS, PAGES, PAGE_ACTIONS, SUPPLIER_CODE, LIQUOR_CATEGORY … today; then Brand, Batch, Bottle,
 │                        Case, BottleMapping, Dispatch, Palette, OutboxMessage, AuditEntry
 ├─ Exceptions/           DomainException.cs
 └─ (next) ValueObjects/  CaseCode, HologramNumber, BrandCode, Gtin, SerialRange, ExciseCode
@@ -195,7 +195,7 @@ ST.LiquorTNT.Logging/
 ├─ LogModeSwitch.cs      NORMAL / DETAIL, switched live
 ├─ AppJsonFormatter.cs   one JSON object per line, IST time, readable message
 ├─ SafeJson.cs           serialise + mask secrets (password, answer, token, hash …) before anything is logged
-└─ LogFields.cs          property names every entry carries (CorrelationId, UserId, CompanyId, PlantId, ExciseCode, …)
+└─ LogFields.cs          property names every entry carries (CorrelationId, UserId, CompanyId, SupplierCodeId, ExciseCode, …)
 ```
 
 Host logging only. The audit / user log is a business feature and lives in Infrastructure, not here.
@@ -275,7 +275,7 @@ Rules:
 - Every endpoint **MUST** carry `[HasPermission("...")]` unless it is part of the auth flow or `/health`.
 - Every async endpoint **MUST** accept and pass `CancellationToken`.
 - Request validation uses FluentValidation, registered in the pipeline; a controller never validates manually.
-- `CompanyId`, `PlantId`, `ExciseCode` **MUST NOT** be accepted as request parameters. They come from `ITenantContext`. ⛔
+- `CompanyId`, `SupplierCodeId`, `ExciseCode` **MUST NOT** be accepted as request parameters. They come from `ITenantContext`. ⛔ (Only exception: Super Admin naming the company a new supplier code or first user belongs to - that is the data being created, not the caller's scope.)
 
 **Response format**
 
@@ -400,7 +400,7 @@ public interface IProductionReportQuery
 2. **Versioning** — scripts are committed with the application and applied by migration. ⛔ Applying a SP manually on a customer database. Every script is idempotent (`CREATE OR REPLACE` / drop-and-create) and carries a header comment: purpose, owner, date, why a SP was chosen.
 3. **Parity** — the file set under `Scripts/MySql/` and `Scripts/SqlServer/` **MUST** match. CI fails when an object exists on one side only.
 4. **Testing** — every SP or view that produces a business result **MUST** have an integration test, and that test runs against **both** providers.
-5. **Tenant safety** — global query filters do **not** apply to SPs, views or raw SQL. Every such object **MUST** take `CompanyId` / `PlantId` / `ExciseCode` as parameters, supplied from `ITenantContext`. ⛔ Passing a tenant value that came from the HTTP request. This is a security rule, not a style rule.
+5. **Tenant safety** — global query filters do **not** apply to SPs, views or raw SQL. Every such object **MUST** take `CompanyId` / `SupplierCodeId` / `ExciseCode` as parameters, supplied from `ITenantContext`. ⛔ Passing a tenant value that came from the HTTP request. This is a security rule, not a style rule.
 6. **Invocation differs per provider even when the SP is identical** — MySQL uses `CALL sp_Name(@p0, @p1)`, SQL Server uses `EXEC sp_Name @p0, @p1`. This is why an SP is always reached through two small provider-specific caller classes behind one interface, never one class with an `if`.
 7. **LINQ cannot be composed over a stored procedure.** `FromSqlRaw("CALL ...").Where(...).Skip(...)` does not work — EF cannot wrap an SP call. Every filter, sort and page must become an SP parameter and be applied inside the SP.
 8. **Views are the preferred shape for read models and reports**, and are the right answer whenever the caller still needs to filter, sort or page. A view is mapped as an EF keyless entity (`HasNoKey().ToView("vw_Name")`), after which normal LINQ composes over it — so the SQL is written once per provider and **the C# stays identical on both**. Reach for an SP only when the work is genuinely procedural (multiple steps, loops, bulk operations, maintenance).
@@ -434,26 +434,44 @@ public interface IProductionReportQuery
 
 ## 9. Multi-tenancy and security
 
-`ITenantContext` is populated by middleware from the authenticated session and contains `UserId, CompanyId, PlantId, ExciseCode, Rights`.
+Hierarchy: **Company → Excise → Supplier Code**. There is no plant entity.
+
+`ITenantContext` carries `CompanyId, SupplierCodeId, ExciseCode`. `SessionValidationMiddleware` reads the supplier code the user picked
+(`USER_SESSION.ACTIVE_SUPPLIER_CODE_ID`) and hands it over as `Api/Security/SessionScope`; without a picked supplier code, `CompanyId` is the
+user's home company from the `company_id` claim.
 
 - ⛔ Accepting any tenant value from the request body, query string or a client-supplied header.
 - Every tenant-scoped entity implements `ITenantScoped`; the EF interceptor applies the filter globally.
 - SPs, views and raw SQL take tenant parameters explicitly (§8.2 rule 5).
 - Authorization is **server-side only**. The frontend hiding a button is not authorization. Permission keys match the frontend list exactly.
-- Portal credentials and connection secrets are encrypted at rest; ⛔ plain text in `appsettings.json` on a customer server.
-- Passwords and line PINs are hashed with **PBKDF2-SHA256, 100,000 iterations, per-user salt** (`Infrastructure/Identity/Pbkdf2PasswordHasher.cs`, stored as `PBKDF2.SHA256.<iterations>.<salt>.<hash>` so the algorithm can be rotated later). **Failed-login lock is data, not code:** `MAX_FAILED_LOGIN_ATTEMPTS` wrong passwords within one **IST calendar day** set `USERS.LOCKED_UNTIL = now + ACCOUNT_LOCK_DURATION_MINUTES` (both from `SECURITY_CONFIG`, switchable with `FAILED_LOGIN_LOCK_ENABLED`). A failure on a new day, or after an expired lock, restarts the count at 1; while locked even the correct password is refused and the lock is never extended; a successful login wipes the counter; an administrator may unlock early (`POST /api/users/{id}/unlock`). `IS_ACTIVE = 0` is the permanent state, `LOCKED_UNTIL` the temporary one. A wrong *current* password on change-password counts as a failed attempt too. The rule lives in `Domain/Entities/USERS.cs` (`RegisterFailedLogin`).
-- JWT bearer for the web: claims `sub`, `unique_name`, `jti`, `role_id`, `company_id` (`perm` claims arrive with the roles module). `JwtSecurityTokenHandler.DefaultInboundClaimTypeMap` is cleared so claim names stay exactly as issued. `Jwt:SigningKey` must be ≥ 32 characters and is changed on every installation.
-- **Sessions are server-side.** Every login writes a `USER_SESSION` row holding the SHA-256 hash of the token (never the token); `SessionValidationMiddleware` runs after JWT validation and refuses a token whose session is not `ACTIVE` or has passed its deadline. **Web sessions slide:**
-  - `EXPIRES_AT` is last activity + `SESSION_IDLE_MINUTES` (default 60). It moves forward with every call, written at most once a minute.
-  - `ABSOLUTE_EXPIRES_AT` is login + `SESSION_EXPIRY_MINUTES` (default 1440), a hard limit even while working. The JWT expires at the same moment.
-  - Idle too long gives `401 SESSION_TIMED_OUT`; the client goes to the login page.
-  - The hard limit gives `401 SESSION_EXPIRED`, from the session check or the expired JWT; the client shows a password popup, logs in again and retries the failed call, so no work is lost.
-  - Logged out, revoked or unknown gives `401 SESSION_INVALID`; the client goes to the login page.
-  - A request that already passed the check always completes, even if the session ends while it runs.
-  
-  The rest of the session behaviour: Logout, self-revocation, deactivation, a password change and a password reset end sessions immediately. `MAX_ACTIVE_SESSIONS` is enforced at login; when reached the new login is **rejected** (`SESSION_FULL_BEHAVIOUR = REJECT`). Passwords use PBKDF2; session and reset tokens, being long random strings, use SHA-256 (`ITokenHasher`).
-- **Forgot password** is a three-step anonymous flow (`start` → `verify` → `reset`) backed by `PASSWORD_RESET_REQUEST`: random single-use token (hash stored), one open request per user, `PASSWORD_RESET_MAX_ATTEMPTS` answers, `PASSWORD_RESET_EXPIRY_MINUTES` validity, answers normalised (trim, lower-case, collapsed spaces) and PBKDF2-hashed in `USER_SECURITY_QUESTION`. Setting a question requires the current password.
-- File uploads (Excel import): extension allow-list and size limit enforced server-side.
+
+### 9.1 Roles and rights
+
+Full design and API: `06-roles-rights-plan.md`. The rules every module follows:
+
+- **Model (ERPNext-style):** a user holds several **master roles**, each for one supplier code or for all supplier codes of the company
+  (`USER_ROLES.SUPPLIER_CODE_ID` null), plus **custom rights** (`USER_RIGHTS`) that only ever *add*. Effective rights in the active supplier code
+  = union of both. Roles are company-wise; **Super Admin** (`ROLES.IS_SYSTEM`, Sundaram Tech) has every right in every company.
+- **Permission key** = `PAGE_ACTIONS.PERMISSION_KEY` (`<page>.<action>`), seeded by SQL. Every key the backend checks is a constant in
+  `Business/Access/Permissions.cs`; add the constant and the seed row together.
+- **Every endpoint** carries `[HasPermission(Permissions.X)]` (`Api/Security/HasPermissionAttribute.cs`) except the auth flow and
+  `/health`. The policy is built on the fly (`PermissionPolicyProvider`) and checked by `PermissionHandler` through
+  `Business/Access/CurrentAccess`, which services also use for their own rules. Refusals: `409 SUPPLIER_CODE_NOT_SELECTED` (no supplier code picked),
+  `403 PERMISSION_DENIED` (key missing; the detail names it).
+- **Rights are read per request** (one query, kept for the request by the scoped `CurrentAccess`), never put in the JWT — a change applies
+  on the next call.
+- **Grant scope** (`PAGE_ACTIONS.GRANT_SCOPE`): `ANY`; `ADMIN` — only a holder of `user.manageadmin` may grant it; `SYSTEM` — never
+  granted, Super Admin only (CRM masters). Admin users (holders of an `IS_ADMIN_ROLE` role, Plant Admin) are managed only by a holder of
+  `user.manageadmin`; nobody but Super Admin changes their own roles or rights.
+- **Password policy** with several roles = the strictest value of each rule (`PASSWORD_POLICY.Strictest`).
+
+### 9.2 Status values and lookup tables
+
+- A value the code branches on (e.g. `PAGE_ACTIONS.GRANT_SCOPE`, later approval statuses) is a C# `enum` stored as **text** in its
+  column — no table. A business category that grows as data (`LIQUOR_CATEGORY`) gets its **own lookup table** with a foreign key.
+  ⛔ A generic "LOOKUP" table.
+- Page-specific steps (approve, reject, cancel …) are just more `PAGE_ACTIONS` rows of that page; who may take them is only ever a
+  role right, never code. The batch approval design is recorded in `06-roles-rights-plan.md` §9 and is built with the batch page.
 
 ---
 
@@ -541,7 +559,7 @@ Three **separate** streams. They are not the same thing and must not be merged.
 
 ### Normal mode (default)
 
-`Information` level. One entry per API call: correlation id, user, company, plant, excise, operation, duration, outcome. Business events are logged as summaries (`cases generated: 240`, `dispatch sent`, `sync completed`) — ⛔ one entry per bottle or per case.
+`Information` level. One entry per API call: correlation id, user, company, supplier code, excise, operation, duration, outcome. Business events are logged as summaries (`cases generated: 240`, `dispatch sent`, `sync completed`) — ⛔ one entry per bottle or per case.
 
 ### Detail mode
 
@@ -554,7 +572,7 @@ Detail mode **MUST** obey all four:
 3. **Auto-expiry mandatory** — always enabled with a duration (30 min / 1 h / 4 h) and it switches itself off. At this volume an accidentally-left-on verbose switch fills the customer's disk in hours.
 4. **Sampling on hot paths** — on line aggregation writes, log every Nth request plus all failures, never every request.
 
-Every log entry automatically carries: timestamp, correlation id, user, company, plant, excise, operation, duration, outcome. Developers do not pass these by hand.
+Every log entry automatically carries: timestamp, correlation id, user, company, supplier code, excise, operation, duration, outcome. Developers do not pass these by hand.
 
 ⛔ Never logged: passwords, PINs, tokens, portal credentials, connection strings, full personal data. Log ids and codes.
 
@@ -596,7 +614,7 @@ Every log entry automatically carries: timestamp, correlation id, user, company,
 A business feature, not application logging. Every state's existing application has this screen and it is required for compliance.
 
 - Written for every user action that changes data, and for login/logout/lockout.
-- Columns: user, company, plant, excise, module, screen, action, entity, entity id, timestamp, correlation id, before/after summary for updates.
+- Columns: user, company, supplier code, excise, module, screen, action, entity, entity id, timestamp, correlation id, before/after summary for updates.
 - Written through `IUserLogWriter` (`Business/Common/Abstractions`): the service describes what happened (`UserLogEntry` — action type from `UserLogActions`, module, entity, plain before/after objects), the writer adds IP, user agent, correlation id and IST time and **stages** the row; the service's own `SaveChanges` commits the audit row and the change in one transaction. Create is the one exception (two commits, because the audit needs the generated id). An EF interceptor was considered and rejected: it cannot name the business action (login vs. lockout vs. reset) or the actor of an anonymous flow.
 - Never contains a password, hash, security answer or token — callers pass response DTOs, not entities.
 - Exposed through `/api/reports/user-log` with filters and CSV export.
@@ -690,15 +708,16 @@ The published OpenAPI document is the input for the frontend's generated client;
 
 ---
 
-## 21. Implementation status (2026-09-28)
+## 21. Implementation status (2026-10-07)
 
 | Done | Not yet |
 |---|---|
 | Solution scaffold, 13 projects, central package versions, 7 architecture rules | EF migrations (User-module schema is hand-run SQL `db/mysql/003`–`005`; the base `USERS`/`ROLES`/`COMPANY`/`USER_LOG` tables come from the legacy merge) |
-| **User module, complete:** users CRUD + activate/deactivate/unlock, role-wise password policy + validation + history, login with IST-day lockout, server-side sessions (limit/expiry/logout/revoke), change password, security questions + forgot-password (wrong answers count towards the lock), `USER_LOG` audit in the same transaction, admin editing of `SECURITY_CONFIG` and `PASSWORD_POLICY`. Interim `Administrator` authorization policy (`role_id` == `SECURITY_CONFIG.ADMIN_ROLE_ID`) on user-management/admin controllers. Two independent audits applied. | `[HasPermission]` attribute and policy handler (replaces the interim policy); role rights; user ↔ plant/excise access mapping; rate limiting on anonymous auth routes; row lock for concurrent logins at the session limit |
+| **User module, complete:** users CRUD + activate/deactivate/unlock, role-wise password policy + validation + history, login with IST-day lockout, server-side sessions (limit/expiry/logout/revoke), change password, security questions + forgot-password (wrong answers count towards the lock), `USER_LOG` audit in the same transaction, admin editing of `SECURITY_CONFIG` and `PASSWORD_POLICY`. Two independent audits applied. | Batch page (create / approve / cancel, design in docs/06 §9); rate limiting on anonymous auth routes; row lock for concurrent logins at the session limit |
+| **Roles & rights module, complete (docs/06):** company-wise master roles + custom rights per supplier code, Super Admin, default role templates copied on a company's first supplier code, `[HasPermission]` on every endpoint, supplier code picked after login and kept in the session, admin-user protection (`user.manageadmin`), grant scopes ANY / ADMIN / SYSTEM, strictest password policy across roles, supplier code and liquor category masters. Script `db/mysql/009`. | Company and brand masters; SQL Server copy of `009` |
 | PBKDF2 hashing; JWT issue + validation; SHA-256 session/reset token hashing | Tenant filter interceptor; detail-mode logging toggle; request logging middleware |
 | ProblemDetails for every error path incl. model binding, `DATABASE_ERROR`, correlation header preserved | SQL Server provider package; Testcontainers (database tests run against the dev MySQL, overridable via `ST_TNT_TEST_CONNECTION`) |
-| 232 tests: Domain 55, Business 145, Infrastructure 16, Api end-to-end 8, Architecture 7 | Every business module after Users/Auth; Line API; outbox; portals |
+| 422 tests: Domain 74, Business 215, Infrastructure 21, Api 104, Architecture 7, Edge 1 (2 cookie tests in Api fail: the test helper sends the URL-encoded XSRF cookie value; not caused by roles) | Every business module after Users/Auth; Line API; outbox; portals |
 
 The former `tnt_user` scaffold was removed; the User module is built on the CAPITAL-named legacy tables (`USERS`, `ROLES`, `COMPANY`, `USER_LOG`) plus the tables added by `003`. Entity classes carry the exact table names (§4).
 

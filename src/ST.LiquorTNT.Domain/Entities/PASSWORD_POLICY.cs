@@ -111,6 +111,43 @@ public class PASSWORD_POLICY
         UpdatedBy = updatedBy;
     }
 
+    /// <summary>
+    /// One policy built from several: a user with many roles gets the STRICTEST value of every rule across
+    /// the policies of those roles (owner decision). The result is only used in memory, never saved.
+    /// </summary>
+    public static PASSWORD_POLICY Strictest(IReadOnlyCollection<PASSWORD_POLICY> policies, DateTime now)
+    {
+        if (policies.Count == 0)
+        {
+            throw new ArgumentException("At least one policy is needed.", nameof(policies));
+        }
+
+        if (policies.Count == 1)
+        {
+            return policies.First();
+        }
+
+        var minLength = policies.Max(p => p.MinLength);                      // longest minimum
+        var maxLength = Math.Max(minLength, policies.Min(p => p.MaxLength)); // shortest maximum, never below the minimum
+        var expiring = policies.Where(p => p.PasswordExpiryEnabled && p.PasswordExpiryDays is > 0).ToList();
+
+        return Create(
+            "STRICTEST(" + string.Join(",", policies.Select(p => p.PolicyName)) + ")",
+            minLength,
+            maxLength,
+            requireUppercase: policies.Any(p => p.RequireUppercase),
+            requireLowercase: policies.Any(p => p.RequireLowercase),
+            requireNumber: policies.Any(p => p.RequireNumber),
+            requireSpecialCharacter: policies.Any(p => p.RequireSpecialCharacter),
+            passwordHistoryCount: policies.Max(p => p.PasswordHistoryCount),
+            passwordExpiryEnabled: expiring.Count > 0,
+            passwordExpiryDays: expiring.Count > 0 ? expiring.Min(p => p.PasswordExpiryDays) : null,   // soonest expiry
+            allowUsernameInPassword: policies.All(p => p.AllowUsernameInPassword),
+            allowCommonPassword: policies.All(p => p.AllowCommonPassword),
+            now,
+            createdBy: null);
+    }
+
     /// <summary>When a password set at <paramref name="now"/> expires under this policy; null = never.</summary>
     public DateTime? ExpiryFrom(DateTime now) =>
         PasswordExpiryEnabled && PasswordExpiryDays is > 0 ? now.AddDays(PasswordExpiryDays.Value) : null;

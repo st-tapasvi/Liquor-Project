@@ -18,7 +18,6 @@ public static class UserProjections
         Email = u.Email,
         Phone = u.Phone,
         EmployeeCode = u.EmployeeCode,
-        RoleId = u.RoleId,
         CompanyId = u.CompanyId,
         IsActive = u.IsActive,
         IsBlocked = u.IsBlocked,

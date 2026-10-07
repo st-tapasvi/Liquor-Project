@@ -7,8 +7,6 @@ public sealed class UpdateUserRequestValidator : AbstractValidator<UpdateUserReq
 {
     public UpdateUserRequestValidator()
     {
-        RuleFor(x => x.RoleId).GreaterThan(0);
-        RuleFor(x => x.CompanyId).GreaterThan(0).When(x => x.CompanyId.HasValue);
         RuleFor(x => x.FullName).MaximumLength(100);
         RuleFor(x => x.Email).MaximumLength(100).EmailAddress().When(x => !string.IsNullOrWhiteSpace(x.Email));
         RuleFor(x => x.Phone).MaximumLength(20);

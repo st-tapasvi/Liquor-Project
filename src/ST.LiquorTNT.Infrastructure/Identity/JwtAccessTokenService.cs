@@ -10,8 +10,9 @@ using ST.LiquorTNT.Domain.Entities;
 namespace ST.LiquorTNT.Infrastructure.Identity;
 
 /// <summary>
-/// HS256 JWT carrying identity claims only. Authorization (rights) is not in the token yet — it
-/// arrives with the roles module. The token's hash is what USER_SESSION stores.
+/// HS256 JWT carrying identity claims only (user id, name, home company). Rights are deliberately NOT in the
+/// token: they are read from the database per request, so a change by an administrator applies on the next call
+/// without a new login. The token's hash is what USER_SESSION stores.
 /// </summary>
 public sealed class JwtAccessTokenService : IAccessTokenService
 {
@@ -42,11 +43,6 @@ public sealed class JwtAccessTokenService : IAccessTokenService
             new("unique_name", user.UserName),
             new("jti", Guid.NewGuid().ToString("N")),
         };
-
-        if (user.RoleId.HasValue)
-        {
-            claims.Add(new Claim("role_id", user.RoleId.Value.ToString(CultureInfo.InvariantCulture)));
-        }
 
         if (user.CompanyId.HasValue)
         {

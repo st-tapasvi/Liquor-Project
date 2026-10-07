@@ -40,10 +40,10 @@ internal static class TestData
         int id = 10,
         string userName = "alice",
         string passwordHash = "H:Secret@1",
-        int roleId = 1,
+        int? companyId = null,
         bool forceChange = false,
         DateTime? expiresAt = null)
-        => USERS.Create(userName, passwordHash, roleId, companyId: null, "Alice", null, null, null,
+        => USERS.Create(userName, passwordHash, companyId, "Alice", null, null, null,
             forceChange, expiresAt, Now, createdBy: 1).WithId(id);
 }
 

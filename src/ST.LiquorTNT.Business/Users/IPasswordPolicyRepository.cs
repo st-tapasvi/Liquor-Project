@@ -5,8 +5,14 @@ namespace ST.LiquorTNT.Business.Users;
 /// <summary>Reads password policies and the role → policy assignment. Implemented in Infrastructure.</summary>
 public interface IPasswordPolicyRepository
 {
-    /// <summary>The active policy assigned to a role via ROLE_PASSWORD_POLICY, or null if none is assigned.</summary>
-    Task<PASSWORD_POLICY?> GetForRoleAsync(int roleId, CancellationToken ct);
+    /// <summary>
+    /// The active policy of each role in <paramref name="roleIds"/> (via ROLE_PASSWORD_POLICY), keyed by role id.
+    /// A role without an assigned active policy is simply missing from the result.
+    /// </summary>
+    Task<IReadOnlyDictionary<int, PASSWORD_POLICY>> GetForRolesAsync(IReadOnlyCollection<int> roleIds, CancellationToken ct);
+
+    /// <summary>The distinct role ids a user holds (any supplier code).</summary>
+    Task<IReadOnlyList<int>> GetRoleIdsForUserAsync(int userId, CancellationToken ct);
 
     Task<PASSWORD_POLICY?> GetByIdAsync(int id, CancellationToken ct);
 

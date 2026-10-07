@@ -183,7 +183,7 @@ public sealed class AuthFlowTests
         {
             var response = await PostJson(client, "/api/users", new CreateUserRequest
             {
-                UserName = NewTempUserName(), Password = "short", RoleId = 1,
+                UserName = NewTempUserName(), Password = "short", Roles = new() { new UserRoleAssignment { RoleId = SuperAdminRoleId } },
             }, admin.AccessToken);
 
             response.StatusCode.Should().Be(HttpStatusCode.BadRequest);

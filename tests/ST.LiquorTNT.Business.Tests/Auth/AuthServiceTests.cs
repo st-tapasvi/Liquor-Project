@@ -1,4 +1,5 @@
 using FluentAssertions;
+using ST.LiquorTNT.Business.Access;
 using ST.LiquorTNT.Business.Auth;
 using ST.LiquorTNT.Business.Common;
 using ST.LiquorTNT.Business.Common.Exceptions;
@@ -22,6 +23,7 @@ public sealed class AuthServiceTests
     private readonly FakeRequestContext _request = new();
     private readonly FakeSecurityConfigProvider _config;
     private readonly FakeCurrentUser _currentUser = new(userId: 10, userName: "alice");
+    private readonly FakeAccessRepository _access = new();
     private readonly AuthService _service;
 
     public AuthServiceTests()
@@ -39,10 +41,10 @@ public sealed class AuthServiceTests
 
         var hasher = new FakePasswordHasher();
         var policies = new FakePasswordPolicyRepository(TestData.Policy(minLength: 6, historyCount: 3));
-        var rules = new PasswordRules(policies, _users, new PasswordPolicyValidator(hasher));
+        var rules = new PasswordRules(policies, _users, new PasswordPolicyValidator(hasher), _clock);
 
         _service = new AuthService(_users, _sessions, new CredentialVerifier(_users, hasher, _log), hasher, _tokens, new FakeTokenHasher(),
-            _config, rules, _clock, _currentUser, _request, _log, new LoginRequestValidator(), new ChangePasswordRequestValidator());
+            _config, rules, _clock, _currentUser, _request, _log, new SupplierCodeDirectory(_access), new LoginRequestValidator(), new ChangePasswordRequestValidator());
     }
 
     private USERS AddUser(bool forceChange = false, DateTime? expiresAt = null)
@@ -347,8 +349,8 @@ public sealed class AuthServiceTests
     {
         var anonymous = new AuthService(_users, _sessions, new CredentialVerifier(_users, new FakePasswordHasher(), _log), new FakePasswordHasher(),
             _tokens, new FakeTokenHasher(), _config,
-            new PasswordRules(new FakePasswordPolicyRepository(), _users, new PasswordPolicyValidator(new FakePasswordHasher())),
-            _clock, new FakeCurrentUser(userId: null, userName: null), _request, _log,
+            new PasswordRules(new FakePasswordPolicyRepository(), _users, new PasswordPolicyValidator(new FakePasswordHasher()), _clock),
+            _clock, new FakeCurrentUser(userId: null, userName: null), _request, _log, new SupplierCodeDirectory(_access),
             new LoginRequestValidator(), new ChangePasswordRequestValidator());
 
         await anonymous.Invoking(s => s.GetCurrentUserAsync(CancellationToken.None)).Should().ThrowAsync<UnauthorizedException>();

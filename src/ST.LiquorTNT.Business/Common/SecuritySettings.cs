@@ -30,9 +30,6 @@ public sealed class SecuritySettings
     public int PasswordResetExpiryMinutes { get; init; }
     public int PasswordResetMaxAttempts { get; init; }
 
-    // --- interim authorization until the roles module ships [HasPermission] ---
-    public int AdminRoleId { get; init; }
-
     // --- application log: NORMAL (default) or DETAIL (bodies, method input/output, SQL) ---
     public bool DetailLogging { get; init; }
 
@@ -59,8 +56,6 @@ public sealed class SecuritySettings
 
             PasswordResetExpiryMinutes = PositiveInt(entries, Keys.PasswordResetExpiryMinutes, 15),
             PasswordResetMaxAttempts   = PositiveInt(entries, Keys.PasswordResetMaxAttempts, 5),
-
-            AdminRoleId                = PositiveInt(entries, Keys.AdminRoleId, 1),
 
             DetailLogging              = Str(entries, Keys.LogMode, LogModes.Normal).Equals(LogModes.Detail, StringComparison.OrdinalIgnoreCase),
         };
@@ -113,7 +108,6 @@ public sealed class SecuritySettings
         public const string SecurityQuestionRequired   = "SECURITY_QUESTION_REQUIRED";
         public const string PasswordResetExpiryMinutes = "PASSWORD_RESET_EXPIRY_MINUTES";
         public const string PasswordResetMaxAttempts   = "PASSWORD_RESET_MAX_ATTEMPTS";
-        public const string AdminRoleId                = "ADMIN_ROLE_ID";
         public const string LogMode                    = "LOG_MODE";
     }
 }

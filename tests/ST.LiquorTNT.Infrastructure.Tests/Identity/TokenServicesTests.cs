@@ -47,7 +47,7 @@ public sealed class TokenServicesTests
             Audience = "ST.LiquorTNT.Web",
             SigningKey = "unit-test-signing-key-with-at-least-32-chars",
         });
-        var user = USERS.Create("alice", "H:x", roleId: 1, companyId: 5, null, null, null, null, false, null,
+        var user = USERS.Create("alice", "H:x", companyId: 5, null, null, null, null, false, null,
             new DateTime(2026, 9, 28, 10, 0, 0), null);
         var expires = DateTime.UtcNow.AddMinutes(30);
 
@@ -57,7 +57,7 @@ public sealed class TokenServicesTests
         jwt.Issuer.Should().Be("ST.LiquorTNT");
         jwt.Audiences.Should().Contain("ST.LiquorTNT.Web");
         jwt.Claims.Should().Contain(c => c.Type == "unique_name" && c.Value == "alice");
-        jwt.Claims.Should().Contain(c => c.Type == "role_id" && c.Value == "1");
+        jwt.Claims.Should().NotContain(c => c.Type == "role_id");         // rights are read per request, never from the token
         jwt.Claims.Should().Contain(c => c.Type == "company_id" && c.Value == "5");
         jwt.Claims.Should().Contain(c => c.Type == "jti");
         jwt.ValidTo.Should().BeCloseTo(expires, TimeSpan.FromSeconds(1));

@@ -40,7 +40,7 @@ public sealed class UserRepositoryTests
         user.Should().NotBeNull();
         user!.UserName.Should().Be("admin");
         user.IsActive.Should().BeTrue();
-        user.RoleId.Should().Be(1);        // Administrator, from the seed
+        user.CompanyId.Should().BeNull();  // Super Admin belongs to no company
     }
 
     [Fact]
@@ -59,10 +59,10 @@ public sealed class UserRepositoryTests
         await using var db = NewContext();
         var repo = new UserRepository(db);
 
-        var all = await repo.GetPageAsync(null, page: 1, pageSize: 200, CancellationToken.None);
-        var filtered = await repo.GetPageAsync("adm", page: 1, pageSize: 10, CancellationToken.None);
-        var tiny = await repo.GetPageAsync(null, page: 1, pageSize: 1, CancellationToken.None);
-        var beyond = await repo.GetPageAsync(null, page: 100000, pageSize: 50, CancellationToken.None);
+        var all = await repo.GetPageAsync(null, null, page: 1, pageSize: 200, CancellationToken.None);
+        var filtered = await repo.GetPageAsync(null, "adm", page: 1, pageSize: 10, CancellationToken.None);
+        var tiny = await repo.GetPageAsync(null, null, page: 1, pageSize: 1, CancellationToken.None);
+        var beyond = await repo.GetPageAsync(null, null, page: 100000, pageSize: 50, CancellationToken.None);
 
         all.TotalCount.Should().Be(await db.USERS.CountAsync());
         all.Items.Select(u => u.UserName).Should().BeInAscendingOrder();
@@ -82,7 +82,7 @@ public sealed class UserRepositoryTests
         await using var db = NewContext();
         var repo = new UserRepository(db);
 
-        var first = USERS.Create(name, "H:x", 1, null, null, null, null, null, false, null, now, null);
+        var first = USERS.Create(name, "H:x", null, null, null, null, null, false, null, now, null);
         await repo.AddAsync(first, CancellationToken.None);
         await repo.SaveChangesAsync(CancellationToken.None);
 
@@ -90,7 +90,7 @@ public sealed class UserRepositoryTests
         {
             await using var db2 = NewContext();
             var repo2 = new UserRepository(db2);
-            var second = USERS.Create(name.ToUpperInvariant(), "H:x", 1, null, null, null, null, null, false, null, now, null);
+            var second = USERS.Create(name.ToUpperInvariant(), "H:x", null, null, null, null, null, false, null, now, null);
             await repo2.AddAsync(second, CancellationToken.None);
 
             var ex = await repo2.Invoking(r => r.SaveChangesAsync(CancellationToken.None)).Should().ThrowAsync<BusinessException>();
@@ -106,18 +106,18 @@ public sealed class UserRepositoryTests
     }
 
     [Fact]
-    public async Task PasswordPolicyRepository_ResolvesPolicyThroughRole()
+    public async Task PasswordPolicyRepository_ResolvesPolicyThroughRoles()
     {
         await using var db = NewContext();
         var repo = new PasswordPolicyRepository(db);
 
-        var hard = await repo.GetForRoleAsync(1, CancellationToken.None);      // Administrator -> HARD (seed)
-        var none = await repo.GetForRoleAsync(9999, CancellationToken.None);
+        var byRole = await repo.GetForRolesAsync(new[] { 1, 9999 }, CancellationToken.None);   // Super Admin -> HARD (seed)
+        var adminRoles = await repo.GetRoleIdsForUserAsync(1, CancellationToken.None);         // admin holds Super Admin
 
-        hard.Should().NotBeNull();
-        hard!.PolicyName.Should().Be("HARD");
-        hard.MinLength.Should().Be(12);
-        none.Should().BeNull();
+        byRole.Should().ContainKey(1).And.NotContainKey(9999);
+        byRole[1].PolicyName.Should().Be("HARD");
+        byRole[1].MinLength.Should().Be(12);
+        adminRoles.Should().Contain(1);
     }
 
     [Fact]

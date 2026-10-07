@@ -4,7 +4,7 @@
 
 ## 1. Context and stack
 
-One **ASP.NET Core Web API (.NET 8)** replacing eleven state-wise desktop applications for liquor excise track & trace in India. One on-premise installation serves **multiple companies, plants and excise states at once**. States: `UP RJ MP JK DL CG AS HP TN KL MG`.
+One **ASP.NET Core Web API (.NET 8)** replacing eleven state-wise desktop applications for liquor excise track & trace in India. One on-premise installation serves **multiple companies, supplier codes and excise states at once**. States: `UP RJ MP JK DL CG AS HP TN KL MG`.
 
 About 80% of the behaviour is identical everywhere. The other 20% differs per state — case code format, source of master data, portal format — and is isolated into state components, never written as conditions in common code.
 
@@ -37,16 +37,16 @@ C:\Projects\Liquor_Application\          repository root
 
 The business layer is named **`Business`** (not "Application"). `ST.LiquorTNT.Integration` and `ST.LiquorTNT.Shared` do **not** exist — do not create them.
 
-**Api** — `Controllers/` (Auth today; then Company, Plant, User, Brand, Batch, Plan, CodePool, Palette, Case, Aggregation, Dispatch, PortalSync, Outbox, Report, Setting, License, ScreenConfig) · `Controllers/Line/` (LineAuth, LineMaster, LineCode, LineAggregation, LineHeartbeat) · `Middleware/` (Correlation → Exception → RequestLogging) · `Security/` (CurrentUser, TenantContext from claims) · `Extensions/ApiServiceExtensions.cs` (the only file referencing Infrastructure) · `Program.cs`
+**Api** — `Controllers/` (Auth, Users, Roles, Pages, SupplierCodes, LiquorCategories today; then Company, Brand, Batch, Plan, CodePool, Palette, Case, Aggregation, Dispatch, PortalSync, Outbox, Report, Setting, Supplier code, ScreenConfig) · `Controllers/Line/` (LineAuth, LineMaster, LineCode, LineAggregation, LineHeartbeat) · `Middleware/` (Correlation → Exception → RequestLogging) · `Security/` (CurrentUser, TenantContext from the session + claims, HasPermission + PermissionPolicyProvider/Handler) · `Extensions/ApiServiceExtensions.cs` (the only file referencing Infrastructure) · `Program.cs`
 
 **Business** — one folder per feature, names matching the frontend features:
 
 ```
 Auth/      IAuthService  AuthService  LoginRequestValidator  AuthOptions
            IUserRepository  IAccessTokenService        ← interfaces live in the feature that owns them
-Brands/ Batches/ Companies/ Plants/ Users/ Plans/ CodePool/ Palette/
+Access/ Roles/ Users/ SupplierCodes/ LiquorCategories/  (today)  Brands/ Batches/ Companies/ Plans/ CodePool/ Palette/
 Production/ Aggregation/ CaseData/ Dispatch/ PortalSync/ Outbox/ Reports/
-Settings/ License/ ScreenConfig/ FeatureFlags/ Line/
+Settings/ Supplier code/ ScreenConfig/ FeatureFlags/ Line/
 Excise/    IBrandProvider  ICaseCodeGenerator  IBottleCodeValidator
            IPortalProcessor  IDispatchProcessor  IExciseRules
            IExciseCapabilityResolver
@@ -58,7 +58,7 @@ Common/    ITenantContext  ICurrentUser  IClock  ErrorCodes
 DependencyInjection.cs   AddBusiness()
 ```
 
-**Domain** — `Entities/` (User, UserRight today; then Company, Plant, Excise, Brand, Batch, Bottle, Case, BottleMapping, Dispatch, Palette, OutboxMessage, AuditEntry) · `ValueObjects/` (CaseCode, HologramNumber, BrandCode, Gtin, SerialRange, ExciseCode) · `Rules/` · `Events/` · `Exceptions/` (DomainException). Private setters, behaviour through methods, **no interfaces, no EF attributes**.
+**Domain** — `Entities/` (USERS, ROLES, USER_ROLES, SUPPLIER_CODE … today; then Brand, Batch, Bottle, Case, BottleMapping, Dispatch, Palette, OutboxMessage, AuditEntry) · `ValueObjects/` (CaseCode, HologramNumber, BrandCode, Gtin, SerialRange, ExciseCode) · `Rules/` (GrantScope) · `Events/` · `Exceptions/` (DomainException). Private setters, behaviour through methods, **no interfaces, no EF attributes**.
 
 **Infrastructure**
 
@@ -144,7 +144,11 @@ Placement: an interface goes in the folder of the feature that **owns** it (`Bus
 
 Any interface outside these two kinds waits until a second implementation actually exists.
 
-**Tenant — never from the request.** `ITenantContext` is filled by middleware from the authenticated session and carries `UserId, CompanyId, PlantId, ExciseCode, Rights`. `CompanyId` / `PlantId` / `ExciseCode` must never be request parameters.
+**Tenant — never from the request.** Hierarchy Company → Excise → Supplier Code; there is no plant entity. `ITenantContext` carries `CompanyId, SupplierCodeId, ExciseCode`, filled by `SessionValidationMiddleware` from the supplier code picked for the session (`USER_SESSION.ACTIVE_SUPPLIER_CODE_ID`). `CompanyId` / `SupplierCodeId` / `ExciseCode` must never be request parameters.
+
+**Rights — `[HasPermission]` on every endpoint** (except the auth flow and `/health`), with a key from `Business/Access/Permissions.cs` that also exists as a `PAGE_ACTIONS` row. Inside a service, ask `CurrentAccess` (`HasPermissionAsync`, `EnsureCanManageAdminsAsync`, `RequireSupplierCode`, `CompanyScopeAsync`) — never read roles yourself. Rights are read per request and are never put in the JWT. A new page adds its `PAGES` / `PAGE_ACTIONS` rows (any action keys, e.g. `approve`) in its SQL script; nothing else changes. Full rules: `06-roles-rights-plan.md`.
+
+**Status values vs lookup tables.** A value the code branches on is a C# `enum` stored as text in the row; a business category that grows as data gets its own table with a foreign key. ⛔ A generic LOOKUP table.
 
 **State differences — capability, never a condition**
 
@@ -172,7 +176,7 @@ No `{ success, data, message }` envelope. Exceptions (all derive from `AppExcept
 
 **Logging** — indented JSON (`AppJsonFormatter`). Every entry has the same keys: `Timestamp` (IST), `Level`, `CorrelationId`, `Method`, `Message`, `Context`, plus `Exception` on errors. Put details in a scope field, not in the message; set `Method` only when the logging class is not the right name. Start-up and start-up failures are logged by `Program.cs`. How much is logged follows `SECURITY_CONFIG.LOG_MODE`: `NORMAL` gives one line per request plus errors; `DETAIL` adds request and response bodies, every Business method's input, output and exception (added automatically by `MethodLoggingProxy`, so write no logging code for it), and the SQL. It is switched live from the admin panel; never set levels in appsettings. Any other payload you log goes through `SafeJson`, which masks password, answer, token and hash fields. ⛔ Logging a secret, or a raw request body, directly.
 
-**Stored procedures, views, triggers** — use them wherever the use case calls for them, under three fixed rules: they live only in `Infrastructure/Database/Scripts/<Provider>/`; they are called through an interface declared in `Business`, implemented once per provider; and they take `CompanyId` / `PlantId` / `ExciseCode` as parameters from `ITenantContext`, because EF's global tenant filter does **not** apply to them — that one is a security rule. Every object must exist in **both** provider folders.
+**Stored procedures, views, triggers** — use them wherever the use case calls for them, under three fixed rules: they live only in `Infrastructure/Database/Scripts/<Provider>/`; they are called through an interface declared in `Business`, implemented once per provider; and they take `CompanyId` / `SupplierCodeId` / `ExciseCode` as parameters from `ITenantContext`, because EF's global tenant filter does **not** apply to them — that one is a security rule. Every object must exist in **both** provider folders.
 
 **Portal integration** — production writes to the local database first, with an outbox row in the same transaction; a background worker sends it onward and retries. A production endpoint never waits for a portal response.
 

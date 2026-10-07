@@ -53,8 +53,12 @@ Contracts → nothing                    wire format shared by Api, Business, De
 | `db/mysql/005_user_module_phase2.sql` | `USER_LOG.USER_ID/EXCISE_CODE` nullable, `PASSWORD_RESET_REQUEST.REQUEST_TOKEN_HASH`, admin credential |
 | `db/mysql/006_log_mode.sql` | `SECURITY_CONFIG.LOG_MODE` = `NORMAL` (the admin switches it to `DETAIL`) |
 | `db/mysql/007_session_sliding.sql` | `USER_SESSION.ABSOLUTE_EXPIRES_AT` (hard limit) + `SECURITY_CONFIG.SESSION_IDLE_MINUTES` = 60 (sliding window) |
+| `db/mysql/008_session_absolute_default.sql` | default for `USER_SESSION.ABSOLUTE_EXPIRES_AT` |
+| `db/mysql/009_roles_rights.sql` | roles & rights: `LIQUOR_CATEGORY`, `SUPPLIER_CODE` (supplier codes), `PAGE_ACTIONS`, company-wise `ROLES` + templates, rebuilt `ROLE_RIGHTS`, `USER_ROLES`, `USER_RIGHTS`, `USER_SESSION.ACTIVE_SUPPLIER_CODE_ID`; moves `USERS.ROLE_ID` into `USER_ROLES` and `COMPANY.EXCISE_CODE/SUPPLIER_CODE` into `SUPPLIER_CODE` (docs/06) |
+| `db/mysql/010_company_view.sql` | `company.view` permission (SYSTEM) for `GET /api/companies` |
+| `db/mysql/demo_globus_spirits.sql` | DEMO data only (Globus Spirits, supplier codes RJ 772 / RJ 1028 / JK 369, one user per role) — never on a customer installation |
 
-The `USERS`, `ROLES`, `ROLE_RIGHTS`, `PAGES`, `COMPANY`, `EXCISE`, `ALLOTEDPLANTS`, `USER_LOG` tables pre-exist in `st_tnt_liquor` (legacy merge); they are not created by these scripts.
+The `USERS`, `ROLES`, `PAGES`, `COMPANY`, `EXCISE`, `ALLOTEDPLANTS`, `USER_LOG` tables pre-exist in `st_tnt_liquor` (legacy merge); they are not created by these scripts.
 
 ---
 
@@ -69,14 +73,17 @@ The `USERS`, `ROLES`, `ROLE_RIGHTS`, `PAGES`, `COMPANY`, `EXCISE`, `ALLOTEDPLANT
 | `Middleware/CorrelationMiddleware.cs` | `X-Correlation-Id` in, echoed out, pushed into Serilog. |
 | `Middleware/ExceptionMiddleware.cs` | The only place errors become HTTP (RFC 7807 + `errorCode` + `correlationId`); also fills bare framework statuses (404/405/415/403) and returns exception chain, type and stack in every environment (ADR 0001); keeps headers set upstream. |
 | `Middleware/CsrfProtectionMiddleware.cs` | Browser CSRF guard: on POST/PUT/PATCH/DELETE to a non-anonymous endpoint that carries the `jwt` cookie and no Authorization header, `X-XSRF-TOKEN` must equal the `XSRF-TOKEN` cookie and a present `Origin` must be this host or a CORS origin → else `403 CSRF_REJECTED`. Bearer callers are never checked. |
-| `Middleware/SessionValidationMiddleware.cs` | After JWT auth: the token's session must be `ACTIVE` and inside its deadline in `USER_SESSION`. Slides the idle deadline (at most one write a minute; reads `SESSION_IDLE_MINUTES` only then). Ends it with `SESSION_TIMED_OUT` (idle → login page), `SESSION_EXPIRED` (hard limit → password popup + retry) or `SESSION_INVALID` (logged out / revoked), and audits the expiry. |
-| `Security/CurrentUser.cs` · `TenantContext.cs` · `RequestContext.cs` | Claims (`sub`, `unique_name`, `perm`; `company_id`…) and request facts (IP, user agent, correlation id, the token from the bearer header or else the `jwt` cookie) for Business. |
+| `Middleware/SessionValidationMiddleware.cs` | After JWT auth: the token's session must be `ACTIVE` and inside its deadline in `USER_SESSION`. Slides the idle deadline (at most one write a minute; reads `SESSION_IDLE_MINUTES` only then). Ends it with `SESSION_TIMED_OUT` (idle → login page), `SESSION_EXPIRED` (hard limit → password popup + retry) or `SESSION_INVALID` (logged out / revoked), and audits the expiry. Also loads the supplier code picked for the session and hands it to `TenantContext` as `SessionScope`. |
+| `Security/CurrentUser.cs` · `TenantContext.cs` · `RequestContext.cs` · `SessionScope.cs` | Claims (`sub`, `unique_name`, `company_id`), the session's supplier code (company / supplier code / excise) and request facts (IP, user agent, correlation id, the token from the bearer header or else the `jwt` cookie) for Business. |
 | `Security/AuthCookies.cs` | The browser's cookies, issued at login and cleared at logout: `jwt` (HttpOnly) and `XSRF-TOKEN` (readable); Secure on https/localhost, SameSite from `Auth:Cookie:SameSite` (Lax), Path=/, Max-Age = session hard limit. |
-| `Security/AdministratorRequirement.cs` | Interim `Administrator` policy: `role_id` claim == `SECURITY_CONFIG.ADMIN_ROLE_ID`. Replaced by `[HasPermission]` with the roles module. |
-| `Controllers/AuthController.cs` | `api/auth`: `login` (token in the body + the two cookies), `logout` (ends the header's or cookie's session, clears the cookies), `me`, `changepassword` (anonymous, password-verified), `sessions`, `sessions/{id}` |
+| `Security/HasPermissionAttribute.cs` · `PermissionAuthorization.cs` | `[HasPermission(Permissions.X)]` → policy built on the fly (`PermissionPolicyProvider`) → `PermissionHandler` asks `CurrentAccess`; refusals are `409 SUPPLIER_CODE_NOT_SELECTED` / `403 PERMISSION_DENIED` |
+| `Controllers/AuthController.cs` | `api/auth`: `login` (token in the body + the two cookies), `logout` (ends the header's or cookie's session, clears the cookies), `me`, `changepassword` (anonymous, password-verified), `sessions`, `sessions/{id}`, `mysuppliercodes`, `selectsuppliercode`, `mypermissions` |
 | `Controllers/PasswordResetController.cs` | `api/auth/forgotpassword`: `start`, `verify`, `reset` (anonymous) |
 | `Controllers/SecurityQuestionsController.cs` | `api/securityquestions`: list (anonymous), `mine` (PUT) |
-| `Controllers/UsersController.cs` | `api/users`: create (201 + Location), get, paged list, update, activate, deactivate, unlock |
+| `Controllers/UsersController.cs` | `api/users`: create (201 + Location), get, paged list, update, activate, deactivate, unlock, `{id}/access`, `{id}/roles`, `{id}/rights` |
+| `Controllers/RolesController.cs` · `PagesController.cs` | `api/roles` (CRUD + `{id}/rights` grid), `api/pages` (every page with its actions) |
+| `Controllers/SupplierCodesController.cs` · `LiquorCategoriesController.cs` | `api/suppliercodes`, `api/liquorcategories`: list / get for the company; create / edit / activate for Super Admin |
+| `Controllers/CompaniesController.cs` · `ExcisesController.cs` | `api/companies` (Super Admin, `company.view`), `api/excises` (`suppliercode.view`) — dropdown lists |
 | `Controllers/SecurityConfigController.cs` · `PasswordPoliciesController.cs` | `api/securityconfig`, `api/passwordpolicies`: admin read/update of `SECURITY_CONFIG` and `PASSWORD_POLICY` |
 | `appsettings.json` | `ConnectionStrings:Default`, `Database:{Provider,ServerVersion}`, `Jwt:{Issuer,Audience,SigningKey}`, `Cors`, `Serilog` (Console and File sinks with `AppJsonFormatter`, indented JSON; levels are **not** set here, they follow `LOG_MODE`). No security behaviour here, it lives in the database. |
 | `Middleware/RequestLoggingMiddleware.cs` | One entry per `/api` call with its errorCode (NORMAL); DETAIL adds the query string and the request and response bodies for `/api` calls (masked, size-capped) |
@@ -84,7 +91,7 @@ The `USERS`, `ROLES`, `ROLE_RIGHTS`, `PAGES`, `COMPANY`, `EXCISE`, `ALLOTEDPLANT
 | `Logging/LogModeRefresher.cs` | Background service: reads `SECURITY_CONFIG.LOG_MODE` at start-up and every 10 s, and applies it to `LogModeSwitch`. The first read logs `Database reachable` or `Database check failed`. |
 | `Logging/StartupFacts.cs` | Content of the `API starting` entry: version, environment, machine, DB provider / server / name (never the connection string) |
 
-All controllers are thin (one call per action, no `try/catch`) and every action returns a body (`200`/`201`, never `204`). Routes are lowercase with no `-`. User-management and admin controllers use the `Administrator` policy until `[HasPermission]` arrives with the roles module.
+All controllers are thin (one call per action, no `try/catch`) and every action returns a body (`200`/`201`, never `204`). Routes are lowercase with no `-`. Every action carries `[HasPermission(...)]` except the auth flow and `/health`.
 
 ### `ST.LiquorTNT.Business` — use cases, organised by feature
 
@@ -98,12 +105,17 @@ All controllers are thin (one call per action, no `try/catch`) and every action 
 | `Common/ValidationExtensions.cs` | FluentValidation result → 400 with camelCase field keys |
 | `Common/ErrorCodes.cs` · `Exceptions/` | stable codes; `AppException` family (400/401/403/404/409) |
 | `Common/Abstractions/` | cross-module interfaces implemented in Infrastructure: `IPasswordHasher`, `ISecurityConfigProvider`, `IUserLogWriter` |
-| `Users/` | `IUserService`/`UserService`, `IUserRepository`, `IReferenceLookup` (role/company exist), `IPasswordPolicyRepository`, `PasswordPolicyValidator` (pure rule check), `PasswordRules` (policy-by-role + history, shared by create/change/reset), `UserProjections` (the one USERS → `UserResponse` expression), request validators |
+| `Users/` (access) | `IUserAccessService`/`UserAccessService` (roles / custom rights per supplier code), `UserAccessRules` (company scope, admin-user protection, no self-change, grant scope), `IUserAccessRepository` |
+| `Users/` | `IUserService`/`UserService`, `IUserRepository`, `IReferenceLookup` (role/company exist), `IPasswordPolicyRepository`, `PasswordPolicyValidator` (pure rule check), `PasswordRules` (strictest policy across the user's roles + history, shared by create/change/reset), `UserProjections` (the one USERS → `UserResponse` expression), request validators |
 | `Auth/` | `CredentialVerifier` (the one password/answer check: same answer for unknown user and wrong password, counts every wrong attempt, refuses inactive/blocked/locked), `IAuthService`/`AuthService` (login, logout, me, change-password), `ISessionService`/`SessionService`, `ISecurityQuestionService`, `IPasswordResetService`, `ISessionRepository`, `ISecurityQuestionRepository`, `IAccessTokenService`, `ITokenHasher`, `SecurityAnswers`/`ResetTokens`, validators |
 | `SecurityConfig/` | `ISecurityConfigService`/`SecurityConfigService` (+ `ISecurityConfigRepository`) — admin editing with per-`DATA_TYPE` validation |
 | `PasswordPolicies/` | `IPasswordPolicyService`/`PasswordPolicyService` + validator — admin editing of policy rules |
+| `Access/` | `CurrentAccess` (the one "may the caller do this?" answer, per request), `Permissions` (every key), `IAccessService`/`AccessService` (my supplier codes, select supplier code, my permissions), `SupplierCodeDirectory`, `IAccessRepository` |
+| `Roles/` | `IRoleService`/`RoleService` (roles + rights grid, admin-role and grant-scope rules), `RoleTemplates` (default roles into a new company), `IRoleRepository`, validators |
+| `SupplierCodes/` · `LiquorCategories/` | supplier code and category masters (Super Admin edits; first supplier code copies the default roles) |
+| `Companies/` · `Excises/` | read-only lists (`ICompanyService`, `IExciseService` + repositories) |
 
-Next here: `Roles/` (rights, `[HasPermission]`), `Companies/`, `Plants/`, `Brands/`…, `Excise/` capability interfaces, `Line/`.
+Next here: `Companies/`, `Brands/`, `Batches/`…, `Excise/` capability interfaces, `Line/`.
 
 ### `ST.LiquorTNT.Domain` — entities and rules (references nothing)
 
@@ -111,9 +123,12 @@ Next here: `Roles/` (rights, `[HasPermission]`), `Companies/`, `Plants/`, `Brand
 |---|---|
 | `USERS` | `Create`, `UpdateProfile`, `SetPassword` (+ history row), `RegisterFailedLogin` (IST day, lock, no sliding lock), `RegisterSuccessfulLogin`, `IsLockedAt`, `IsPasswordExpiredAt`, `Unlock`, `Activate`/`Deactivate` |
 | `USER_PASSWORD_HISTORY` | appended by `USERS.SetPassword` only |
-| `USER_SESSION` | `Create` (idle window + hard limit), `IsActiveAt`, `Slide` (activity; never past the hard limit), `ReachedLimitAt`, `Logout`/`Revoke`/`Expire` |
-| `PASSWORD_POLICY` | `Create`/`UpdateRules` (guards), `ExpiryFrom` |
-| `ROLE_PASSWORD_POLICY`, `ROLES`, `COMPANY`, `SECURITY_QUESTION` | read models for lookups |
+| `USER_SESSION` | `Create` (idle window + hard limit), `SelectSupplierCode`, `IsActiveAt`, `Slide` (activity; never past the hard limit), `ReachedLimitAt`, `Logout`/`Revoke`/`Expire` |
+| `PASSWORD_POLICY` | `Create`/`UpdateRules` (guards), `ExpiryFrom`, `Strictest` (several roles) |
+| `ROLES` | `Create` (company role or template), `CopyOf` (template → company), `Update` (Super Admin never) |
+| `ROLE_RIGHTS`, `USER_ROLES`, `USER_RIGHTS`, `ROLE_PASSWORD_POLICY` | `Create` (+ `ChangePolicy`) |
+| `SUPPLIER_CODE`, `LIQUOR_CATEGORY` | `Create`, `Update`, `SetActive` |
+| `PAGES`, `PAGE_ACTIONS` (`GrantScope` from `Rules/`), `EXCISE`, `COMPANY`, `SECURITY_QUESTION` | read models for lookups |
 | `USER_SECURITY_QUESTION` | `Create` (hash only), `Deactivate` |
 | `PASSWORD_RESET_REQUEST` | `Create`, `RegisterFailedVerify`, `MarkVerified`/`MarkUsed`/`MarkExpired`, `IsExpiredAt`, `IsOpen` |
 | `SECURITY_CONFIG` | `UpdateValue` |
@@ -124,7 +139,7 @@ Private setters, private constructors, behaviour through methods, limits passed 
 
 ### `ST.LiquorTNT.Contracts` — wire format (references nothing)
 
-`Auth/` (`LoginRequest/Response`, `CurrentUserResponse`, `ChangePasswordRequest`, `SessionResponse`, security-question and forgot-password requests/responses), `Users/` (`CreateUserRequest`, `UpdateUserRequest`, `UserListRequest`, `UserResponse`), `SecurityConfig/`, `PasswordPolicies/`, `Common/PagedResponse.cs`, `Common/MessageResponse.cs` (body of an action with no record to return). All timestamps are IST.
+`Auth/` (`LoginRequest/Response`, `CurrentUserResponse`, `ChangePasswordRequest`, `SessionResponse`, security-question and forgot-password requests/responses), `Users/` (`CreateUserRequest` with `roles`, `UpdateUserRequest`, `UserListRequest`, `UserResponse`, `UserAccessContracts`), `Access/` (`SupplierCodeResponse`, `SelectSupplierCodeRequest`, `MyPermissionsResponse`), `Roles/`, `SupplierCodes/`, `LiquorCategories/`, `SecurityConfig/`, `PasswordPolicies/`, `Common/PagedResponse.cs`, `Common/MessageResponse.cs` (body of an action with no record to return). All timestamps are IST.
 
 ### `ST.LiquorTNT.Infrastructure`
 
@@ -133,7 +148,7 @@ Private setters, private constructors, behaviour through methods, limits passed 
 | `DependencyInjection.cs` | `AddInfrastructure()`: `AddDbContext<AppDbContext>` with the **only provider switch**; registers every repository, `ISecurityConfigProvider`, `IUserLogWriter`, `IPasswordHasher`, `IAccessTokenService`, `ITokenHasher`, `IClock`, `JwtOptions` |
 | `Database/AppDbContext.cs` | the only `DbContext`; one `DbSet` per entity, named like the table |
 | `Database/Configurations/*Configuration.cs` | one `IEntityTypeConfiguration<T>` per entity: CAPITAL column names, lengths, indexes, `USERS.USERNAME` collation explicit (case-insensitive) |
-| `Database/Repositories/` | `UserRepository` (paged projection, recent hashes, unique-violation → 409), `ReferenceLookup`, `PasswordPolicyRepository`, `SessionRepository`, `SecurityQuestionRepository`, `SecurityConfigRepository` |
+| `Database/Repositories/` | `UserRepository` (paged projection, recent hashes, unique-violation → 409), `ReferenceLookup`, `PasswordPolicyRepository`, `SessionRepository`, `SecurityQuestionRepository`, `SecurityConfigRepository`, `AccessRepository` (effective rights per supplier code, supplier codes of a user), `RoleRepository`, `UserAccessRepository`, `SupplierCodeRepository`, `LiquorCategoryRepository`, `CompanyRepository`, `ExciseRepository`, `SupplierCodeQuery` (supplier code + names + "RJ CL 550") |
 | `Database/DbErrors.cs` | provider error-code mapping in one place (MySQL 1062 today) |
 | `Audit/UserLogWriter.cs` | stages a `USER_LOG` row with request facts; committed by the caller's `SaveChanges` |
 | `Identity/Pbkdf2PasswordHasher.cs` · `JwtAccessTokenService.cs` · `JwtOptions.cs` · `Sha256TokenHasher.cs` | credentials and tokens |
@@ -151,10 +166,10 @@ Logging: `LoggingSetup` (Serilog sinks from configuration, levels bound to `LogM
 
 | Project | What it covers |
 |---|---|
-| `Domain.Tests` (64) | `USERS` lockout matrix (N-th attempt, same/new IST day to the second, expired lock restart, no sliding lock, correct password while locked), password state, sessions, reset requests, policies, config |
-| `Business.Tests` (167) | `UserService`, `AuthService` (login matrix incl. "locked now" vs "already locked", session limit, change-password counts as attempt), `SessionService`, `PasswordResetService`, `SecurityQuestionService`, `SecurityConfigService`, `PasswordPolicyService`, `PasswordPolicyValidator`, `SecuritySettings`, request validators — all with the in-memory fakes in `Fakes/` |
-| `Infrastructure.Tests` (16) | PBKDF2, SHA-256, JWT claims; EF mappings and repositories against MySQL (`ST_TNT_TEST_CONNECTION` or the dev server), incl. duplicate user name → 409 |
-| `Api.Tests` (96) | `WebApplicationFactory` end-to-end: login → 3 wrong = lock → unlock (200 + user) → logout kills token → session limit → revoke → deactivate; forced password change; forgot-password start/verify/reset; admin config validation; error shape and correlation header; unknown route / wrong method / non-JSON, empty or broken JSON body still get ProblemDetails. `ExceptionMiddlewareTests`, `SessionValidationMiddlewareTests` (idle → TIMED_OUT, hard limit while working → EXPIRED, one write a minute), an expired-JWT → `SESSION_EXPIRED` check, `AdministratorHandlerTests` and `Logging/` (JSON formatter, secret masking, log-mode switch, request logging incl. malformed bodies, method-logging proxy and its registration) as unit tests. One xUnit collection (shared admin account). |
+| `Domain.Tests` (74) | `USERS` lockout matrix (N-th attempt, same/new IST day to the second, expired lock restart, no sliding lock, correct password while locked), password state, sessions, reset requests, policies (incl. strictest of several), config, `ROLES` (templates, copy, Super Admin) |
+| `Business.Tests` (215) | `CurrentAccess` + `AccessService` (supplier code pick), `RoleService` + `RoleTemplates`, `UserAccessService` (admin protection, no self-change, grant scope), `UserService` (company scope, roles, strictest policy), `AuthService` (login matrix incl. "locked now" vs "already locked", session limit, change-password counts as attempt), `SessionService`, `PasswordResetService`, `SecurityQuestionService`, `SecurityConfigService`, `PasswordPolicyService`, `PasswordPolicyValidator`, `SecuritySettings`, request validators — all with the in-memory fakes in `Fakes/` |
+| `Infrastructure.Tests` (21) | PBKDF2, SHA-256, JWT claims; EF mappings and repositories against MySQL (`ST_TNT_TEST_CONNECTION` or the dev server), incl. duplicate user name → 409, and `AccessRepositoryTests` (rights per supplier code, "all supplier codes" never leak into another company) |
+| `Api.Tests` (104) | `WebApplicationFactory` end-to-end: login → 3 wrong = lock → unlock (200 + user) → logout kills token → session limit → revoke → deactivate; forced password change; forgot-password start/verify/reset; admin config validation; error shape and correlation header; unknown route / wrong method / non-JSON, empty or broken JSON body still get ProblemDetails. `ExceptionMiddlewareTests`, `SessionValidationMiddlewareTests` (idle → TIMED_OUT, hard limit while working → EXPIRED, one write a minute), an expired-JWT → `SESSION_EXPIRED` check, `RolesRightsFlowTests` (supplier code → default roles → Agent Manager → rights apply on the next call; `SUPPLIER_CODE_NOT_SELECTED`) and `Logging/` (JSON formatter, secret masking, log-mode switch, request logging incl. malformed bodies, method-logging proxy and its registration) as unit tests. One xUnit collection (shared admin account). |
 | `Architecture.Tests` (7) | the layer rules in §1 |
 | `Edge.Tests` (1) | line application placeholder |
 

@@ -1,4 +1,5 @@
 using FluentValidation;
+using ST.LiquorTNT.Business.Access;
 using ST.LiquorTNT.Business.Common;
 using ST.LiquorTNT.Business.Common.Abstractions;
 using ST.LiquorTNT.Business.Common.Exceptions;
@@ -30,6 +31,7 @@ public sealed class AuthService : IAuthService
     private readonly ICurrentUser _currentUser;
     private readonly IRequestContext _request;
     private readonly IUserLogWriter _log;
+    private readonly SupplierCodeDirectory _supplierCodes;
     private readonly IValidator<LoginRequest> _loginValidator;
     private readonly IValidator<ChangePasswordRequest> _changePasswordValidator;
 
@@ -46,6 +48,7 @@ public sealed class AuthService : IAuthService
         ICurrentUser currentUser,
         IRequestContext request,
         IUserLogWriter log,
+        SupplierCodeDirectory supplierCodes,
         IValidator<LoginRequest> loginValidator,
         IValidator<ChangePasswordRequest> changePasswordValidator)
     {
@@ -61,6 +64,7 @@ public sealed class AuthService : IAuthService
         _currentUser = currentUser;
         _request = request;
         _log = log;
+        _supplierCodes = supplierCodes;
         _loginValidator = loginValidator;
         _changePasswordValidator = changePasswordValidator;
     }
@@ -104,6 +108,15 @@ public sealed class AuthService : IAuthService
         var session = USER_SESSION.Create(user.Id, _tokenHasher.Hash(token), now, settings.SessionIdleMinutes, expiresAt,
             _request.IpAddress, _request.UserAgent);
 
+        // The supplier codes this user may work in. Exactly one → picked straight away, so the user can start working;
+        // more than one → the screen shows a picker (POST /api/auth/selectsuppliercode).
+        var supplierCodes = await _supplierCodes.ForUserAsync(user.Id, ct);
+        var activeSupplierCode = supplierCodes.Count == 1 ? supplierCodes[0] : null;
+        if (activeSupplierCode is not null)
+        {
+            session.SelectSupplierCode(activeSupplierCode.Id);
+        }
+
         await _sessions.AddAsync(session, ct);
         user.RegisterSuccessfulLogin(now, _request.IpAddress);
 
@@ -122,6 +135,8 @@ public sealed class AuthService : IAuthService
             ExpiresAt = expiresAt,
             IdleTimeoutMinutes = settings.SessionIdleMinutes,
             User = ToCurrentUser(user),
+            SupplierCodes = supplierCodes,
+            ActiveSupplierCode = activeSupplierCode,
         };
     }
 
@@ -187,7 +202,6 @@ public sealed class AuthService : IAuthService
         UserId = user.Id,
         UserName = user.UserName,
         FullName = user.FullName,
-        RoleId = user.RoleId,
         CompanyId = user.CompanyId,
         ForcePasswordChange = user.ForcePasswordChange,
         PasswordExpiresAt = user.PasswordExpiresAt,

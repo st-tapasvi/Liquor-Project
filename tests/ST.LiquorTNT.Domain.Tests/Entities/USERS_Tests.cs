@@ -14,7 +14,7 @@ public sealed class USERS_Tests
     private const int LockMinutes = 1440;
 
     private static USERS NewUser(bool forceChange = false, DateTime? expiresAt = null) =>
-        USERS.Create(" alice ", "H:x", roleId: 1, companyId: 2, "Alice", "a@x.com", "999", "E1",
+        USERS.Create(" alice ", "H:x", companyId: 2, "Alice", "a@x.com", "999", "E1",
             forceChange, expiresAt, Now, createdBy: 7);
 
     // ---------- creation ----------
@@ -41,7 +41,7 @@ public sealed class USERS_Tests
     [InlineData("   ")]
     public void Create_BlankUserName_Throws(string name)
     {
-        var act = () => USERS.Create(name, "H:x", 1, null, null, null, null, null, false, null, Now, null);
+        var act = () => USERS.Create(name, "H:x", null, null, null, null, null, false, null, Now, null);
         act.Should().Throw<ArgumentException>();
     }
 
@@ -338,12 +338,11 @@ public sealed class USERS_Tests
     {
         var user = NewUser();
 
-        user.UpdateProfile(" Bob ", "  ", null, "E2", roleId: 3, companyId: null, Now, 5);
+        user.UpdateProfile(" Bob ", "  ", null, "E2", Now, 5);
 
         user.FullName.Should().Be("Bob");
         user.Email.Should().BeNull();
         user.EmployeeCode.Should().Be("E2");
-        user.RoleId.Should().Be(3);
-        user.CompanyId.Should().BeNull();
+        user.CompanyId.Should().Be(2);       // the home company is not part of a profile edit
     }
 }

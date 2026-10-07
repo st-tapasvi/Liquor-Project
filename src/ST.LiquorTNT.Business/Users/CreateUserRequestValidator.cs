@@ -14,7 +14,8 @@ public sealed class CreateUserRequestValidator : AbstractValidator<CreateUserReq
             .Matches("^[A-Za-z0-9._@-]+$").WithMessage("User name may contain letters, digits, '.', '_', '@' and '-' only.");
 
         RuleFor(x => x.Password).NotEmpty().MaximumLength(128);
-        RuleFor(x => x.RoleId).GreaterThan(0);
+        RuleFor(x => x.Roles).NotEmpty().WithMessage("Give the user at least one role.");
+        RuleForEach(x => x.Roles).SetValidator(new UserRoleAssignmentValidator());
         RuleFor(x => x.CompanyId).GreaterThan(0).When(x => x.CompanyId.HasValue);
         RuleFor(x => x.FullName).MaximumLength(100);
         RuleFor(x => x.Email).MaximumLength(100).EmailAddress().When(x => !string.IsNullOrWhiteSpace(x.Email));

@@ -9,7 +9,10 @@ public sealed class CreateUserRequestValidatorTests
 {
     private readonly CreateUserRequestValidator _validator = new();
 
-    private static CreateUserRequest Valid() => new() { UserName = "bob", Password = "x", RoleId = 1 };
+    private static CreateUserRequest Valid() => new()
+    {
+        UserName = "bob", Password = "x", Roles = new() { new UserRoleAssignment { RoleId = 1 } },
+    };
 
     private IEnumerable<string> FailingFields(CreateUserRequest request) =>
         _validator.Validate(request).Errors.Select(e => e.PropertyName).Distinct();
@@ -67,15 +70,25 @@ public sealed class CreateUserRequestValidatorTests
         (FailingFields(request).Contains(nameof(request.Password)) == false).Should().Be(ok);
     }
 
-    [Theory]
-    [InlineData(0)]
-    [InlineData(-1)]
-    public void RoleId_MustBePositive(int roleId)
+    [Fact]
+    public void Roles_AtLeastOneRequired()
     {
         var request = Valid();
-        request.RoleId = roleId;
+        request.Roles.Clear();
 
-        FailingFields(request).Should().Contain(nameof(request.RoleId));
+        FailingFields(request).Should().Contain(nameof(request.Roles));
+    }
+
+    [Theory]
+    [InlineData(0, null)]
+    [InlineData(-1, null)]
+    [InlineData(1, 0)]
+    public void RoleAndSupplierCodeIds_MustBePositive(int roleId, int? supplierCodeId)
+    {
+        var request = Valid();
+        request.Roles[0] = new UserRoleAssignment { RoleId = roleId, SupplierCodeId = supplierCodeId };
+
+        FailingFields(request).Should().Contain(f => f.StartsWith("Roles[0]"));
     }
 
     [Fact]

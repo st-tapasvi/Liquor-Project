@@ -17,7 +17,7 @@ path starts with `/api/`. Swagger (try-it-out page): `https://localhost:7180/swa
 |---|---|
 | 🌐 **Public** | No login needed. |
 | 🔑 **Logged in** | Desktop / scripts / Swagger: header `Authorization: Bearer <accessToken>`. Web app: nothing by hand - login also set the HttpOnly `jwt` cookie, which the browser sends on its own; on POST/PUT/DELETE axios adds `X-XSRF-TOKEN` from the readable `XSRF-TOKEN` cookie. The header wins when both are present. |
-| 🛡️ **Admin** | Logged in **and** the user's role is the admin role (`SECURITY_CONFIG.ADMIN_ROLE_ID`, today role `1`). |
+| 🛡️ **Right** | Logged in **and** the user holds the named permission key (e.g. `user.add`) in the selected supplier code, through a role or a custom right. Super Admin holds every key. See `06-roles-rights-plan.md`. |
 
 **The token.** Login gives you an `accessToken`. The server also keeps a record of it (a "session").
 A session ends in one of three ways, and each one needs a different screen:
@@ -35,7 +35,7 @@ the session ends while it runs.
 **Times.** All dates and times are **Indian time (IST)**, sent without a time zone, for example
 `2026-09-28T18:30:00`. Show them as they are. Do not convert them.
 
-**JSON names** are camelCase: `userName`, `accessToken`, `roleId`.
+**JSON names** are camelCase: `userName`, `accessToken`, `supplierCodeId`.
 
 **Errors.** Every error has the same shape. Build the screen logic on `errorCode`, never on the
 message text:
@@ -177,7 +177,9 @@ Checks the user name and password. On success it opens a session and returns a t
   "expiresAt": "2026-09-29T10:00:00",     // hard limit of this session (then SESSION_EXPIRED → popup)
   "idleTimeoutMinutes": 60,               // no call for this long → SESSION_TIMED_OUT → login page
   "user": { "userId": 1, "userName": "admin", "fullName": "Administrator",
-            "roleId": 1, "companyId": null, "forcePasswordChange": false, "passwordExpiresAt": null }
+            "companyId": null, "forcePasswordChange": false, "passwordExpiresAt": null },
+  "supplierCodes": [ { "id": 3, "exciseCode": "RJ", "supplierCode": "550", "liquorCategoryCode": "CL", "displayName": "RJ CL 550", … } ],
+  "activeSupplierCode": { "id": 3, … }  // set when there is exactly one supplier code; else null → show a picker (POST /api/auth/selectsuppliercode)
 }
 ```
 
@@ -298,15 +300,14 @@ The new password must follow the role's rules (`400` with `errors.password`
 otherwise). A successful reset also clears the failed-login lock and ends all the user's sessions.
 The user then logs in with the new password. A token works only once.
 
-### 4.4 User management (all 🛡️ Admin)
+### 4.4 User management (🛡️ rights: `user.view`, `user.add`, `user.edit`, `user.status`, `user.unlock`)
 
 #### 12. `POST /api/users` — create a user
 ```json
 {
   "userName": "ravi.k",
   "password": "Temp@Pass2026x",
-  "roleId": 2,
-  "companyId": 5,
+  "roles": [ { "roleId": 12, "supplierCodeId": 3 }, { "roleId": 14, "supplierCodeId": null } ],
   "fullName": "Ravi Kumar",
   "email": "ravi@example.com",
   "phone": "9876543210",
@@ -317,14 +318,18 @@ The user then logs in with the new password. A token works only once.
 Response: `201` with the new user (shape in #14).
 - `userName`: up to 50 characters, only letters, digits and `. _ @ -`. It must be unique and
   **cannot be changed later**.
-- `password` must follow the password rules of the chosen role.
+- `roles`: at least one. Each role is for one supplier code (`supplierCodeId`) or for every supplier code of the company (`null`).
+  The roles and supplier codes must belong to the caller's company; giving an admin role (Plant Admin) needs `user.manageadmin`.
+- The new user always joins the caller's company. Only Super Admin may send `companyId` (to create the first user of a company).
+- `password` must follow the password rules of the user's roles (with several roles, the strictest value of each rule).
 - `forcePasswordChange` is `true` by default: the user must set their own password at first login.
-- `companyId`, `fullName`, `email`, `phone`, `employeeCode` are optional.
+- `fullName`, `email`, `phone`, `employeeCode` are optional.
 
 | Error | When |
 |---|---|
 | 400 `VALIDATION_FAILED` | Bad field, or the password breaks the role's rules (`errors.password`) |
-| 404 `NOT_FOUND` | `roleId` or `companyId` does not exist |
+| 404 `NOT_FOUND` | A role or supplier code is not of this company, or `companyId` does not exist |
+| 403 `ADMIN_USER_PROTECTED` | An admin role was given without `user.manageadmin` |
 | 409 `USERNAME_TAKEN` | User name already used |
 | 409 `PASSWORD_POLICY_NOT_CONFIGURED` | The role has no password rules linked to it (see §6) |
 
@@ -339,23 +344,23 @@ by default and 200 at most.
 #### 14. `GET /api/users/{id}`
 ```json
 { "id": 7, "userName": "ravi.k", "fullName": "Ravi Kumar", "email": "ravi@example.com",
-  "phone": "9876543210", "employeeCode": "EMP-104", "roleId": 2, "companyId": 5,
+  "phone": "9876543210", "employeeCode": "EMP-104", "companyId": 5,
   "isActive": true, "isBlocked": false, "failedLoginAttempts": 0, "lockedUntil": null,
   "forcePasswordChange": true, "passwordExpiresAt": null,
   "lastLoginAt": "2026-09-28T09:00:00", "createdAt": "2026-09-27T16:20:00" }
 ```
-`404` if the user does not exist. The password is never returned, not even as a hash.
+`404` if the user does not exist or belongs to another company. Roles and rights: `GET /api/users/{id}/access`. The password is never returned, not even as a hash.
 `failedLoginAttempts` is the number of wrong passwords counted today. Together with `lockedUntil`
 it shows the admin why a user is locked.
 
 #### 15. `PUT /api/users/{id}` — edit a user
 ```json
-{ "roleId": 2, "companyId": 5, "fullName": "Ravi Kumar", "email": "ravi@example.com",
+{ "fullName": "Ravi Kumar", "email": "ravi@example.com",
   "phone": "9876543210", "employeeCode": "EMP-104" }
 ```
 Send **all** fields. A field left out is cleared, it does not keep its old value. The user name and
-password cannot be changed here. Response: `200` with the updated user.
-`409 CANNOT_CHANGE_OWN_ROLE` means an admin tried to change their own role.
+password cannot be changed here, and neither can roles (use `PUT /api/users/{id}/roles`, see 06). Response: `200` with the updated user.
+Editing, deactivating or unlocking an **admin user** needs `user.manageadmin` (`403 ADMIN_USER_PROTECTED`).
 
 These three send no body. Each one answers `200` with the user **after** the change (same shape as
 #14), so the screen can refresh the row straight away.
@@ -373,7 +378,7 @@ Removes the failed-login lock **and** an admin block, and sets the failed-attemp
 The response shows `lockedUntil: null`, `isBlocked: false`, `failedLoginAttempts: 0`. Calling it on
 a user who is not locked is harmless.
 
-### 4.5 Security settings and password rules (all 🛡️ Admin)
+### 4.5 Security settings and password rules (🛡️ rights: `securityconfig.view/edit`, `passwordpolicy.view/edit`)
 
 #### 19. `GET /api/securityconfig`
 All settings: `[ { "key": "MAX_FAILED_LOGIN_ATTEMPTS", "value": "3", "dataType": "INT", "description": "…", "updatedAt": "…" }, … ]`
@@ -406,11 +411,7 @@ A bad value gives `400` with `errors.value`. An unknown key gives `404`.
 | `SECURITY_QUESTION_REQUIRED` | `1` | Questions per user |
 | `PASSWORD_RESET_EXPIRY_MINUTES` | `15` | How long a forgot-password request stays valid |
 | `PASSWORD_RESET_MAX_ATTEMPTS` | `5` | Wrong answers allowed per forgot-password request |
-| `ADMIN_ROLE_ID` | `1` | Which role counts as admin for the 🛡️ APIs |
 | `LOG_MODE` | `NORMAL` | How much the server writes to its log. `NORMAL`: one line per call, plus errors. `DETAIL`: also every request and response body, every method's input and output, and the SQL. The change applies within 10 seconds, with no restart. See §7. |
-
-> ⚠️ Changing `ADMIN_ROLE_ID` to a role nobody has locks every admin out of these screens. Only a
-> fix directly in the database can undo it.
 
 #### 21. `GET /api/passwordpolicies`
 The rule sets, for example:
@@ -460,11 +461,13 @@ New rules apply the next time a password is set. Existing passwords keep working
 | `USER_INACTIVE` / `USER_BLOCKED` | 403 | "Contact your administrator" |
 | `PASSWORD_CHANGE_REQUIRED` / `PASSWORD_EXPIRED` | 403 | Open the "Set new password" screen |
 | `RESET_ATTEMPTS_EXCEEDED` | 403 | "Too many wrong answers — start again" |
-| `FORBIDDEN` | 403 | A 🛡️ API was called by a non-admin (`detail` names the caller's role): hide the admin menu for such users |
+| `PERMISSION_DENIED` | 403 | The user lacks the permission key (`detail` names it): hide that menu / button using `GET /api/auth/mypermissions` |
+| `SUPPLIER_CODE_NOT_SELECTED` | 409 | No supplier code picked for the session: show the supplier code picker |
+| `ADMIN_USER_PROTECTED` / `RIGHT_NOT_GRANTABLE` | 403 | Only an administrator (or nobody) may give this role / right |
 | `NOT_FOUND` | 404 | "Not found" |
 | `USERNAME_TAKEN` | 409 | "User name already in use" |
 | `PASSWORD_POLICY_NOT_CONFIGURED` | 409 | "This role has no password rules — ask IT" |
-| `CANNOT_DEACTIVATE_SELF` / `CANNOT_CHANGE_OWN_ROLE` | 409 | Explain that an admin cannot do this to their own account |
+| `CANNOT_DEACTIVATE_SELF` / `CANNOT_CHANGE_OWN_ACCESS` | 409 | Explain that nobody can do this to their own account |
 | `SESSION_LIMIT_REACHED` | 409 | "Log out from another device first" |
 | `CSRF_REJECTED` | 403 | A cookie-authenticated write without a matching `X-XSRF-TOKEN`, or from another site. A client bug, not a user error. |
 | `SECURITY_QUESTION_NOT_SET` / `SECURITY_QUESTION_DISABLED` | 409 | "Ask the administrator to reset your password" |
@@ -479,14 +482,8 @@ New rules apply the next time a password is set. Existing passwords keep working
 
 - **Every change is recorded** in `USER_LOG`: who, what, when, from which IP. Passwords, answers
   and tokens are never written there.
-- **Linking a role to a password policy** (`ROLE_PASSWORD_POLICY`) has no API yet. Today there is
-  one role, Administrator, and it is linked to HARD. A new role needs its link added in the
-  database first. Until then, creating a user with that role fails with
-  `PASSWORD_POLICY_NOT_CONFIGURED`.
-- **Admin = one role for now.** Detailed rights ("who can do what") come with the Roles module and
-  will replace the single admin role.
-- **Plant / excise access** for a user is not part of this module. It comes later with a separate
-  access mapping.
+- **Roles, rights and supplier codes** are in `06-roles-rights-plan.md`: a role is created with its password policy
+  (`passwordPolicyId`), and a user works inside one supplier code at a time.
 - **Forgot password is only by security question.** There is no email or SMS OTP.
 - **Test login:** `admin` / `Admin@123`. Change it on every customer installation.
 

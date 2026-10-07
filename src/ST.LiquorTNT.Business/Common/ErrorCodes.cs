@@ -21,7 +21,21 @@ public static class ErrorCodes
     public const string UserNameTaken               = "USERNAME_TAKEN";
     public const string PasswordPolicyNotConfigured = "PASSWORD_POLICY_NOT_CONFIGURED";
     public const string CannotDeactivateSelf        = "CANNOT_DEACTIVATE_SELF";
-    public const string CannotChangeOwnRole         = "CANNOT_CHANGE_OWN_ROLE";
+
+    // roles and rights
+    public const string PermissionDenied       = "PERMISSION_DENIED";        // the caller lacks the permission key of this API
+    public const string SupplierCodeNotSelected     = "SUPPLIER_CODE_NOT_SELECTED";     // pick a supplierCode first (POST /api/auth/selectsuppliercode)
+    public const string SupplierCodeNotAssigned     = "SUPPLIER_CODE_NOT_ASSIGNED";     // the user holds no role or right on this supplierCode
+    public const string CannotChangeOwnAccess  = "CANNOT_CHANGE_OWN_ACCESS"; // nobody edits their own roles or rights
+    public const string AdminUserProtected     = "ADMIN_USER_PROTECTED";     // admin users / roles need user.manageadmin
+    public const string RightNotGrantable      = "RIGHT_NOT_GRANTABLE";      // SYSTEM rights are never granted; ADMIN ones need user.manageadmin
+    public const string RoleNotEditable        = "ROLE_NOT_EDITABLE";        // Super Admin, or a template edited by a company
+    public const string RoleNameTaken          = "ROLE_NAME_TAKEN";
+    public const string RoleInUse              = "ROLE_IN_USE";
+
+    // masters
+    public const string SupplierCodeTaken      = "SUPPLIER_CODE_TAKEN";
+    public const string LiquorCategoryCodeTaken = "LIQUOR_CATEGORY_CODE_TAKEN";
 
     // login / account state
     public const string InvalidCredentials     = "INVALID_CREDENTIALS";

@@ -127,9 +127,11 @@ public static class ApiServiceExtensions
 
         services.Configure<AuthCookieOptions>(configuration.GetSection(AuthCookieOptions.Section));
 
-        services.AddAuthorization(options =>
-            options.AddPolicy(AdministratorRequirement.PolicyName, policy => policy.AddRequirements(new AdministratorRequirement())));
-        services.AddScoped<IAuthorizationHandler, AdministratorHandler>();
+        // [HasPermission("user.add")]: policies are built per key on the fly and checked against the
+        // caller's roles and custom rights in the selected supplier code (see Security/PermissionAuthorization.cs).
+        services.AddAuthorization();
+        services.AddSingleton<IAuthorizationPolicyProvider, PermissionPolicyProvider>();
+        services.AddScoped<IAuthorizationHandler, PermissionHandler>();
     }
 
     private static void AddCors(IServiceCollection services, IConfiguration configuration)

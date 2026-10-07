@@ -51,7 +51,6 @@ public sealed class SecuritySettingsTests
         settings.SessionExpiryMinutes.Should().Be(1440);
         settings.SessionFullBehaviour.Should().Be("REJECT");
         settings.PasswordResetMaxAttempts.Should().Be(5);
-        settings.AdminRoleId.Should().Be(1);
     }
 
     [Theory]

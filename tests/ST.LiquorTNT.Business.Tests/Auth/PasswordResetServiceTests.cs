@@ -40,7 +40,7 @@ public sealed class PasswordResetServiceTests
         _questions.UserQuestions.Add(USER_SECURITY_QUESTION.Create(10, 1, "H:" + SecurityAnswers.Normalize(Answer), TestData.Now).WithId(1));
 
         var hasher = new FakePasswordHasher();
-        var rules = new PasswordRules(new FakePasswordPolicyRepository(TestData.Policy(minLength: 6, historyCount: 3)), _users, new PasswordPolicyValidator(hasher));
+        var rules = new PasswordRules(new FakePasswordPolicyRepository(TestData.Policy(minLength: 6, historyCount: 3)), _users, new PasswordPolicyValidator(hasher), _clock);
 
         _service = new PasswordResetService(_questions, _users, _sessions, new CredentialVerifier(_users, hasher, _log), hasher, new FakeTokenHasher(),
             _config, rules, _clock, _log,

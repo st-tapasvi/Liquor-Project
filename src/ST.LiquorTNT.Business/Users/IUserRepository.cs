@@ -17,7 +17,8 @@ public interface IUserRepository
     Task<bool> UserNameExistsAsync(string userName, CancellationToken ct);
 
     /// <summary>Server-paged list, projected to the response type in the query (never entities).</summary>
-    Task<PagedResponse<UserResponse>> GetPageAsync(string? search, int page, int pageSize, CancellationToken ct);
+    /// <remarks><paramref name="companyId"/> limits the list to one company; null = every company (Super Admin only).</remarks>
+    Task<PagedResponse<UserResponse>> GetPageAsync(int? companyId, string? search, int page, int pageSize, CancellationToken ct);
 
     /// <summary>The newest <paramref name="count"/> password hashes of a user, for the reuse check.</summary>
     Task<IReadOnlyList<string>> GetRecentPasswordHashesAsync(int userId, int count, CancellationToken ct);

@@ -56,13 +56,14 @@ public sealed class ExceptionMiddlewareTests
     }
 
     [Fact]
-    public async Task Forbidden_NamesTheCallersRole()
+    public async Task Forbidden_SaysAPermissionIsMissing()
     {
-        var user = new ClaimsPrincipal(new ClaimsIdentity(new[] { new Claim("role_id", "4") }, "test"));
+        var user = new ClaimsPrincipal(new ClaimsIdentity(new[] { new Claim("sub", "4") }, "test"));
 
         var (_, body) = await Run(ctx => { ctx.Response.StatusCode = 403; return Task.CompletedTask; }, user);
 
-        body.GetProperty("detail").GetString().Should().Contain("role_id: '4'");
+        body.GetProperty("errorCode").GetString().Should().Be("FORBIDDEN");
+        body.GetProperty("detail").GetString().Should().Contain("needs a permission");
     }
 
     [Fact]

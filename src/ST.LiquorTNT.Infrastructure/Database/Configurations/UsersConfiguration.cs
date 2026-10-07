@@ -22,7 +22,6 @@ public sealed class UsersConfiguration : IEntityTypeConfiguration<USERS>
         builder.Property(u => u.Phone).HasColumnName("PHONE").HasMaxLength(20);
         builder.Property(u => u.EmployeeCode).HasColumnName("EMPLOYEE_CODE").HasMaxLength(50);
 
-        builder.Property(u => u.RoleId).HasColumnName("ROLE_ID");
         builder.Property(u => u.CompanyId).HasColumnName("COMPANY_ID");
 
         builder.Property(u => u.PasswordHash).HasColumnName("PASSWORD_HASH").HasMaxLength(255);

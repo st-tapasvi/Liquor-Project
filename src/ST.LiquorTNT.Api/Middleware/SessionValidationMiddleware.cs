@@ -1,3 +1,5 @@
+using ST.LiquorTNT.Api.Security;
+using ST.LiquorTNT.Business.Access;
 using ST.LiquorTNT.Business.Auth;
 using ST.LiquorTNT.Business.Common;
 using ST.LiquorTNT.Business.Common.Abstractions;
@@ -15,7 +17,8 @@ namespace ST.LiquorTNT.Api.Middleware;
 /// <item>SESSION_INVALID — logged out, revoked or unknown: go to the login page.</item>
 /// </list>
 /// Activity slides the idle deadline forward; it is written at most once a minute, and only then is the
-/// idle window read from SECURITY_CONFIG — so a normal call costs one session lookup.
+/// idle window read from SECURITY_CONFIG. It also loads the supplier code picked for the session (one small indexed
+/// read when a supplier code is picked) and hands it to TenantContext.
 /// </summary>
 public sealed class SessionValidationMiddleware
 {
@@ -32,7 +35,8 @@ public sealed class SessionValidationMiddleware
         IRequestContext request,
         ISecurityConfigProvider config,
         IClock clock,
-        IUserLogWriter log)
+        IUserLogWriter log,
+        IAccessRepository supplierCodes)
     {
         // Anonymous endpoints (login, forgot-password ...) must work even if the client still sends an old token.
         var anonymous = context.GetEndpoint()?.Metadata.GetMetadata<Microsoft.AspNetCore.Authorization.IAllowAnonymous>() is not null;
@@ -73,6 +77,14 @@ public sealed class SessionValidationMiddleware
                 var settings = await config.GetAsync(ct);
                 session.Slide(now, settings.SessionIdleMinutes);
                 await sessions.SaveChangesAsync(ct);
+            }
+
+            // The supplier code picked for this session scopes the whole call (rights and data). A supplier code that was
+            // deactivated meanwhile counts as "not picked", so the user is sent back to the picker.
+            if (session.ActiveSupplierCodeId is int supplierCodeId
+                && await supplierCodes.GetSupplierCodeAsync(supplierCodeId, ct) is { } supplierCode)
+            {
+                context.Items[SessionScope.ItemKey] = new SessionScope(supplierCode.Id, supplierCode.CompanyId, supplierCode.ExciseCode);
             }
         }
 

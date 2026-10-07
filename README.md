@@ -1,6 +1,6 @@
 # ST.LiquorTNT
 
-Merged Excise Track & Trace platform. One installation serves multiple companies, plants and excise
+Merged Excise Track & Trace platform. One installation serves multiple companies, supplier codes and excise
 states. This repository holds the backend, the React front end and the line (desktop) application.
 
 ## Solution
@@ -63,6 +63,10 @@ db/mysql/004_users_remove_excise_plant.sql drops EXCISE_CODE / ALLOTED_PLANT_ID 
 db/mysql/005_user_module_phase2.sql       USER_LOG nullable columns, reset-token column, admin credential
 db/mysql/006_log_mode.sql                 SECURITY_CONFIG.LOG_MODE (NORMAL / DETAIL)
 db/mysql/007_session_sliding.sql          USER_SESSION.ABSOLUTE_EXPIRES_AT, SESSION_IDLE_MINUTES (sliding web sessions)
+db/mysql/008_session_absolute_default.sql default for ABSOLUTE_EXPIRES_AT
+db/mysql/009_roles_rights.sql             roles & rights: SUPPLIER_CODE (supplier codes), LIQUOR_CATEGORY, PAGE_ACTIONS,
+                                          company-wise ROLES + templates, ROLE_RIGHTS, USER_ROLES, USER_RIGHTS
+db/mysql/010_company_view.sql            company.view permission (company list for Super Admin)
 ```
 
 Seeds use `INSERT IGNORE`, so re-running never overwrites values an administrator has changed.
@@ -151,16 +155,15 @@ change. Actions with no record (logout, verify, reset …) return `{ "message": 
 `detail` (the inner-exception chain), `exceptionType` and stack frames in **every** environment
 (owner decision, [ADR 0001](docs/adr/0001-response-bodies-and-routes.md)). Because of this, the API
 must stay on the plant or office network. Routes are lowercase with no `-`.
-Full guide: [docs/05-user-module-api.md](docs/05-user-module-api.md).
+Full guides: [docs/05-user-module-api.md](docs/05-user-module-api.md) and, for roles, rights and supplier codes, [docs/06-roles-rights-plan.md](docs/06-roles-rights-plan.md).
 
 Every change is written to `USER_LOG` (who / what / when / from where / on which record) in the same
 transaction as the change; secrets never appear there.
 
 ## 5. Not in this cut
 
-Role rights and the `[HasPermission]` attribute — until the roles module lands, user-management and
-admin endpoints are gated by the `Administrator` policy (`role_id` claim must equal
-`SECURITY_CONFIG.ADMIN_ROLE_ID`, seeded 1). Also: user ↔ plant/excise access mapping, refresh tokens,
+Batch page (create / approve / cancel - its rights plug into the roles module, docs/06 §9), company and brand masters,
+refresh tokens,
 rate limiting on the anonymous auth endpoints, a row lock for concurrent logins at the session limit,
 the SQL Server provider wiring, Testcontainers, the Line API, the React app, and
 `ST.LiquorTNT.Integration` (government portal clients).

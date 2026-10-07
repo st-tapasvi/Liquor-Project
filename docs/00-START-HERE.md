@@ -19,7 +19,7 @@
 1. **Layers:** `Api → Business → Domain`; `Infrastructure` implements interfaces that `Business` declares. `Domain` and `Contracts` reference nothing. `Desktop` references only `Contracts`. Architecture tests enforce this.
 2. **Interfaces live in `Business`, in the folder of the feature that owns them.** Exactly two kinds: `I<Feature>Service`, and interfaces whose implementation lives in another project. Domain declares none.
 3. **State differences are capabilities, never conditions.** `if (excise == "RJ")` outside `Business/Excise/*` is a defect.
-4. **Tenant (`CompanyId`, `PlantId`, `ExciseCode`) comes only from the JWT** via `ITenantContext` — never from a request, and always passed explicitly to SPs/views.
+4. **Tenant (`CompanyId`, `SupplierCodeId`, `ExciseCode`) comes only from the server-side session and the JWT** via `ITenantContext` — never from a request, and always passed explicitly to SPs/views. Hierarchy: Company → Excise → Supplier Code.
 5. **MySQL primary, SQL Server supported.** A feature is done when both providers are done; SQL objects exist in both `Scripts/<Provider>/` folders; LINQ composes over views, not over SPs.
 
 ## Where the code is
@@ -36,4 +36,4 @@ Login is implemented end to end and is the reference shape for every next module
 
 1. `dotnet build ST.LiquorTNT.sln` and `dotnet test ST.LiquorTNT.sln` — both green.
 2. Run `db\mysql\003`–`005` once (if not already), start `ST.LiquorTNT.Api`, `POST /api/auth/login` with `admin` / `Admin@123`.
-3. The User module is complete (see `05-user-module-api.md`). Next: the Roles module with `[HasPermission]`, then Companies → Plants → Brands, following the module checklist in the standards §19.
+3. The User module and the Roles & Rights / Batch approval module are complete (see `05-user-module-api.md` and `06-roles-rights-and-approval-plan.md`). Next: Companies → Brands, following the module checklist in the standards §19.

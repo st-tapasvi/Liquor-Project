@@ -2,10 +2,13 @@ using System.Security.Claims;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using ST.LiquorTNT.Api.Middleware;
+using ST.LiquorTNT.Api.Security;
+using ST.LiquorTNT.Business.Access;
 using ST.LiquorTNT.Business.Auth;
 using ST.LiquorTNT.Business.Common;
 using ST.LiquorTNT.Business.Common.Abstractions;
 using ST.LiquorTNT.Business.Common.Exceptions;
+using ST.LiquorTNT.Contracts.SupplierCodes;
 using ST.LiquorTNT.Domain.Entities;
 using Xunit;
 
@@ -23,6 +26,9 @@ public sealed class SessionValidationMiddlewareTests
     private readonly FakeConfig _config = new();
     private readonly FakeLog _log = new();
     private readonly FakeClock _clock = new();
+    private readonly FakeSupplierCodes _supplierCodes = new();
+
+    private HttpContext? LastContext { get; set; }
 
     private USER_SESSION AddSession(int idle = 60, int limitHours = 24)
     {
@@ -41,7 +47,8 @@ public sealed class SessionValidationMiddlewareTests
         var reachedController = false;
 
         var middleware = new SessionValidationMiddleware(_ => { reachedController = true; return Task.CompletedTask; });
-        await middleware.InvokeAsync(context, _sessions, new FakeHasher(), new FakeRequest(), _config, _clock, _log);
+        await middleware.InvokeAsync(context, _sessions, new FakeHasher(), new FakeRequest(), _config, _clock, _log, _supplierCodes);
+        LastContext = context;
         return reachedController;
     }
 
@@ -133,7 +140,46 @@ public sealed class SessionValidationMiddlewareTests
         session.ExpiresAt.Should().Be(LoginAt.AddMinutes(20));
     }
 
+    // ---------- the supplier code picked for the session ----------
+
+    [Fact]
+    public async Task PickedSupplierCode_IsHandedToTheTenantContext()
+    {
+        var session = AddSession();
+        session.SelectSupplierCode(55);
+        _supplierCodes.Active[55] = new SupplierCodeResponse { Id = 55, CompanyId = 3, ExciseCode = "RJ" };
+
+        await Call(LoginAt.AddMinutes(5));
+
+        LastContext!.Items[SessionScope.ItemKey].Should().Be(new SessionScope(55, 3, "RJ"));
+    }
+
+    [Fact]
+    public async Task DeactivatedSupplierCode_CountsAsNotPicked()
+    {
+        var session = AddSession();
+        session.SelectSupplierCode(56);                     // no longer active: the lookup returns nothing
+
+        (await Call(LoginAt.AddMinutes(5))).Should().BeTrue();
+
+        LastContext!.Items.ContainsKey(SessionScope.ItemKey).Should().BeFalse();
+    }
+
     // ---------- small fakes ----------
+
+    private sealed class FakeSupplierCodes : IAccessRepository
+    {
+        public Dictionary<int, SupplierCodeResponse> Active { get; } = new();
+
+        public Task<SupplierCodeResponse?> GetSupplierCodeAsync(int supplierCodeId, CancellationToken ct) =>
+            Task.FromResult(Active.GetValueOrDefault(supplierCodeId));
+
+        public Task<bool> IsSuperAdminAsync(int userId, CancellationToken ct) => throw new NotSupportedException();
+        public Task<IReadOnlyList<string>> GetPermissionKeysAsync(int userId, int supplierCodeId, CancellationToken ct) => throw new NotSupportedException();
+        public Task<IReadOnlyList<string>> GetAllPermissionKeysAsync(CancellationToken ct) => throw new NotSupportedException();
+        public Task<IReadOnlyList<SupplierCodeResponse>> GetSupplierCodesForUserAsync(int userId, CancellationToken ct) => throw new NotSupportedException();
+        public Task<IReadOnlyList<SupplierCodeResponse>> GetAllSupplierCodesAsync(CancellationToken ct) => throw new NotSupportedException();
+    }
 
     private sealed class FakeSessions : ISessionRepository
     {

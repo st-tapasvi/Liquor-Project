@@ -66,4 +66,54 @@ public sealed class PASSWORD_POLICY_Tests
         Create(expiryEnabled: true, expiryDays: 90).ExpiryFrom(Now).Should().Be(Now.AddDays(90));
         Create(expiryEnabled: false).ExpiryFrom(Now).Should().BeNull();
     }
+
+    // ---------- several roles: the strictest combination ----------
+
+    [Fact]
+    public void Strictest_OnePolicy_ReturnsItUnchanged()
+    {
+        var only = Create(min: 10);
+        PASSWORD_POLICY.Strictest(new[] { only }, Now).Should().BeSameAs(only);
+    }
+
+    [Fact]
+    public void Strictest_TakesTheHardestValueOfEveryRule()
+    {
+        var easy = PASSWORD_POLICY.Create("EASY", 6, 64, false, true, false, false, 2, false, null, true, true, Now, 1);
+        var hard = PASSWORD_POLICY.Create("HARD", 12, 32, true, false, true, true, 5, true, 90, false, true, Now, 1);
+        var medium = PASSWORD_POLICY.Create("MEDIUM", 8, 40, false, false, false, false, 3, true, 30, true, false, Now, 1);
+
+        var combined = PASSWORD_POLICY.Strictest(new[] { easy, hard, medium }, Now);
+
+        combined.MinLength.Should().Be(12);                  // longest minimum
+        combined.MaxLength.Should().Be(32);                  // shortest maximum
+        combined.RequireUppercase.Should().BeTrue();         // any policy asks -> required
+        combined.RequireLowercase.Should().BeTrue();
+        combined.RequireNumber.Should().BeTrue();
+        combined.RequireSpecialCharacter.Should().BeTrue();
+        combined.PasswordHistoryCount.Should().Be(5);        // most history
+        combined.PasswordExpiryEnabled.Should().BeTrue();
+        combined.PasswordExpiryDays.Should().Be(30);         // soonest expiry
+        combined.AllowUsernameInPassword.Should().BeFalse(); // allowed only if every policy allows
+        combined.AllowCommonPassword.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Strictest_MaximumNeverBelowMinimum()
+    {
+        var longMin = Create(min: 20, max: 64);
+        var shortMax = Create(min: 6, max: 12);
+
+        var combined = PASSWORD_POLICY.Strictest(new[] { longMin, shortMax }, Now);
+
+        combined.MinLength.Should().Be(20);
+        combined.MaxLength.Should().Be(20);
+    }
+
+    [Fact]
+    public void Strictest_NoPolicies_Throws()
+    {
+        var act = () => PASSWORD_POLICY.Strictest(Array.Empty<PASSWORD_POLICY>(), Now);
+        act.Should().Throw<ArgumentException>();
+    }
 }

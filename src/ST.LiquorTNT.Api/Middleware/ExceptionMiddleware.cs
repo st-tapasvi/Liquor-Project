@@ -84,7 +84,7 @@ public sealed class ExceptionMiddleware
                 "Authentication is required.", $"{call} needs a valid bearer token."),
             StatusCodes.Status403Forbidden => (ErrorCodes.Forbidden,
                 "You are not allowed to use this API.",
-                $"{call} needs a role the caller does not have (caller role_id: '{context.User.FindFirst("role_id")?.Value ?? "none"}')."),
+                $"{call} needs a permission the caller does not have in the selected supplier code."),
             StatusCodes.Status404NotFound => (ErrorCodes.EndpointNotFound,
                 "No API exists at this address.",
                 $"Nothing answers {call}. Check the URL: routes are lowercase without '-', e.g. /api/auth/changepassword."),

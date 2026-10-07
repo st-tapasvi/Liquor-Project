@@ -4,8 +4,16 @@ public sealed class CreateUserRequest
 {
     public string UserName { get; set; } = string.Empty;
     public string Password { get; set; } = string.Empty;
-    public int RoleId { get; set; }
+
+    /// <summary>
+    /// Only Super Admin sends this (when creating the first user of a company). For everyone else the new user
+    /// joins the caller's own company and this value is ignored.
+    /// </summary>
     public int? CompanyId { get; set; }
+
+    /// <summary>At least one role. Each role is for one supplier code, or for all supplier codes when SupplierCodeId is null.</summary>
+    public List<UserRoleAssignment> Roles { get; set; } = new();
+
     public string? FullName { get; set; }
     public string? Email { get; set; }
     public string? Phone { get; set; }

@@ -22,6 +22,18 @@ public sealed class AppDbContext : DbContext
     public DbSet<PASSWORD_RESET_REQUEST> PASSWORD_RESET_REQUEST => Set<PASSWORD_RESET_REQUEST>();
     public DbSet<SECURITY_CONFIG> SECURITY_CONFIG => Set<SECURITY_CONFIG>();
 
+    // roles and rights
+    public DbSet<PAGES> PAGES => Set<PAGES>();
+    public DbSet<PAGE_ACTIONS> PAGE_ACTIONS => Set<PAGE_ACTIONS>();
+    public DbSet<ROLE_RIGHTS> ROLE_RIGHTS => Set<ROLE_RIGHTS>();
+    public DbSet<USER_ROLES> USER_ROLES => Set<USER_ROLES>();
+    public DbSet<USER_RIGHTS> USER_RIGHTS => Set<USER_RIGHTS>();
+
+    // masters
+    public DbSet<EXCISE> EXCISE => Set<EXCISE>();
+    public DbSet<LIQUOR_CATEGORY> LIQUOR_CATEGORY => Set<LIQUOR_CATEGORY>();
+    public DbSet<SUPPLIER_CODE> SUPPLIER_CODE => Set<SUPPLIER_CODE>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
