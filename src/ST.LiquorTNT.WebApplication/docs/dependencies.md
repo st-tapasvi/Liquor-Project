@@ -33,6 +33,8 @@ The project is meant to live 15–20 years. Every dependency is a liability with
 | husky, lint-staged                                                                                                                                                                                                           | Pre-commit hook                                                                                                                                   |
 | @types/react, @types/react-dom, @types/node                                                                                                                                                                                  | Types                                                                                                                                             |
 
+The Inter font (OFL-1.1, latin + latin-ext, weights 400/500/600/700) is committed under `src/app/styles/fonts/` and declared in `src/app/styles/fonts.css`, so it needs no package and works offline. It is the same font as the Penpot text styles.
+
 Deliberately not included: `eslint-plugin-jsx-a11y` (last release 2024, no ESLint 10 support), `orval` (25 direct dependencies; `npx openapi-typescript@7` is run on demand instead), `dompurify` (added with the first `SafeHtml` consumer), `i18next` (no multilingual requirement yet), `web-vitals` and a Sentry SDK (on-premise; the logger's remote transport covers it).
 
 ## Versioning policy

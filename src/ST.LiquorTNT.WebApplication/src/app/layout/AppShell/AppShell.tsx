@@ -1,7 +1,5 @@
 import Box from '@mui/material/Box';
-import Container from '@mui/material/Container';
 import { useTheme } from '@mui/material/styles';
-import Toolbar from '@mui/material/Toolbar';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useState } from 'react';
 import { Outlet } from 'react-router';
@@ -14,27 +12,37 @@ import { SessionCountdown } from './SessionCountdown';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
 
-/** Authenticated layout: sidebar + top bar + page outlet, plus the app-wide re-authentication dialog. */
 export function AppShell() {
   const theme = useTheme();
   const isDesktop = useMediaQuery(theme.breakpoints.up('md'));
+  const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  const sidebarOpen = isDesktop ? !collapsed : mobileOpen;
+
+  const toggle = () => {
+    if (!isDesktop) {
+      setMobileOpen((o) => !o);
+      return;
+    }
+    setCollapsed((c) => !c);
+  };
 
   return (
     <RequireAuth>
-      <Box sx={{ display: 'flex', minHeight: '100vh' }}>
-        <TopBar showMenuButton={!isDesktop} onMenuClick={() => setMobileOpen(true)} />
+      <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
         <Sidebar
           variant={isDesktop ? 'permanent' : 'temporary'}
-          open={isDesktop || mobileOpen}
+          open={sidebarOpen}
           onClose={() => setMobileOpen(false)}
+          onExpand={() => setCollapsed(false)}
         />
-        <Box component="main" sx={{ flexGrow: 1, minWidth: 0 }}>
-          <Toolbar />
-          <Container maxWidth="xl" sx={{ py: 3 }}>
+        <Box sx={{ flexGrow: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+          <TopBar onMenuClick={toggle} sidebarOpen={sidebarOpen} />
+          <Box component="main" sx={{ flexGrow: 1, px: { xs: 2, sm: 3 }, pt: 2.25, pb: 3 }}>
             <SessionCountdown />
             <Outlet />
-          </Container>
+          </Box>
         </Box>
       </Box>
       <SessionExpiredDialog />

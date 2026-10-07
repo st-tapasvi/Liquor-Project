@@ -28,10 +28,12 @@ export function AuthCard({
       <Box sx={{ display: 'flex', justifyContent: 'center', mb: 1.75 }}>
         <Box component="img" src={LOGO_SRC} alt={COMPANY} sx={{ height: 64, width: 'auto', display: 'block' }} />
       </Box>
-      <Typography id="auth-card-title" component="h1" sx={{ fontSize: 24, fontWeight: 700, lineHeight: 1.3 }}>
+      <Typography id="auth-card-title" component="h1" variant="h5">
         {title}
       </Typography>
-      <Typography sx={{ fontSize: 14, color: 'text.secondary', mt: 0.75 }}>{line}</Typography>
+      <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.75 }}>
+        {line}
+      </Typography>
       <Box sx={{ textAlign: 'left', mt: 3.25 }}>{children}</Box>
     </Paper>
   );

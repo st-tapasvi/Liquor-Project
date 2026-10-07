@@ -8,7 +8,7 @@ import { PATHS } from '@/core/router';
 export function BackToLoginLink() {
   return (
     <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2.5 }}>
-      <Link component={RouterLink} to={PATHS.login} underline="always" color="text.primary" sx={{ fontSize: 14 }}>
+      <Link component={RouterLink} to={PATHS.login} underline="always" color="text.primary" variant="body2">
         Back to log in
       </Link>
     </Box>

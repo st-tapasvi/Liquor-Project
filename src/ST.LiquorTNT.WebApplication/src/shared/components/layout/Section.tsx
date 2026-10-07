@@ -7,7 +7,7 @@ export function Section({ title, children, dense }: { title?: string; children: 
   return (
     <Paper sx={{ p: dense ? 1.5 : 2.5, mb: 2 }}>
       {title && (
-        <Typography variant="subtitle1" component="h2" sx={{ mb: 1.5, fontWeight: 600 }}>
+        <Typography variant="h6" component="h2" sx={{ mb: 1.5 }}>
           {title}
         </Typography>
       )}

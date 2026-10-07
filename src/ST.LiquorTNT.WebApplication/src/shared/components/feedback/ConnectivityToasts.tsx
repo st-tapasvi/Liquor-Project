@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
 
 import { useConnectivity } from '@/core/network';
+import { tokens } from '@/core/theme';
 
 export const CONNECTIVITY_TOAST_ID = 'connectivity';
 
@@ -13,7 +14,7 @@ const BAR_STYLE = {
   borderLeft: 'none',
   borderRadius: 999,
   padding: '8px 18px 8px 14px',
-  fontSize: 14,
+  fontSize: tokens.font.body2,
 } as const;
 
 export function ConnectivityToasts() {

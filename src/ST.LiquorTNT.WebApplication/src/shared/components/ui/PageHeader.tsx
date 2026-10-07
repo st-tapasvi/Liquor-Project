@@ -14,7 +14,7 @@ export function PageHeader({ title, subtitle, actions }: PageHeaderProps) {
   return (
     <Stack direction="row" spacing={2} sx={{ mb: 2, alignItems: 'flex-start', justifyContent: 'space-between' }}>
       <Box>
-        <Typography variant="h5" component="h1">
+        <Typography variant="h4" component="h1">
           {title}
         </Typography>
         {subtitle && (

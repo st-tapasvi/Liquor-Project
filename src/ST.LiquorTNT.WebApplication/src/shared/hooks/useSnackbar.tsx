@@ -38,7 +38,9 @@ function content(text: string, reference?: string, heading?: string): string | R
       {heading && <strong style={{ display: 'block', fontWeight: 600, marginBottom: 2 }}>{heading}</strong>}
       {text}
       {reference && (
-        <span style={{ display: 'block', opacity: 0.7, fontSize: '0.75rem', marginTop: 2 }}>Ref: {reference}</span>
+        <span style={{ display: 'block', opacity: 0.7, fontSize: tokens.font.caption, marginTop: 2 }}>
+          Ref: {reference}
+        </span>
       )}
     </span>
   );
@@ -111,7 +113,7 @@ function AppToaster() {
       toastOptions={{
         style: {
           fontFamily: tokens.fontFamily,
-          fontSize: 14,
+          fontSize: tokens.font.body2,
           lineHeight: 1.45,
           color: tokens.color.textPrimary,
           background: tokens.color.surface,

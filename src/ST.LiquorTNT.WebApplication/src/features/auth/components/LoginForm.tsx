@@ -136,7 +136,7 @@ export function LoginForm() {
         </Stack>
 
         <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1.125, mb: 2.25 }}>
-          <Link component={RouterLink} to={PATHS.forgotPassword} sx={{ fontSize: 13.5 }}>
+          <Link component={RouterLink} to={PATHS.forgotPassword} variant="body2">
             Forgot password?
           </Link>
         </Box>

@@ -34,11 +34,7 @@ export function AuthLayout() {
 
         <Outlet />
 
-        <Typography
-          variant="caption"
-          color="text.secondary"
-          sx={{ position: 'absolute', left: 26, bottom: 20, fontSize: 12 }}
-        >
+        <Typography variant="caption" color="text.secondary" sx={{ position: 'absolute', left: 26, bottom: 20 }}>
           v{appConfig.version}
         </Typography>
       </Box>

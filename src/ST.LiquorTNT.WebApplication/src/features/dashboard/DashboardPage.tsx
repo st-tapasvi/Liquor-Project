@@ -1,93 +1,110 @@
-import DevicesIcon from '@mui/icons-material/Devices';
-import GroupIcon from '@mui/icons-material/Group';
-import PolicyIcon from '@mui/icons-material/Policy';
-import SecurityIcon from '@mui/icons-material/Security';
-import Card from '@mui/material/Card';
-import CardActionArea from '@mui/material/CardActionArea';
-import CardContent from '@mui/material/CardContent';
-import Grid from '@mui/material/Grid';
+import Box from '@mui/material/Box';
+import Link from '@mui/material/Link';
 import Typography from '@mui/material/Typography';
-import type { ReactNode } from 'react';
 import { Link as RouterLink } from 'react-router';
 
-import { type PermissionKey, useCurrentUser, useSession } from '@/core/auth';
+import { useCurrentUser } from '@/core/auth';
+import { isModuleEnabled, useModuleFlagsStore } from '@/core/modules';
 import { PATHS } from '@/core/router';
+import { useTenantStore } from '@/core/tenant';
+import { tokens } from '@/core/theme';
 
-import { PageHeader } from '@/shared/components/ui';
-import { formatDateTime } from '@/shared/utils';
+import { KpiCard } from './components/KpiCard';
+import { ModuleTile } from './components/ModuleTile';
+import { RecentActivity } from './components/RecentActivity';
+import { KPIS, MODULE_TILES, rightsLabel } from './dashboard.config';
 
-interface Tile {
-  title: string;
-  description: string;
-  to: string;
-  icon: ReactNode;
-  permission?: readonly PermissionKey[];
-}
+const { color } = tokens;
 
-const TILES: readonly Tile[] = [
-  {
-    title: 'Users',
-    description: 'Accounts, roles, locks.',
-    to: PATHS.users.list,
-    icon: <GroupIcon />,
-    permission: ['users.view', 'users.manage'],
-  },
-  {
-    title: 'Security settings',
-    description: 'Login locking and session limits.',
-    to: PATHS.settings.security,
-    icon: <SecurityIcon />,
-    permission: ['settings.view', 'settings.manage'],
-  },
-  {
-    title: 'Password policies',
-    description: 'Rules for new passwords.',
-    to: PATHS.settings.passwordPolicies,
-    icon: <PolicyIcon />,
-    permission: ['settings.view', 'settings.manage'],
-  },
-  {
-    title: 'My sessions',
-    description: 'Devices where you are signed in.',
-    to: PATHS.settings.sessions,
-    icon: <DevicesIcon />,
-  },
-];
+const TODAY = new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
 
-/** Landing page: tiles for every module the user may open (menu and tiles come from the same rights). */
+/**
+ * Landing page (Penpot "2.1 App shell dashboard"): today's figures, one tile per module the user may open,
+ * and the latest activity. Tiles and sidebar come from the same rights and feature flags.
+ */
 export default function DashboardPage() {
   const user = useCurrentUser();
-  const { expiresAt } = useSession();
+  const enabled = useModuleFlagsStore((s) => s.enabled);
+  const companyName = useTenantStore((s) => s.companyName);
+  const companyId = useTenantStore((s) => s.companyId);
+  const exciseCode = useTenantStore((s) => s.exciseCode);
 
-  const visible = TILES.filter((t) => !t.permission || t.permission.some((p) => user.permissions.has(p)));
+  const context = [
+    companyName ? `${companyName}${companyId ? ` (${companyId})` : ''}` : null,
+    exciseCode ? `${exciseCode} excise` : null,
+    TODAY.format(new Date()),
+  ].filter(Boolean);
+
+  const tiles = MODULE_TILES.filter((t) => t.permission.some((p) => user.permissions.has(p))).map((t) => ({
+    ...t,
+    enabled: isModuleEnabled(t.module, enabled),
+    rights: rightsLabel(t.module, user.permissions),
+  }));
+
+  const canOpenLog =
+    isModuleEnabled('reports', enabled) &&
+    (user.permissions.has('reports.view') || user.permissions.has('reports.export'));
 
   return (
     <>
-      <PageHeader
-        title={`Welcome, ${user.fullName ?? user.userName}`}
-        subtitle={expiresAt ? `This session ends at ${formatDateTime(expiresAt)} at the latest.` : undefined}
-      />
-      <Grid container spacing={2}>
-        {visible.map((tile) => (
-          <Grid key={tile.to} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
-            <Card>
-              <CardActionArea component={RouterLink} to={tile.to} sx={{ height: '100%' }}>
-                <CardContent sx={{ display: 'flex', gap: 2, alignItems: 'flex-start' }}>
-                  <span style={{ color: 'var(--mui-palette-primary-main)' }}>{tile.icon}</span>
-                  <span>
-                    <Typography variant="subtitle1" component="h2">
-                      {tile.title}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {tile.description}
-                    </Typography>
-                  </span>
-                </CardContent>
-              </CardActionArea>
-            </Card>
-          </Grid>
+      <Box component="header" sx={{ mb: 2 }}>
+        <Typography variant="body2" sx={{ color: color.textSecondary, mb: 0.25 }}>
+          Home
+        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', columnGap: 3, rowGap: 0.5 }}>
+          <Typography component="h1" variant="h4">
+            Dashboard
+          </Typography>
+          <Typography variant="body1" sx={{ color: color.textSecondary }}>
+            {context.join(' · ')}
+          </Typography>
+        </Box>
+      </Box>
+
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' },
+          gap: 2,
+          mb: 2.5,
+        }}
+      >
+        {KPIS.map((kpi) => (
+          <KpiCard key={kpi.label} {...kpi} />
         ))}
-      </Grid>
+      </Box>
+
+      <Box component="section" aria-labelledby="modules-title" sx={{ mb: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', columnGap: 2.5, mb: 1.25 }}>
+          <Typography id="modules-title" component="h2" variant="h6">
+            Modules
+          </Typography>
+          <Typography variant="body2" sx={{ color: color.textSecondary }}>
+            Same list as the sidebar — both come from your rights and this installation&apos;s modules
+          </Typography>
+        </Box>
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))',
+            gap: 2,
+          }}
+        >
+          {tiles.map((t) => (
+            <ModuleTile key={t.module} {...t} />
+          ))}
+        </Box>
+      </Box>
+
+      <RecentActivity
+        action={
+          canOpenLog ? (
+            <Link component={RouterLink} to={PATHS.reports.activity} variant="body2">
+              Open the full user log
+            </Link>
+          ) : null
+        }
+      />
     </>
   );
 }

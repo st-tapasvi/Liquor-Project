@@ -28,7 +28,7 @@ export function RequireModule({ module, children }: { module: ModuleKey; childre
 
   return (
     <Box sx={{ p: 4, textAlign: 'center' }}>
-      <Typography variant="h5" component="h1" gutterBottom>
+      <Typography variant="h4" component="h1" gutterBottom>
         Page not found
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>

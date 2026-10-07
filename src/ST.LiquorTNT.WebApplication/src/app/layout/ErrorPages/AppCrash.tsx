@@ -9,7 +9,7 @@ export function AppCrash({ error, onReset }: { error: Error; onReset: () => void
   return (
     <Box sx={{ minHeight: '100vh', display: 'grid', placeItems: 'center', p: 3, textAlign: 'center' }}>
       <Box sx={{ maxWidth: 480 }}>
-        <Typography variant="h5" component="h1" gutterBottom>
+        <Typography variant="h4" component="h1" gutterBottom>
           {appConfig.name} ran into a problem
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
