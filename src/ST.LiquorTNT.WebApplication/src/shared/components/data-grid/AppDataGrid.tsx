@@ -1,71 +1,92 @@
-import Box from '@mui/material/Box';
-import { DataGrid, type GridColDef, type GridRowId, type GridValidRowModel } from '@mui/x-data-grid';
+import Paper from '@mui/material/Paper';
+import {
+  DataGrid,
+  type GridColDef,
+  type GridPaginationModel,
+  type GridRowId,
+  type GridValidRowModel,
+} from '@mui/x-data-grid';
 
-import type { PagedResult } from '@/core/api';
+import { tokens } from '@/core/theme';
 
-import { ErrorState } from '@/shared/components/feedback';
+import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS } from '@/shared/constants';
 
-import type { useServerGrid } from './useServerGrid';
+import { ErrorState } from '../feedback';
 
 export type AppGridColumn<TRow extends GridValidRowModel> = GridColDef<TRow>;
 
-interface AppDataGridProps<TRow extends GridValidRowModel> {
-  columns: readonly AppGridColumn<TRow>[];
-  /** The page currently held by the query (undefined while loading the first time). */
-  data: PagedResult<TRow> | undefined;
-  isLoading: boolean;
-  error?: unknown;
-  onRetry?: () => void;
-  grid: ReturnType<typeof useServerGrid>;
-  getRowId: (row: TRow) => GridRowId;
-  /** Accessible name for the table. */
-  ariaLabel: string;
-  minHeight?: number;
+export interface ServerPaging {
+  rowCount: number;
+  paginationModel: GridPaginationModel;
+  onPaginationModelChange: (model: GridPaginationModel) => void;
 }
 
-/**
- * The project's grid: MUI X DataGrid (Community, MIT) in server-side pagination mode. Every list screen
- * uses this wrapper, never `@mui/x-data-grid` directly, so paging, density, empty/error states and
- * accessibility are decided once.
- */
+interface AppDataGridProps<TRow extends GridValidRowModel> {
+  rows: readonly TRow[] | undefined;
+  columns: readonly AppGridColumn<TRow>[];
+  getRowId: (row: TRow) => GridRowId;
+  ariaLabel: string;
+  loading?: boolean;
+  error?: unknown;
+  onRetry?: () => void;
+  server?: ServerPaging;
+}
+
+const paginationModel = { page: 0, pageSize: DEFAULT_PAGE_SIZE };
+
+const gridSx = {
+  border: 0,
+  '& .MuiDataGrid-columnHeader, & .MuiDataGrid-columnHeaders .MuiDataGrid-filler, & .MuiDataGrid-scrollbarFiller--header':
+    { backgroundColor: tokens.shell.sidebarDivider },
+  '& .MuiDataGrid-columnHeader': { color: tokens.color.gridHeaderText },
+  '& .MuiDataGrid-columnHeader .MuiIconButton-root, & .MuiDataGrid-columnHeader .MuiCheckbox-root': {
+    color: tokens.color.gridHeaderIcon,
+  },
+  '& .MuiDataGrid-columnHeader .MuiCheckbox-root.Mui-checked, & .MuiDataGrid-columnHeader .MuiCheckbox-indeterminate': {
+    color: tokens.color.gridHeaderText,
+  },
+  '& .MuiDataGrid-columnHeader .MuiIconButton-root:hover': { backgroundColor: tokens.shell.sidebarHoverBg },
+  '& .MuiDataGrid-columnSeparator': { color: tokens.color.gridSeparator, opacity: 1 },
+  '& .MuiDataGrid-columnHeader .MuiDataGrid-menuIcon': { width: 'auto', visibility: 'visible' },
+  '& .MuiDataGrid-row.odd:not(:hover):not(.Mui-selected)': { backgroundColor: tokens.color.gridStripe },
+} as const;
+
 export function AppDataGrid<TRow extends GridValidRowModel>({
+  rows,
   columns,
-  data,
-  isLoading,
-  error,
-  onRetry,
-  grid,
   getRowId,
   ariaLabel,
-  minHeight = 420,
+  loading = false,
+  error,
+  onRetry,
+  server,
 }: AppDataGridProps<TRow>) {
   if (error) {
     return <ErrorState error={error} {...(onRetry ? { onRetry } : {})} />;
   }
 
   return (
-    <Box sx={{ minHeight, width: '100%' }}>
+    <Paper elevation={1} sx={{ height: 400, width: '100%' }}>
       <DataGrid<TRow>
         aria-label={ariaLabel}
+        rows={rows ?? []}
         columns={columns as GridColDef<TRow>[]}
-        rows={data?.items ?? []}
-        rowCount={data?.totalCount ?? 0}
         getRowId={getRowId}
-        loading={isLoading}
-        density="compact"
-        disableRowSelectionOnClick
-        disableColumnMenu
-        paginationMode="server"
-        sortingMode="server"
-        filterMode="server"
-        paginationModel={{ page: grid.state.page - 1, pageSize: grid.state.pageSize }}
-        onPaginationModelChange={(model) => {
-          if (model.pageSize !== grid.state.pageSize) grid.setPageSize(model.pageSize);
-          else grid.setPage(model.page + 1);
-        }}
-        pageSizeOptions={[...grid.pageSizeOptions]}
-        sx={{ border: 0, '& .MuiDataGrid-cell:focus, & .MuiDataGrid-columnHeader:focus': { outline: 'none' } }}
+        loading={loading}
+        initialState={{ pagination: { paginationModel } }}
+        pageSizeOptions={[...PAGE_SIZE_OPTIONS]}
+        checkboxSelection
+        getRowClassName={({ indexRelativeToCurrentPage }) => (indexRelativeToCurrentPage % 2 ? 'odd' : 'even')}
+        sx={gridSx}
+        {...(server
+          ? {
+              paginationMode: 'server' as const,
+              rowCount: server.rowCount,
+              paginationModel: server.paginationModel,
+              onPaginationModelChange: server.onPaginationModelChange,
+            }
+          : {})}
       />
-    </Box>
+    </Paper>
   );
 }

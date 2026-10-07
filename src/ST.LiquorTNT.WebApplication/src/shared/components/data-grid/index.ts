@@ -1,2 +1,2 @@
-export { AppDataGrid, type AppGridColumn } from './AppDataGrid';
+export { AppDataGrid, type AppGridColumn, type ServerPaging } from './AppDataGrid';
 export { useServerGrid, type ServerGridState } from './useServerGrid';

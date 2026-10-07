@@ -28,8 +28,22 @@ interface ProtectedRouteOptions {
 }
 
 /** Lazy page + Suspense. Every page is its own chunk, so a module never lands in the initial bundle. */
+const RETRY_DELAY_MS = 600;
+
+function withRetry(loader: PageLoader): PageLoader {
+  return () =>
+    loader().catch(
+      () =>
+        new Promise<{ default: ComponentType }>((resolve, reject) => {
+          setTimeout(() => {
+            loader().then(resolve, reject);
+          }, RETRY_DELAY_MS);
+        }),
+    );
+}
+
 function lazyPage(loader: PageLoader) {
-  const Page = lazy(loader);
+  const Page = lazy(withRetry(loader));
   return (
     <Suspense fallback={<LoadingFallback />}>
       <Page />

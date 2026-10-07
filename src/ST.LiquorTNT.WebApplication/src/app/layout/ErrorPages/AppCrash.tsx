@@ -3,6 +3,7 @@ import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 
 import { appConfig } from '@/core/config';
+import { describeError } from '@/core/errors';
 
 /** Last-resort page when something outside the router crashes. No stack trace is shown to the user. */
 export function AppCrash({ error, onReset }: { error: Error; onReset: () => void }) {
@@ -13,7 +14,7 @@ export function AppCrash({ error, onReset }: { error: Error; onReset: () => void
           {appConfig.name} ran into a problem
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-          {error.name}: {error.message}
+          {describeError(error)}
         </Typography>
         <Button variant="contained" onClick={() => window.location.reload()} sx={{ mr: 1 }}>
           Reload

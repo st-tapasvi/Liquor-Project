@@ -3,6 +3,9 @@ import { useSearchParams } from 'react-router';
 
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, PAGE_SIZE_OPTIONS } from '@/shared/constants';
 
+import type { ServerPaging } from './AppDataGrid';
+
+
 export interface ServerGridState {
   /** 1-based page as the API expects. */
   page: number;
@@ -43,8 +46,18 @@ export function useServerGrid(defaults?: Partial<ServerGridState>) {
     [setParams, state],
   );
 
+  const paging = (rowCount: number): ServerPaging => ({
+    rowCount,
+    paginationModel: { page: state.page - 1, pageSize: state.pageSize },
+    onPaginationModelChange: (model) => {
+      if (model.pageSize !== state.pageSize) update({ pageSize: model.pageSize, page: 1 });
+      else update({ page: model.page + 1 });
+    },
+  });
+
   return {
     state,
+    paging,
     setPage: (page: number) => update({ page }),
     setPageSize: (pageSize: number) => update({ pageSize }),
     setSearch: (search: string) => update({ search }),

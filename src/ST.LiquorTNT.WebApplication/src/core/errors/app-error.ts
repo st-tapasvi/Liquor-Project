@@ -115,12 +115,21 @@ export function isClientError(error: unknown): boolean {
   return isApiError(error) && error.status >= 400 && error.status < 500;
 }
 
-/** A short, safe message for a snackbar or fallback UI. Never includes stack traces. */
+const CHUNK_LOAD_PATTERN =
+  /Failed to fetch dynamically imported module|error loading dynamically imported module|Importing a module script failed|ChunkLoadError/i;
+
+/** A lazily loaded screen could not be downloaded (new deployment, dropped connection, dev-server restart). */
+export function isChunkLoadError(error: unknown): boolean {
+  return error instanceof Error && CHUNK_LOAD_PATTERN.test(`${error.name} ${error.message}`);
+}
+
+/** A short, safe message for a snackbar or fallback UI. Never includes stack traces, file names or URLs. */
 export function describeError(error: unknown): string {
   if (isValidationError(error)) return 'Some fields need attention.';
   if (isApiError(error)) return error.detail ?? error.title;
   if (isNetworkError(error))
     return error.isTimeout ? 'The server took too long to respond.' : 'The server cannot be reached.';
-  if (error instanceof Error) return error.message;
-  return 'Something went wrong.';
+  if (isChunkLoadError(error))
+    return 'This screen could not be loaded. Please reload the page to get the latest version.';
+  return 'Something went wrong. Please try again.';
 }

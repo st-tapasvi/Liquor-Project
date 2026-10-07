@@ -1,4 +1,5 @@
 import AddIcon from '@mui/icons-material/Add';
+import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
 import { useEffect, useState } from 'react';
@@ -8,7 +9,6 @@ import { Can } from '@/core/auth';
 import { PATHS } from '@/core/router';
 
 import { useServerGrid } from '@/shared/components/data-grid';
-import { Section } from '@/shared/components/layout';
 import { PageHeader } from '@/shared/components/ui';
 import { useDebounce } from '@/shared/hooks';
 
@@ -38,17 +38,17 @@ export default function UserListPage() {
           </Can>
         }
       />
-      <Section dense>
+      <Box sx={{ mb: 2 }}>
         <TextField
           label="Search"
           placeholder="User name or full name"
           value={searchText}
           onChange={(e) => setSearchText(e.target.value)}
-          sx={{ maxWidth: 360, mb: 1 }}
+          sx={{ width: '100%', maxWidth: 360, bgcolor: 'background.paper' }}
           slotProps={{ htmlInput: { maxLength: 100, 'aria-label': 'Search users' } }}
         />
-        <UserGrid grid={grid} />
-      </Section>
+      </Box>
+      <UserGrid grid={grid} />
     </>
   );
 }

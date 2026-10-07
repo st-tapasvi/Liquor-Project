@@ -20,6 +20,10 @@ export const tokens = {
     textSecondary: '#6C6D72',
     iconTint: '#FDEAEB',
     iconTintMuted: '#F1F1F3',
+    gridHeaderText: '#FFFFFF',
+    gridHeaderIcon: '#C5C6CA',
+    gridStripe: '#F3F4F6',
+    gridSeparator: '#6E7178',
   },
   shell: {
     sidebarWidth: 240,

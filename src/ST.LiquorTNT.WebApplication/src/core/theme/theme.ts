@@ -14,7 +14,6 @@ export const theme = createTheme({
     info: { main: tokens.color.info },
     background: { default: tokens.color.background, paper: tokens.color.surface },
     text: { primary: tokens.color.textPrimary, secondary: tokens.color.textSecondary },
-    divider: tokens.color.border,
   },
   shape: { borderRadius: tokens.radius },
   typography: {
@@ -56,9 +55,8 @@ export const theme = createTheme({
     },
     MuiPaper: {
       defaultProps: { elevation: 0 },
-      styleOverrides: { root: { border: `1px solid ${tokens.color.border}` } },
+      styleOverrides: { elevation0: { border: `1px solid ${tokens.color.border}` } },
     },
-    MuiTableCell: { styleOverrides: { root: { paddingTop: 8, paddingBottom: 8, fontSize: tokens.font.body2 } } },
     MuiTooltip: { styleOverrides: { tooltip: { fontSize: tokens.font.caption } } },
     MuiChip: { styleOverrides: { label: { fontSize: tokens.font.caption } } },
     MuiFormHelperText: { styleOverrides: { root: { fontSize: tokens.font.caption } } },

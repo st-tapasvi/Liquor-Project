@@ -10,6 +10,7 @@ export {
   isNetworkError,
   isClientError,
   describeError,
+  isChunkLoadError,
   type FieldErrors,
 } from './app-error';
 export {

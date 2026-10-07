@@ -43,6 +43,7 @@ export function UserGrid({ grid }: { grid: ReturnType<typeof useServerGrid> }) {
       {
         field: 'userName',
         headerName: 'User name',
+        rowHeader: true,
         flex: 1,
         minWidth: 140,
         renderCell: ({ row }) => (
@@ -63,7 +64,7 @@ export function UserGrid({ grid }: { grid: ReturnType<typeof useServerGrid> }) {
       {
         field: 'status',
         headerName: 'Status',
-        width: 200,
+        width: 120,
         sortable: false,
         renderCell: ({ row }) => {
           const s = userStatus(row);
@@ -73,18 +74,19 @@ export function UserGrid({ grid }: { grid: ReturnType<typeof useServerGrid> }) {
       {
         field: 'lastLoginAt',
         headerName: 'Last login',
-        width: 150,
+        width: 160,
         valueFormatter: (v: string | null) => formatDateTime(v),
       },
       {
         field: 'actions',
+        disableColumnMenu: true,
         headerName: '',
-        width: 130,
+        width: 110,
         sortable: false,
         align: 'right',
         renderCell: ({ row }) => (
           <Can right="users.manage">
-            <Stack direction="row" spacing={0.5}>
+            <Stack direction="row" spacing={0.5} sx={{ height: '100%', alignItems: 'center' }}>
               {(row.lockedUntil !== null || row.isBlocked) && (
                 <Tooltip title="Unlock">
                   <IconButton size="small" aria-label={`Unlock ${row.userName}`} onClick={() => unlock.mutate(row.id)}>
@@ -136,13 +138,13 @@ export function UserGrid({ grid }: { grid: ReturnType<typeof useServerGrid> }) {
   return (
     <AppDataGrid<UserResponse>
       ariaLabel="Users"
+      rows={users.data?.items}
       columns={columns}
-      data={users.data}
-      isLoading={users.isPending || users.isFetching}
+      getRowId={(row) => row.id}
+      loading={users.isPending || users.isFetching}
       error={users.error}
       onRetry={() => void users.refetch()}
-      grid={grid}
-      getRowId={(row) => row.id}
+      server={grid.paging(users.data?.totalCount ?? 0)}
     />
   );
 }
