@@ -111,14 +111,9 @@ public sealed class AuthService : IAuthService
         var session = USER_SESSION.Create(user.Id, _tokenHasher.Hash(token), now, settings.SessionIdleMinutes, expiresAt,
             _request.IpAddress, _request.UserAgent);
 
-        // The supplier codes this user may work in. Exactly one → picked straight away, so the user can start working;
-        // more than one → the screen shows a picker (POST /api/auth/selectsuppliercode).
+        // The supplier codes this user may work in. Nothing is picked here, even when there is only one: after every
+        // login each user goes to the supplier code screen and picks one (POST /api/auth/selectsuppliercode).
         var supplierCodes = await _supplierCodes.ForUserAsync(user.Id, ct);
-        var activeSupplierCode = supplierCodes.Count == 1 ? supplierCodes[0] : null;
-        if (activeSupplierCode is not null)
-        {
-            session.SelectSupplierCode(activeSupplierCode.Id);
-        }
 
         // No security question yet (first login after the password change): the session is held on the
         // security-question screen until one is set, so "forgot password" always has a question to ask.
@@ -147,7 +142,7 @@ public sealed class AuthService : IAuthService
             IdleTimeoutMinutes = settings.SessionIdleMinutes,
             User = ToCurrentUser(user, securityQuestionRequired),
             SupplierCodes = supplierCodes,
-            ActiveSupplierCode = activeSupplierCode,
+            ActiveSupplierCode = null,
         };
     }
 

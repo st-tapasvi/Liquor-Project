@@ -61,11 +61,14 @@ public sealed class RolesRightsFlowTests
             await CreateCompanyUserAsync(client, admin, agentName, companyId, RoleId("Agent Manager"));
             var operatorUser = await CreateCompanyUserAsync(client, admin, operatorName, companyId, RoleId("Operator"));
 
-            // the company has one supplier code -> picked automatically at login
+            // even with one supplier code nothing is picked at login: every user picks on the supplier code screen
             var agentLogin = await LoginOk(client, agentName, StrongPassword);
-            agentLogin.ActiveSupplierCode!.Id.Should().Be(supplierCode.Id);
+            agentLogin.SupplierCodes.Select(s => s.Id).Should().Equal(supplierCode.Id);
+            agentLogin.ActiveSupplierCode.Should().BeNull();
             var agent = agentLogin.AccessToken;
             var op = (await LoginOk(client, operatorName, StrongPassword)).AccessToken;
+            await PostJson(client, "/api/auth/selectsuppliercode", new SelectSupplierCodeRequest { SupplierCodeId = supplierCode.Id }, agent);
+            await PostJson(client, "/api/auth/selectsuppliercode", new SelectSupplierCodeRequest { SupplierCodeId = supplierCode.Id }, op);
 
             // 3. the Agent Manager manages users but is no administrator
             (await client.SendAsync(WithToken(HttpMethod.Get, "/api/users", agent))).StatusCode.Should().Be(HttpStatusCode.OK);

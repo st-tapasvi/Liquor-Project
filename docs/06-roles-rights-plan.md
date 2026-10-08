@@ -35,8 +35,8 @@ Super Admin (Sundaram Tech, no company)
    └─ SUPPLIER_CODE = EXCISE + code + LIQUOR_CATEGORY      e.g. RJ · 550 · CL
 ```
 
-- After login the user works in one **active supplier code** (`USER_SESSION.ACTIVE_SUPPLIER_CODE_ID`). It is picked automatically when the
-  user has exactly one; otherwise the user picks one with `POST /api/auth/selectsuppliercode`.
+- After login the user works in one **active supplier code** (`USER_SESSION.ACTIVE_SUPPLIER_CODE_ID`). Nothing is picked at login (owner,
+  2026-10-08): after every login every user, also with one supplier code, picks one with `POST /api/auth/selectsuppliercode`.
 - `ITenantContext` = `CompanyId`, `SupplierCodeId`, `ExciseCode`. `SessionValidationMiddleware` loads the supplier code from the session; a
   deactivated supplier code counts as not picked. Tenant values never come from a request.
 
@@ -125,7 +125,7 @@ All responses have a body; errors are ProblemDetails with `errorCode` (see `05-u
 
 | Method & path | Right | What it does |
 |---|---|---|
-| `POST /api/auth/login` | – | Now also returns `supplierCodes[]` and `activeSupplierCode` (set when the user has exactly one) |
+| `POST /api/auth/login` | – | Also returns `supplierCodes[]` for the supplier code screen; `activeSupplierCode` is always null (nothing picked at login) |
 | `GET /api/auth/mysuppliercodes` | logged in | Supplier codes the user may pick |
 | `POST /api/auth/selectsuppliercode` `{ supplierCodeId }` | logged in | Picks / switches the supplier code; returns `MyPermissionsResponse`. Not the user's supplier code → `403 SUPPLIER_CODE_NOT_ASSIGNED` |
 | `GET /api/auth/mypermissions` | logged in | `{ isSuperAdmin, activeSupplierCode, permissions[] }` for the menu and buttons |

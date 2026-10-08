@@ -18,11 +18,12 @@ public sealed class LoginResponse
     public CurrentUserResponse User { get; set; } = new();
 
     /// <summary>
-    /// The supplier codes this user may work in. With more than one, show a picker and call
-    /// <c>POST /api/auth/selectsuppliercode</c>; business APIs answer 409 SUPPLIER_CODE_NOT_SELECTED until then.
+    /// The supplier codes this user may work in, for the supplier code screen shown after every login (also with
+    /// only one). Pick one with <c>POST /api/auth/selectsuppliercode</c>; business APIs answer
+    /// 409 SUPPLIER_CODE_NOT_SELECTED until then.
     /// </summary>
     public IReadOnlyCollection<SupplierCodeResponse> SupplierCodes { get; set; } = Array.Empty<SupplierCodeResponse>();
 
-    /// <summary>Already selected when the user has exactly one supplier code; otherwise null.</summary>
+    /// <summary>Always null at login: a new session has no supplier code until the user picks one. Kept so clients need no change.</summary>
     public SupplierCodeResponse? ActiveSupplierCode { get; set; }
 }

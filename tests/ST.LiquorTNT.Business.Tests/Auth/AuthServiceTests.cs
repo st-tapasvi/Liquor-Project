@@ -300,6 +300,21 @@ public sealed class AuthServiceTests
         _log.Entries.Should().OnlyContain(e => e.OldValue == null && e.NewValue == null);   // nothing sensitive serialised
     }
 
+    // ---------- supplier code screen after every login ----------
+
+    [Fact]
+    public async Task Login_EvenWithOneSupplierCode_NothingIsPicked_UserGoesToTheSupplierCodeScreen()
+    {
+        AddUser();
+        _access.SupplierCodesByUser[10] = new() { FakeAccessRepository.SupplierCode(30) };
+
+        var response = await Login();
+
+        response.SupplierCodes.Select(s => s.Id).Should().Equal(30);
+        response.ActiveSupplierCode.Should().BeNull();
+        _sessions.Sessions.Single().ActiveSupplierCodeId.Should().BeNull();
+    }
+
     // ---------- security question on first login ----------
 
     [Fact]

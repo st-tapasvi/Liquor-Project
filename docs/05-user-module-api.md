@@ -179,7 +179,7 @@ Checks the user name and password. On success it opens a session and returns a t
   "user": { "userId": 1, "userName": "admin", "fullName": "Administrator",
             "companyId": null, "forcePasswordChange": false, "passwordExpiresAt": null },
   "supplierCodes": [ { "id": 3, "exciseCode": "RJ", "supplierCode": "550", "liquorCategoryCode": "CL", "displayName": "RJ CL 550", … } ],
-  "activeSupplierCode": { "id": 3, … }  // set when there is exactly one supplier code; else null → show a picker (POST /api/auth/selectsuppliercode)
+  "activeSupplierCode": null           // always null: after every login the user picks a supplier code (POST /api/auth/selectsuppliercode)
 }
 ```
 

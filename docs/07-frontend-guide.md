@@ -23,7 +23,7 @@ every API with request, response and errors; give it to the AI assistant as the 
 |---|---|
 | **Company** | The customer, e.g. *Globus Spirits Ltd*. Companies already exist in the database (they come from our CRM); there is no "create company" screen. |
 | **Supplier code** | A code the state excise department gives the company, per state and liquor category: **RJ CL 772**, **RJ IMFL 1028**, **JK IMFL 369**. A company has several. It is shown as `excise + category + code`. The same number can exist in two states (RJ 772 and JK 772); they are different supplier codes with different ids. |
-| **Session supplier code** | After login the user works **inside one supplier code at a time** (picked once, switchable from the header). Rights and data follow it. |
+| **Session supplier code** | After **every** login, **every** user (also with only one supplier code) goes to the supplier code screen and picks one; then the dashboard opens. The user works inside that one supplier code (switchable from the header). Rights and data follow it. |
 | **Master role** | A named set of rights. **Each supplier code has its own roles** ("Operator RJ CL 772", "Operator RJ IMFL 1028"), so each can get different rights. **Company-level roles** (Plant Admin, Agent Manager) cover every supplier code of the company. A user can hold several roles. |
 | **Right (permission key)** | One thing a user may do on one page, written `page.action`: `user.add`, `role.edit`. Pages and their actions are fixed by us (seeded in the database). |
 | **Custom right** | A right given straight to one user, on top of the roles (for one supplier code or all). It only adds; it never takes a role's right away. |
@@ -37,9 +37,9 @@ NEW INSTALLATION
  2. "Set new password" screen ............................ POST /api/auth/changepassword
  3. Logs in with the new password ........................ 200, user.securityQuestionRequired = true
  4. "Set security question" screen ....................... PUT /api/securityquestions/mine
- 5. Picks a supplier code of the company (picker) ........ POST /api/auth/selectsuppliercode
+ 5. Supplier code screen: picks a supplier code ......... POST /api/auth/selectsuppliercode
     -> the company of that supplier code is now "his" company for the screens below
- 6. Menu from GET /api/auth/mypermissions
+ 6. Dashboard; menu from the permissions in that response
 
 SUPER ADMIN SETS UP THE COMPANY
  7. Roles screen: the company already has its default roles (created with each supplier code):
@@ -54,11 +54,14 @@ SUPER ADMIN SETS UP THE COMPANY
 THE NEW USER
 11. Logs in with the temporary password ................. 403 PASSWORD_CHANGE_REQUIRED
 12. Sets an own password, logs in again, sets the security question (same as steps 2-4)
-13. Has exactly one supplier code -> picked automatically; more -> picker
+13. Supplier code screen: the list of HIS supplier codes (even if only one) -> picks one -> dashboard
 14. Menu shows only what the roles allow
 
+EVERY LATER LOGIN (every user)
+15. Login -> supplier code screen -> picks one -> dashboard
+
 LATER
-15. Forgot password on the login page -> answers the security question -> new password
+16. Forgot password on the login page -> answers the security question -> new password
 ```
 
 ## A3. Screens to build
@@ -69,7 +72,7 @@ LATER
 | 2 | Set new password | first login, expired password | `POST /api/auth/changepassword` |
 | 3 | Set security question | first login (and profile, to change it) | `GET /api/securityquestions`, `PUT /api/securityquestions/mine` |
 | 4 | Forgot password (3 steps) | login page link | `POST /api/auth/forgotpassword/start`, `/verify`, `/reset` |
-| 5 | Supplier code picker + header switcher | after login | `GET /api/auth/mysuppliercodes`, `POST /api/auth/selectsuppliercode` |
+| 5 | Supplier code screen (after every login, all users) + header switcher | after login | `GET /api/auth/mysuppliercodes`, `POST /api/auth/selectsuppliercode` |
 | 6 | Menu / buttons | always | `GET /api/auth/mypermissions` |
 | 7 | Users list | `user.view` | `GET /api/users` |
 | 8 | User create / edit | `user.add` / `user.edit` | `POST /api/users`, `PUT /api/users/{id}`, `GET /api/roles` |
@@ -160,7 +163,7 @@ Show `title` (and `detail` where useful). Show `correlationId` on unexpected err
 | errorCode | Status | What the app does |
 |---|---|---|
 | `UNAUTHENTICATED`, `SESSION_INVALID`, `SESSION_TIMED_OUT` | 401 | clear the user → login page |
-| `SESSION_EXPIRED` | 401 | keep the screen, password popup → `POST /api/auth/login` (same user) → **retry** the failed call |
+| `SESSION_EXPIRED` | 401 | keep the screen, password popup → `POST /api/auth/login` (same user) → `POST /api/auth/selectsuppliercode` (the same supplier code as before) → **retry** the failed call |
 | `SECURITY_QUESTION_REQUIRED` | 403 | open "Set security question" |
 | `SUPPLIER_CODE_NOT_SELECTED` | 409 | open the supplier code picker; after picking, reload `mypermissions` and retry |
 | `PERMISSION_DENIED` | 403 | toast "You don't have the right to do this" (`detail` names the right); stay on the page |
@@ -205,17 +208,18 @@ No session and no cookie are created. Open "Set new password" with the same user
       "exciseCode": "RJ", "supplierCode": "772", "liquorCategoryId": 2, "liquorCategoryCode": "CL",
       "displayName": "RJ CL 772", "isActive": true, "createdAt": "2026-10-07T15:15:35" }
   ],
-  "activeSupplierCode": { "id": 30, "displayName": "RJ CL 772", "…": "…" }
+  "activeSupplierCode": null
 }
 ```
+`activeSupplierCode` is **always `null` at login**: nothing is picked yet, even when the user has only one supplier code.
 
 What to do after a `200`, in this order:
 ```
 if user.securityQuestionRequired     -> "Set security question" screen (Step 3), then continue
-if activeSupplierCode != null        -> picked automatically (user has exactly one) -> GET mypermissions -> app
-else if supplierCodes is empty       -> "No supplier code is assigned to you. Contact your administrator."
-else                                 -> supplier code picker (B5)
+if supplierCodes is empty            -> "No supplier code is assigned to you. Contact your administrator."
+else                                 -> supplier code screen (B5) with supplierCodes -> user picks one -> dashboard
 ```
+This happens after **every** login, for **every** user.
 
 | Error | Status | Screen action |
 |---|---|---|
@@ -287,7 +291,8 @@ Until this is saved, every other API (except `GET /api/auth/me` and logout) answ
 ```
 GET /api/auth/me              -> 401 = not logged in -> login page
                                  securityQuestionRequired = true -> "Set security question"
-GET /api/auth/mypermissions   -> activeSupplierCode == null -> picker (GET /api/auth/mysuppliercodes)
+GET /api/auth/mypermissions   -> activeSupplierCode == null -> supplier code screen (GET /api/auth/mysuppliercodes)
+                                 else -> stay on the current screen (the session still has its supplier code)
 ```
 
 `GET /api/auth/me`
@@ -311,11 +316,17 @@ Clears the cookies. Go to the login page.
 
 ### Session timing
 - **Idle:** no call for `SESSION_IDLE_MINUTES` (default 60) → `401 SESSION_TIMED_OUT` → login page.
-- **Hard limit:** `SESSION_EXPIRY_MINUTES` after login (default 24 h, = `expiresAt`) → `401 SESSION_EXPIRED` → password popup, retry.
+- **Hard limit:** `SESSION_EXPIRY_MINUTES` after login (default 24 h, = `expiresAt`) → `401 SESSION_EXPIRED` → password popup,
+  `POST /api/auth/login`, then **`POST /api/auth/selectsuppliercode` with the supplier code the user was working in** (the new
+  session starts without one), then retry the failed call. The user stays on the same screen.
 
 ---
 
-## B5. Supplier code picker and menu
+## B5. Supplier code screen and menu
+
+**After every login, every user lands on this screen** — a full page listing the user's supplier codes (from the login
+response's `supplierCodes`, or `GET /api/auth/mysuppliercodes`). Even a user with one supplier code sees it and picks it.
+Picking one calls `selectsuppliercode` and opens the dashboard. The header keeps a "switch" dropdown with the same list.
 
 `GET /api/auth/mysuppliercodes` → only the user's supplier codes (Super Admin: every active one of every company)
 ```json
@@ -778,7 +789,7 @@ export interface LoginResponse {
   idleTimeoutMinutes: number;
   user: CurrentUserResponse;
   supplierCodes: SupplierCodeResponse[];
-  activeSupplierCode: SupplierCodeResponse | null;   // set when the user has exactly one
+  activeSupplierCode: SupplierCodeResponse | null;   // always null at login: the user picks on the supplier code screen
 }
 export interface ChangePasswordRequest { userName: string; currentPassword: string; newPassword: string; }
 export interface SessionResponse { id: number; loginAt: string; lastActivityAt?: string | null; expiresAt: string; ipAddress?: string | null; userAgent?: string | null; isCurrent: boolean; }
@@ -873,16 +884,16 @@ export interface CompanyResponse { id: number; companyName?: string | null; alia
 
 Password of every demo user: `Admin@123`. Company: Globus Spirits Ltd (RJ CL 772, RJ IMFL 1028, JK IMFL 369).
 
-| User | Roles | Picker after login |
+| User | Roles | Supplier codes on the screen after login |
 |---|---|---|
 | `admin` | Super Admin | every supplier code of every company |
 | `globus.admin` | Plant Admin (company-level) | 3 |
 | `globus.agent` | Agent Manager (company-level) | 3 |
 | `globus.pm` | Plant Manager RJ CL 772 / RJ IMFL 1028 / JK IMFL 369 | 3 |
 | `rj.supervisor` | Supervisor RJ CL 772, Supervisor RJ IMFL 1028 | 2 |
-| `rj772.operator` | Operator RJ CL 772 (+ custom right `user.view`) | picked automatically |
-| `rj1028.operator` | Operator RJ IMFL 1028 | picked automatically |
-| `jk369.operator` | Operator JK IMFL 369 | picked automatically |
+| `rj772.operator` | Operator RJ CL 772 (+ custom right `user.view`) | 1 (still shown, user picks it) |
+| `rj1028.operator` | Operator RJ IMFL 1028 | 1 (still shown, user picks it) |
+| `jk369.operator` | Operator JK IMFL 369 | 1 (still shown, user picks it) |
 | `globus.viewer` | Viewer of all 3 supplier codes | 3 |
 
 - On the dev server `admin` logs in directly (no first-login steps), because the team and the automatic tests use it.
