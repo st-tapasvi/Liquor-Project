@@ -6,14 +6,28 @@ public sealed class RoleResponse
 
     /// <summary>Null for Super Admin and for the default templates.</summary>
     public int? CompanyId { get; set; }
+
+    /// <summary>The supplier code the role works in. Null = company-level role (every supplier code of the company).</summary>
+    public int? SupplierCodeId { get; set; }
+
+    /// <summary>"RJ CL 772", or null for a company-level role.</summary>
+    public string? SupplierCodeName { get; set; }
+
+    /// <summary>The name as typed, e.g. "Operator".</summary>
     public string RoleName { get; set; } = string.Empty;
+
+    /// <summary>What screens show: "Operator RJ CL 772" (role name + supplier code), or just the name for a company-level role.</summary>
+    public string DisplayName { get; set; } = string.Empty;
     public string? Description { get; set; }
 
     /// <summary>Super Admin: cannot be edited, deleted or assigned by a company.</summary>
     public bool IsSystem { get; set; }
 
-    /// <summary>A default role, copied into every new company.</summary>
+    /// <summary>A default role, copied into new companies / new supplier codes.</summary>
     public bool IsTemplate { get; set; }
+
+    /// <summary>Templates only: copied for every new supplier code (true) or once per company (false).</summary>
+    public bool PerSupplierCode { get; set; }
 
     /// <summary>Plant Admin: its users can only be managed by a holder of user.manageadmin.</summary>
     public bool IsAdminRole { get; set; }
@@ -27,8 +41,19 @@ public sealed class RoleResponse
 public sealed class SaveRoleRequest
 {
     public string RoleName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The supplier code of the role (one of the caller's company). Null = company-level role. Set on create only:
+    /// on edit it must stay the same (create a new role for another supplier code).
+    /// </summary>
+    public int? SupplierCodeId { get; set; }
     public string? Description { get; set; }
+
+    /// <summary>Admin role (Plant Admin). Always company-level, so not together with a supplier code.</summary>
     public bool IsAdminRole { get; set; }
+
+    /// <summary>Default templates only (Super Admin): copy this template for every new supplier code. Ignored for company roles.</summary>
+    public bool PerSupplierCode { get; set; }
     public int PasswordPolicyId { get; set; }
 }
 
@@ -61,6 +86,9 @@ public sealed class RoleRightsResponse
 {
     public int RoleId { get; set; }
     public string RoleName { get; set; } = string.Empty;
+
+    /// <summary>"Operator RJ CL 772" — see <see cref="RoleResponse.DisplayName"/>.</summary>
+    public string DisplayName { get; set; } = string.Empty;
     public IReadOnlyCollection<PageResponse> Pages { get; set; } = Array.Empty<PageResponse>();
 }
 

@@ -6,6 +6,8 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using ST.LiquorTNT.Business.Auth;
+using ST.LiquorTNT.Business.Common.Abstractions;
 using ST.LiquorTNT.Contracts.Auth;
 using ST.LiquorTNT.Contracts.Users;
 using ST.LiquorTNT.Domain.Entities;
@@ -36,8 +38,19 @@ internal static class ApiTestHelpers
             session.Revoke(now);
         }
 
+        // Without a security question every admin call would be held on the first-login question screen.
+        if (!await db.USER_SECURITY_QUESTION.AnyAsync(q => q.UserId == admin.Id && q.IsActive))
+        {
+            var questionId = await db.SECURITY_QUESTION.Where(q => q.Status).Select(q => q.Id).FirstAsync();
+            var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+            db.USER_SECURITY_QUESTION.Add(USER_SECURITY_QUESTION.Create(admin.Id, questionId, hasher.Hash(SecurityAnswers.Normalize(E2eAnswer)), now));
+        }
+
         await db.SaveChangesAsync();
     }
+
+    /// <summary>The security answer the helpers give when a login lands on the first-login question screen.</summary>
+    public const string E2eAnswer = "e2e answer";
 
     public static string NewTempUserName() => "e2e_" + Guid.NewGuid().ToString("N")[..8];
 
@@ -73,7 +86,20 @@ internal static class ApiTestHelpers
     {
         var response = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest { UserName = userName, Password = password });
         response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
-        return (await response.Content.ReadFromJsonAsync<LoginResponse>())!;
+        var login = (await response.Content.ReadFromJsonAsync<LoginResponse>())!;
+
+        // First login of a fresh user: set the security question, as the screen would, so the session can go on.
+        if (login.User.SecurityQuestionRequired)
+        {
+            var questions = await GetWithToken<List<SecurityQuestionResponse>>(client, "/api/securityquestions", token: null);
+            var set = await PutJson(client, "/api/securityquestions/mine", new SetSecurityQuestionRequest
+            {
+                QuestionId = questions[0].Id, Answer = E2eAnswer, CurrentPassword = password,
+            }, login.AccessToken);
+            set.StatusCode.Should().Be(HttpStatusCode.OK, await set.Content.ReadAsStringAsync());
+        }
+
+        return login;
     }
 
     public static async Task<(HttpStatusCode Status, string Code)> LoginFail(HttpClient client, string userName, string password)

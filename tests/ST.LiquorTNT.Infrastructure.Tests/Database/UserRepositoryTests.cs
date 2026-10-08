@@ -65,7 +65,7 @@ public sealed class UserRepositoryTests
         var beyond = await repo.GetPageAsync(null, null, page: 100000, pageSize: 50, CancellationToken.None);
 
         all.TotalCount.Should().Be(await db.USERS.CountAsync());
-        all.Items.Select(u => u.UserName).Should().BeInAscendingOrder();
+        all.Items.Select(u => u.UserName).Should().BeInAscendingOrder(StringComparer.OrdinalIgnoreCase);   // MySQL collation ignores case
         filtered.Items.Should().OnlyContain(u => u.UserName.Contains("adm", StringComparison.OrdinalIgnoreCase) || (u.FullName ?? "").Contains("adm", StringComparison.OrdinalIgnoreCase));
         filtered.TotalCount.Should().Be(filtered.Items.Count).And.BeLessThanOrEqualTo(all.TotalCount);
         tiny.Items.Should().HaveCount(1);

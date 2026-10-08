@@ -14,6 +14,7 @@ public sealed class UserSessionConfiguration : IEntityTypeConfiguration<USER_SES
         builder.Property(s => s.Id).HasColumnName("ID").ValueGeneratedOnAdd();
         builder.Property(s => s.UserId).HasColumnName("USER_ID");
         builder.Property(s => s.ActiveSupplierCodeId).HasColumnName("ACTIVE_SUPPLIER_CODE_ID");
+        builder.Property(s => s.SecurityQuestionPending).HasColumnName("SECURITY_QUESTION_PENDING");
         builder.Property(s => s.SessionTokenHash).HasColumnName("SESSION_TOKEN_HASH").HasMaxLength(255).IsRequired();
         builder.Property(s => s.LoginAt).HasColumnName("LOGIN_AT");
         builder.Property(s => s.LastActivityAt).HasColumnName("LAST_ACTIVITY_AT");

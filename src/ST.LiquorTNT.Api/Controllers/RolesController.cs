@@ -16,10 +16,14 @@ public sealed class RolesController : ControllerBase
 
     public RolesController(IRoleService roles) => _roles = roles;
 
+    /// <summary>
+    /// The company's roles: company-level ones first, then per supplier code ("Operator RJ CL 772").
+    /// <c>?supplierCodeId=30</c> → only the roles usable in that supplier code (its own + company-level).
+    /// </summary>
     [HttpGet]
     [HasPermission(Permissions.RoleView)]
-    public async Task<ActionResult<IReadOnlyList<RoleResponse>>> GetListAsync(CancellationToken ct)
-        => Ok(await _roles.GetListAsync(ct));
+    public async Task<ActionResult<IReadOnlyList<RoleResponse>>> GetListAsync([FromQuery] int? supplierCodeId, CancellationToken ct)
+        => Ok(await _roles.GetListAsync(supplierCodeId, ct));
 
     [HttpGet("{id:int}")]
     [HasPermission(Permissions.RoleView)]

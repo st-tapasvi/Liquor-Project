@@ -11,7 +11,7 @@ public sealed class CreateUserRequest
     /// </summary>
     public int? CompanyId { get; set; }
 
-    /// <summary>At least one role. Each role is for one supplier code, or for all supplier codes when SupplierCodeId is null.</summary>
+    /// <summary>At least one role. The supplier code comes with each role ("Operator RJ CL 772"); company-level roles cover all.</summary>
     public List<UserRoleAssignment> Roles { get; set; } = new();
 
     public string? FullName { get; set; }

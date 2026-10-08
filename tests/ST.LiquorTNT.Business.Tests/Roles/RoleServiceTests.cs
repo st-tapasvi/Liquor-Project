@@ -16,6 +16,8 @@ public sealed class RoleServiceTests
     private const int CallerId = 1;
     private const int Company = 1;
     private const int OwnSupplierCode = 10;
+    private const int SecondSupplierCode = 30;      // also company 1
+    private const int ForeignSupplierCode = 40;     // company 2
 
     // page actions
     private const int RoleView = 1;
@@ -36,7 +38,11 @@ public sealed class RoleServiceTests
         _roles.Roles.Add(AccessRows.Role(2, null, "Operator", isTemplate: true));
         _roles.Roles.Add(AccessRows.Role(10, Company, "Operator"));
         _roles.Roles.Add(AccessRows.Role(11, Company, "Plant Admin", isAdminRole: true));
+        _roles.Roles.Add(AccessRows.Role(12, Company, "Operator", supplierCodeId: OwnSupplierCode));      // "Operator RJ CL 550"
         _roles.Roles.Add(AccessRows.Role(20, 2, "Operator"));                 // another company's
+        _roles.SupplierCodes[OwnSupplierCode] = FakeAccessRepository.SupplierCode(OwnSupplierCode, Company, code: "550");
+        _roles.SupplierCodes[SecondSupplierCode] = FakeAccessRepository.SupplierCode(SecondSupplierCode, Company, code: "1028");
+        _roles.SupplierCodes[ForeignSupplierCode] = FakeAccessRepository.SupplierCode(ForeignSupplierCode, companyId: 2, code: "777");
         _roles.Actions.Add(AccessRows.Action(RoleView, "role.view"));
         _roles.Actions.Add(AccessRows.Action(UserUnlock, "user.unlock"));
         _roles.Actions.Add(AccessRows.Action(SecurityEdit, "securityconfig.edit", GrantScope.ADMIN));
@@ -46,8 +52,8 @@ public sealed class RoleServiceTests
             new SaveRoleRequestValidator(), new UpdateRoleRightsRequestValidator());
     }
 
-    private static SaveRoleRequest Save(string name = "Packer", bool admin = false, int policy = 2) =>
-        new() { RoleName = name, PasswordPolicyId = policy, IsAdminRole = admin };
+    private static SaveRoleRequest Save(string name = "Packer", bool admin = false, int policy = 2, int? supplierCode = null) =>
+        new() { RoleName = name, PasswordPolicyId = policy, IsAdminRole = admin, SupplierCodeId = supplierCode };
 
     private static UpdateRoleRightsRequest Rights(params int[] ids) => new() { PageActionIds = ids.ToList() };
 
@@ -56,9 +62,20 @@ public sealed class RoleServiceTests
     [Fact]
     public async Task GetList_CompanyUser_SeesOwnCompanyOnly()
     {
-        var list = await _service.GetListAsync(CancellationToken.None);
+        var list = await _service.GetListAsync(null, CancellationToken.None);
 
-        list.Select(r => r.Id).Should().BeEquivalentTo(new[] { 10, 11 });
+        list.Select(r => r.Id).Should().BeEquivalentTo(new[] { 10, 11, 12 });
+    }
+
+    [Fact]
+    public async Task GetList_ForOneSupplierCode_ItsOwnRolesPlusCompanyLevel()
+    {
+        _roles.Roles.Add(AccessRows.Role(13, Company, "Operator", supplierCodeId: SecondSupplierCode));
+
+        var list = await _service.GetListAsync(OwnSupplierCode, CancellationToken.None);
+
+        list.Select(r => r.Id).Should().BeEquivalentTo(new[] { 10, 11, 12 });
+        list.Single(r => r.Id == 12).DisplayName.Should().Be("Operator RJ CL 550");
     }
 
     [Fact]
@@ -68,7 +85,7 @@ public sealed class RoleServiceTests
         _tenant.SupplierCodeId = null;
         _tenant.CompanyId = null;
 
-        var list = await _service.GetListAsync(CancellationToken.None);
+        var list = await _service.GetListAsync(null, CancellationToken.None);
 
         list.Select(r => r.Id).Should().BeEquivalentTo(new[] { 1, 2 });
     }
@@ -102,6 +119,68 @@ public sealed class RoleServiceTests
             .Should().ThrowAsync<BusinessException>();
 
         ex.Which.ErrorCode.Should().Be(ErrorCodes.RoleNameTaken);
+    }
+
+    // ---------- roles of a supplier code ----------
+
+    [Fact]
+    public async Task Create_ForASupplierCode_NamedWithIt()
+    {
+        var response = await _service.CreateAsync(Save("Supervisor", supplierCode: OwnSupplierCode), CancellationToken.None);
+
+        response.SupplierCodeId.Should().Be(OwnSupplierCode);
+        response.SupplierCodeName.Should().Be("RJ CL 550");
+        response.DisplayName.Should().Be("Supervisor RJ CL 550");
+        _roles.Roles.Single(r => r.Id == response.Id).SupplierCodeId.Should().Be(OwnSupplierCode);
+    }
+
+    [Fact]
+    public async Task Create_SameNameForAnotherSupplierCode_IsFine_ButNotTwiceForTheSame()
+    {
+        // "Operator" already exists company-level (10) and for RJ CL 550 (12)
+        (await _service.CreateAsync(Save("Operator", supplierCode: SecondSupplierCode), CancellationToken.None))
+            .DisplayName.Should().Be("Operator RJ CL 1028");
+
+        var ex = await _service.Invoking(s => s.CreateAsync(Save("operator", supplierCode: OwnSupplierCode), CancellationToken.None))
+            .Should().ThrowAsync<BusinessException>();
+        ex.Which.ErrorCode.Should().Be(ErrorCodes.RoleNameTaken);
+    }
+
+    [Theory]
+    [InlineData(ForeignSupplierCode)]   // another company's
+    [InlineData(999)]                   // unknown or inactive
+    public async Task Create_SupplierCodeNotOfTheCompany_Returns404(int supplierCodeId)
+    {
+        await _service.Invoking(s => s.CreateAsync(Save(supplierCode: supplierCodeId), CancellationToken.None))
+            .Should().ThrowAsync<NotFoundException>();
+    }
+
+    [Fact]
+    public async Task Create_AdminRoleForASupplierCode_Returns400()
+    {
+        _access.Grant(CallerId, OwnSupplierCode, Permissions.UserManageAdmin);
+
+        var ex = await _service.Invoking(s => s.CreateAsync(Save(admin: true, supplierCode: OwnSupplierCode), CancellationToken.None))
+            .Should().ThrowAsync<ValidationException>();
+
+        ex.Which.Errors.Should().ContainKey("isAdminRole");
+    }
+
+    [Fact]
+    public async Task Update_ChangingTheSupplierCode_Returns400()
+    {
+        var ex = await _service.Invoking(s => s.UpdateAsync(12, Save("Operator", supplierCode: SecondSupplierCode), CancellationToken.None))
+            .Should().ThrowAsync<ValidationException>();
+
+        ex.Which.Errors.Should().ContainKey("supplierCodeId");
+    }
+
+    [Fact]
+    public async Task Update_RoleOfASupplierCode_KeepsItsSupplierCode()
+    {
+        var response = await _service.UpdateAsync(12, Save("Line Operator", supplierCode: OwnSupplierCode), CancellationToken.None);
+
+        response.DisplayName.Should().Be("Line Operator RJ CL 550");
     }
 
     [Fact]
@@ -242,21 +321,31 @@ public sealed class RoleServiceTests
     // ---------- templates ----------
 
     [Fact]
-    public async Task Templates_CopiedIntoNewCompany_WithRightsAndPolicy_OnlyOnce()
+    public async Task Templates_PerSupplierCode_CopiedForEverySupplierCode_CompanyLevel_OnceForTheCompany()
     {
+        // template 2 "Operator" is per supplier code; a company-level template "Agent Manager"
+        _roles.Roles.Single(r => r.Id == 2).Update("Operator", null, false, TestData.Now, null, perSupplierCode: true);
+        _roles.Roles.Add(AccessRows.Role(3, null, "Agent Manager", isTemplate: true));
         _roles.Rights[2] = new HashSet<int> { RoleView };
         _roles.PolicyLinks.Add(ROLE_PASSWORD_POLICY.Create(2, 2, TestData.Now, null));
         var templates = new RoleTemplates(_roles, _clock, new FakeCurrentUser(CallerId), _log);
 
-        var copied = await templates.CopyIntoCompanyAsync(companyId: 5, CancellationToken.None);
-        var again = await templates.CopyIntoCompanyAsync(companyId: 5, CancellationToken.None);
+        var first = await templates.CopyForSupplierCodeAsync(companyId: 5, supplierCodeId: 51, CancellationToken.None);
+        var second = await templates.CopyForSupplierCodeAsync(companyId: 5, supplierCodeId: 52, CancellationToken.None);
+        var again = await templates.CopyForSupplierCodeAsync(companyId: 5, supplierCodeId: 52, CancellationToken.None);
 
-        copied.Should().Be(1);
+        first.Should().Be(2);           // Agent Manager (company) + Operator of 51
+        second.Should().Be(1);          // only Operator of 52: the company already has its Agent Manager
         again.Should().Be(0);
-        var copy = _roles.Roles.Single(r => r.CompanyId == 5);
-        copy.RoleName.Should().Be("Operator");
-        copy.IsTemplate.Should().BeFalse();
-        _roles.Rights[copy.Id].Should().BeEquivalentTo(new[] { RoleView });
-        _roles.PolicyLinks.Should().Contain(l => l.RoleId == copy.Id && l.PasswordPolicyId == 2);
+
+        var copies = _roles.Roles.Where(r => r.CompanyId == 5).ToList();
+        copies.Select(r => (r.RoleName, r.SupplierCodeId)).Should().BeEquivalentTo(new (string, int?)[]
+        {
+            ("Agent Manager", null), ("Operator", 51), ("Operator", 52),
+        });
+        copies.Should().OnlyContain(r => !r.IsTemplate);
+        var operator51 = copies.Single(r => r.SupplierCodeId == 51);
+        _roles.Rights[operator51.Id].Should().BeEquivalentTo(new[] { RoleView });
+        _roles.PolicyLinks.Should().Contain(l => l.RoleId == operator51.Id && l.PasswordPolicyId == 2);
     }
 }

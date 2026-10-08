@@ -56,6 +56,7 @@ public static class ErrorCodes
     // forgot password / security questions
     public const string SecurityQuestionDisabled = "SECURITY_QUESTION_DISABLED";
     public const string SecurityQuestionNotSet   = "SECURITY_QUESTION_NOT_SET";
+    public const string SecurityQuestionRequired = "SECURITY_QUESTION_REQUIRED";   // logged in, but no question chosen yet -> question screen
     public const string SecurityAnswerIncorrect  = "SECURITY_ANSWER_INCORRECT";
     public const string ResetRequestInvalid      = "RESET_REQUEST_INVALID";
     public const string ResetRequestExpired      = "RESET_REQUEST_EXPIRED";

@@ -5,13 +5,15 @@ using ST.LiquorTNT.Domain.Entities;
 namespace ST.LiquorTNT.Business.Roles;
 
 /// <summary>
-/// Gives a new company its default roles: every template (Plant Admin, Agent Manager, Plant Manager, Supervisor,
-/// Operator, Viewer) is copied with its rights and its password policy. The company then owns the copies and may
-/// change or delete them; later edits of a template never reach companies that already have their copies.
-/// <para>
-/// Called when a company gets its first supplier code (there is no separate "create company" screen yet).
-/// A company that already has roles is left alone, so calling this twice is harmless.
-/// </para>
+/// Gives a new supplier code its default roles, copied from the templates with their rights and password policy:
+/// <list type="bullet">
+/// <item>Per-supplier-code templates (Plant Manager, Supervisor, Operator, Viewer) are copied for EVERY new supplier
+/// code, e.g. "Operator RJ CL 772", "Operator RJ IMFL 1028".</item>
+/// <item>Company-level templates (Plant Admin, Agent Manager) are copied once, with the company's first supplier code.</item>
+/// </list>
+/// The company then owns the copies and may change or delete them; later edits of a template never reach copies
+/// that already exist. A company or supplier code that already has its roles is left alone, so calling this twice
+/// is harmless.
 /// </summary>
 public sealed class RoleTemplates
 {
@@ -28,21 +30,33 @@ public sealed class RoleTemplates
         _log = log;
     }
 
-    /// <summary>Copies the templates into <paramref name="companyId"/>; returns how many roles were created (0 if it had roles).</summary>
-    public async Task<int> CopyIntoCompanyAsync(int companyId, CancellationToken ct)
+    /// <summary>Copies the templates for a new supplier code of <paramref name="companyId"/>; returns how many roles were created.</summary>
+    public async Task<int> CopyForSupplierCodeAsync(int companyId, int supplierCodeId, CancellationToken ct)
     {
-        if (await _roles.CompanyHasRolesAsync(companyId, ct))
+        var templates = await _roles.GetTemplatesAsync(ct);
+        var wanted = new List<(ROLES Template, int? SupplierCodeId)>();
+
+        if (!await _roles.CompanyHasCompanyRolesAsync(companyId, ct))
+        {
+            wanted.AddRange(templates.Where(t => !t.PerSupplierCode).Select(t => (t, (int?)null)));
+        }
+
+        if (!await _roles.SupplierCodeHasRolesAsync(supplierCodeId, ct))
+        {
+            wanted.AddRange(templates.Where(t => t.PerSupplierCode).Select(t => (t, (int?)supplierCodeId)));
+        }
+
+        if (wanted.Count == 0)
         {
             return 0;
         }
 
         var now = _clock.IndiaNow;
-        var templates = await _roles.GetTemplatesAsync(ct);
         var copies = new List<(ROLES Template, ROLES Copy)>();
 
-        foreach (var template in templates)
+        foreach (var (template, forSupplierCode) in wanted)
         {
-            var copy = ROLES.CopyOf(template, companyId, now, _user.UserId);
+            var copy = ROLES.CopyOf(template, companyId, now, _user.UserId, forSupplierCode);
             await _roles.AddAsync(copy, ct);
             copies.Add((template, copy));
         }
@@ -61,8 +75,8 @@ public sealed class RoleTemplates
             }
         }
 
-        await _log.WriteAsync(UserLogEntry.Success(UserLogActions.RoleTemplatesCopied, UserLogModules.Roles, "COMPANY",
-            companyId.ToString(), $"{copies.Count} default role(s) copied into the company."), ct);
+        await _log.WriteAsync(UserLogEntry.Success(UserLogActions.RoleTemplatesCopied, UserLogModules.Roles, "SUPPLIER_CODE",
+            supplierCodeId.ToString(), $"{copies.Count} default role(s) copied for the new supplier code."), ct);
         await _roles.SaveChangesAsync(ct);
 
         return copies.Count;

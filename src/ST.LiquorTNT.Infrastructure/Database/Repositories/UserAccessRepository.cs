@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using ST.LiquorTNT.Business.Roles;
 using ST.LiquorTNT.Business.Users;
 using ST.LiquorTNT.Contracts.Users;
 using ST.LiquorTNT.Domain.Entities;
@@ -20,8 +21,7 @@ public sealed class UserAccessRepository : IUserAccessRepository
         var roles = await (from ur in _db.USER_ROLES.AsNoTracking()
                            join r in _db.ROLES on ur.RoleId equals r.Id
                            where ur.UserId == user.Id
-                           orderby r.RoleName
-                           select new { ur.RoleId, r.RoleName, ur.SupplierCodeId })
+                           select new { ur.RoleId, r.RoleName, r.SupplierCodeId })
                           .ToListAsync(ct);
 
         var rights = await (from uri in _db.USER_RIGHTS.AsNoTracking()
@@ -39,9 +39,12 @@ public sealed class UserAccessRepository : IUserAccessRepository
             {
                 RoleId = r.RoleId,
                 RoleName = r.RoleName,
+                DisplayName = RoleNames.Display(r.RoleName, r.SupplierCodeId is null ? null : Name(supplierCodeNames, r.SupplierCodeId)),
                 SupplierCodeId = r.SupplierCodeId,
                 SupplierCodeName = Name(supplierCodeNames, r.SupplierCodeId),
-            }).ToList(),
+            })
+            .OrderBy(r => r.SupplierCodeId is null ? 0 : 1).ThenBy(r => r.SupplierCodeName).ThenBy(r => r.RoleName)
+            .ToList(),
             Rights = rights.Select(r => new UserRightResponse
             {
                 PageActionId = r.PageActionId,
@@ -55,7 +58,7 @@ public sealed class UserAccessRepository : IUserAccessRepository
 
     public async Task<IReadOnlyList<UserRoleAssignment>> GetRoleAssignmentsAsync(int userId, CancellationToken ct) =>
         await _db.USER_ROLES.AsNoTracking().Where(r => r.UserId == userId)
-            .Select(r => new UserRoleAssignment { RoleId = r.RoleId, SupplierCodeId = r.SupplierCodeId })
+            .Select(r => new UserRoleAssignment { RoleId = r.RoleId })
             .ToListAsync(ct);
 
     public async Task<IReadOnlyList<UserRightAssignment>> GetRightAssignmentsAsync(int userId, CancellationToken ct) =>
@@ -84,14 +87,14 @@ public sealed class UserAccessRepository : IUserAccessRepository
     public async Task ReplaceRolesAsync(int userId, IReadOnlyCollection<UserRoleAssignment> roles, DateTime now, int? changedBy, CancellationToken ct)
     {
         var existing = await _db.USER_ROLES.Where(r => r.UserId == userId).ToListAsync(ct);
-        var wanted = roles.Select(r => (r.RoleId, r.SupplierCodeId)).ToHashSet();
+        var wanted = roles.Select(r => r.RoleId).ToHashSet();
 
-        _db.USER_ROLES.RemoveRange(existing.Where(r => !wanted.Contains((r.RoleId, r.SupplierCodeId))));
+        _db.USER_ROLES.RemoveRange(existing.Where(r => !wanted.Contains(r.RoleId)));
 
-        var have = existing.Select(r => (r.RoleId, r.SupplierCodeId)).ToHashSet();
-        foreach (var (roleId, supplierCodeId) in wanted.Where(w => !have.Contains(w)))
+        var have = existing.Select(r => r.RoleId).ToHashSet();
+        foreach (var roleId in wanted.Where(id => !have.Contains(id)))
         {
-            await _db.USER_ROLES.AddAsync(USER_ROLES.Create(userId, roleId, supplierCodeId, now, changedBy), ct);
+            await _db.USER_ROLES.AddAsync(USER_ROLES.Create(userId, roleId, now, changedBy), ct);
         }
     }
 
@@ -114,7 +117,10 @@ public sealed class UserAccessRepository : IUserAccessRepository
     /// <summary>Display names of every supplier code named on the user's roles or rights.</summary>
     private async Task<Dictionary<int, string>> SupplierCodeNamesAsync(int userId, CancellationToken ct)
     {
-        var ids = _db.USER_ROLES.Where(r => r.UserId == userId && r.SupplierCodeId != null).Select(r => r.SupplierCodeId!.Value)
+        var ids = (from ur in _db.USER_ROLES
+                   join r in _db.ROLES on ur.RoleId equals r.Id
+                   where ur.UserId == userId && r.SupplierCodeId != null
+                   select r.SupplierCodeId!.Value)
             .Union(_db.USER_RIGHTS.Where(r => r.UserId == userId && r.SupplierCodeId != null).Select(r => r.SupplierCodeId!.Value));
 
         var supplierCodes = await SupplierCodeQuery.ToResponsesAsync(_db, _db.SUPPLIER_CODE.Where(s => ids.Contains(s.Id)), ct);

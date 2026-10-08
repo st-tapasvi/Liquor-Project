@@ -77,7 +77,9 @@ internal sealed class FakeUserAccessRepository : IUserAccessRepository
     {
         UserId = user.Id,
         UserName = user.UserName,
-        Roles = UserRoles.GetValueOrDefault(user.Id, new()).Select(r => new UserRoleResponse { RoleId = r.RoleId, SupplierCodeId = r.SupplierCodeId }).ToList(),
+        Roles = UserRoles.GetValueOrDefault(user.Id, new())
+            .Select(r => new UserRoleResponse { RoleId = r.RoleId, SupplierCodeId = Roles.FirstOrDefault(role => role.Id == r.RoleId)?.SupplierCodeId })
+            .ToList(),
         Rights = UserRights.GetValueOrDefault(user.Id, new()).Select(r => new UserRightResponse { PageActionId = r.PageActionId, SupplierCodeId = r.SupplierCodeId }).ToList(),
     });
 
@@ -122,9 +124,10 @@ internal sealed class FakeUserAccessRepository : IUserAccessRepository
 /// <summary>Rows that are seeded by SQL in production (roles, page actions) built by reflection.</summary>
 internal static class AccessRows
 {
-    public static ROLES Role(int id, int? companyId, string name, bool isAdminRole = false, bool isSystem = false, bool isTemplate = false)
+    public static ROLES Role(int id, int? companyId, string name, bool isAdminRole = false, bool isSystem = false, bool isTemplate = false,
+        int? supplierCodeId = null)
     {
-        var role = ROLES.Create(companyId, name, null, isAdminRole, TestData.Now, null).WithId(id);
+        var role = ROLES.Create(companyId, name, null, isAdminRole, TestData.Now, null, supplierCodeId).WithId(id);
         Set(role, nameof(ROLES.IsSystem), isSystem);
         Set(role, nameof(ROLES.IsTemplate), isTemplate);
         return role;

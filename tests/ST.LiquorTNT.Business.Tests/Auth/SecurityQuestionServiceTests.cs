@@ -14,6 +14,7 @@ public sealed class SecurityQuestionServiceTests
     private readonly FakeSecurityQuestionRepository _questions = new();
     private readonly FakeUserRepository _users = new();
     private readonly FakeUserLogWriter _log = new();
+    private readonly FakeSessionRepository _sessions = new();
     private readonly USERS _alice;
     private readonly SecurityQuestionService _service;
 
@@ -31,7 +32,7 @@ public sealed class SecurityQuestionServiceTests
     private SecurityQuestionService Build(FakeCurrentUser caller)
     {
         var hasher = new FakePasswordHasher();
-        return new SecurityQuestionService(_questions, new CredentialVerifier(_users, hasher, _log), new FakeSecurityConfigProvider(),
+        return new SecurityQuestionService(_questions, _sessions, new CredentialVerifier(_users, hasher, _log), new FakeSecurityConfigProvider(),
             hasher, new FixedClock(TestData.Now), caller, _log, new SetSecurityQuestionRequestValidator());
     }
 
@@ -102,6 +103,19 @@ public sealed class SecurityQuestionServiceTests
         rows.Should().HaveCount(2);                                      // one row per (user, question), never a duplicate
         rows.Single(q => q.QuestionId == 1).Should().Match<USER_SECURITY_QUESTION>(q => q.IsActive && q.AnswerHash == "H:back again");
         rows.Single(q => q.QuestionId == 2).IsActive.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task SetMine_FirstLogin_ReleasesSessionsHeldOnQuestionScreen()
+    {
+        var session = USER_SESSION.Create(10, "TH:tok", TestData.Now.AddMinutes(-5), 60, TestData.Now.AddHours(8), null, null);
+        session.RequireSecurityQuestion();
+        _sessions.Sessions.Add(session);
+
+        await SetMine();
+
+        session.SecurityQuestionPending.Should().BeFalse();
+        _sessions.SaveCount.Should().Be(1);
     }
 
     [Fact]

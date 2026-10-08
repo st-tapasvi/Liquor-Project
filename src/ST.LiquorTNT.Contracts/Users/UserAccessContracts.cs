@@ -1,10 +1,12 @@
 namespace ST.LiquorTNT.Contracts.Users;
 
-/// <summary>A role given to a user for one supplier code, or for every supplier code of the company when <see cref="SupplierCodeId"/> is null.</summary>
+/// <summary>
+/// A role given to a user. The supplier code comes with the role ("Operator RJ CL 772"); a company-level role
+/// (Plant Admin, Agent Manager) covers every supplier code of the company.
+/// </summary>
 public sealed class UserRoleAssignment
 {
     public int RoleId { get; set; }
-    public int? SupplierCodeId { get; set; }
 }
 
 /// <summary>A custom right given to a user for one supplier code, or for every supplier code when <see cref="SupplierCodeId"/> is null.</summary>
@@ -14,7 +16,7 @@ public sealed class UserRightAssignment
     public int? SupplierCodeId { get; set; }
 }
 
-/// <summary>Everything a user holds: roles (per supplier code) and custom rights (per supplier code).</summary>
+/// <summary>Everything a user holds: roles (each of a supplier code, or company-level) and custom rights (per supplier code).</summary>
 public sealed class UserAccessResponse
 {
     public int UserId { get; set; }
@@ -27,6 +29,11 @@ public sealed class UserRoleResponse
 {
     public int RoleId { get; set; }
     public string RoleName { get; set; } = string.Empty;
+
+    /// <summary>"Operator RJ CL 772", or just the name for a company-level role.</summary>
+    public string DisplayName { get; set; } = string.Empty;
+
+    /// <summary>The role's supplier code; null for a company-level role.</summary>
     public int? SupplierCodeId { get; set; }
 
     /// <summary>"RJ CL 550", or "All supplier codes" when the role covers the whole company.</summary>

@@ -80,13 +80,12 @@ public sealed class CreateUserRequestValidatorTests
     }
 
     [Theory]
-    [InlineData(0, null)]
-    [InlineData(-1, null)]
-    [InlineData(1, 0)]
-    public void RoleAndSupplierCodeIds_MustBePositive(int roleId, int? supplierCodeId)
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void RoleIds_MustBePositive(int roleId)
     {
         var request = Valid();
-        request.Roles[0] = new UserRoleAssignment { RoleId = roleId, SupplierCodeId = supplierCodeId };
+        request.Roles[0] = new UserRoleAssignment { RoleId = roleId };
 
         FailingFields(request).Should().Contain(f => f.StartsWith("Roles[0]"));
     }

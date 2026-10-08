@@ -5,7 +5,8 @@ namespace ST.LiquorTNT.Business.Roles;
 
 public interface IRoleService
 {
-    Task<IReadOnlyList<RoleResponse>> GetListAsync(CancellationToken ct);
+    /// <summary>The roles of the caller's company; with <paramref name="supplierCodeId"/>, only those usable in that supplier code.</summary>
+    Task<IReadOnlyList<RoleResponse>> GetListAsync(int? supplierCodeId, CancellationToken ct);
 
     Task<RoleResponse> GetByIdAsync(int id, CancellationToken ct);
 

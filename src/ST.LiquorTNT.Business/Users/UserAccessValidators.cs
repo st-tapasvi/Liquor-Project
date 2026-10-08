@@ -3,13 +3,12 @@ using ST.LiquorTNT.Contracts.Users;
 
 namespace ST.LiquorTNT.Business.Users;
 
-/// <summary>Shape of one role assignment; whether the role and supplier code may be used is <see cref="UserAccessRules"/>' job.</summary>
+/// <summary>Shape of one role assignment; whether the role may be used is <see cref="UserAccessRules"/>' job.</summary>
 public sealed class UserRoleAssignmentValidator : AbstractValidator<UserRoleAssignment>
 {
     public UserRoleAssignmentValidator()
     {
         RuleFor(x => x.RoleId).GreaterThan(0);
-        RuleFor(x => x.SupplierCodeId).GreaterThan(0).When(x => x.SupplierCodeId.HasValue);
     }
 }
 

@@ -46,8 +46,8 @@ public sealed class UserServiceTests
         _policies.ByRole[OperatorRole] = TestData.Policy(id: 1, name: "EASY", minLength: 6, number: true);
         _policies.ByRole[PlantAdminRole] = hard;
 
-        _userAccess.Roles.Add(AccessRows.Role(PlantManagerRole, Company, "Plant Manager"));
-        _userAccess.Roles.Add(AccessRows.Role(OperatorRole, Company, "Operator"));
+        _userAccess.Roles.Add(AccessRows.Role(PlantManagerRole, Company, "Plant Manager", supplierCodeId: OwnSupplierCode));
+        _userAccess.Roles.Add(AccessRows.Role(OperatorRole, Company, "Operator", supplierCodeId: OwnSupplierCode));
         _userAccess.Roles.Add(AccessRows.Role(NoPolicyRole, Company, "Viewer"));
         _userAccess.Roles.Add(AccessRows.Role(PlantAdminRole, Company, "Plant Admin", isAdminRole: true));
         _userAccess.Roles.Add(AccessRows.Role(OtherCompanyRole, OtherCompany, "Operator"));
@@ -67,7 +67,7 @@ public sealed class UserServiceTests
     {
         UserName = userName,
         Password = "Str0ng!Passw0rd#",
-        Roles = new() { new UserRoleAssignment { RoleId = roleId, SupplierCodeId = OwnSupplierCode } },
+        Roles = new() { new UserRoleAssignment { RoleId = roleId } },
         FullName = "Bob Builder",
         Email = "bob@example.com",
     };
@@ -97,7 +97,7 @@ public sealed class UserServiceTests
         var stored = _users.Users.Single();
         stored.PasswordHash.Should().Be("H:Str0ng!Passw0rd#");                // hashed, never plain
         stored.CreatedBy.Should().Be(CallerId);
-        _userAccess.UserRoles[stored.Id].Should().ContainSingle(r => r.RoleId == PlantManagerRole && r.SupplierCodeId == OwnSupplierCode);
+        _userAccess.UserRoles[stored.Id].Should().ContainSingle(r => r.RoleId == PlantManagerRole);
         _users.SaveCount.Should().Be(2);                                      // user first (needs Id), then roles + audit
 
         var entry = _log.Entries.Single(e => e.ActionType == UserLogActions.UserCreated);
@@ -133,7 +133,7 @@ public sealed class UserServiceTests
     public async Task Create_SeveralRoles_PasswordMustMeetTheStrictestPolicy()
     {
         var request = ValidCreate(roleId: OperatorRole);
-        request.Roles.Add(new UserRoleAssignment { RoleId = PlantManagerRole, SupplierCodeId = OwnSupplierCode });
+        request.Roles.Add(new UserRoleAssignment { RoleId = PlantManagerRole });
         request.Password = "easy123";                                         // fine for EASY, too weak for HARD
 
         var ex = await _service.Invoking(s => s.CreateAsync(request, CancellationToken.None))
@@ -164,12 +164,13 @@ public sealed class UserServiceTests
     }
 
     [Fact]
-    public async Task Create_SupplierCodeOfAnotherCompany_Returns404()
+    public async Task Create_RoleOfADeactivatedSupplierCode_Returns404()
     {
-        var request = ValidCreate();
-        request.Roles[0].SupplierCodeId = OtherSupplierCode;
+        const int retiredSupplierCode = 30;                                   // not active: missing from SupplierCodeCompany
+        _userAccess.Roles.Add(AccessRows.Role(6, Company, "Operator", supplierCodeId: retiredSupplierCode));
+        _policies.ByRole[6] = _policies.ByRole[OperatorRole];
 
-        await _service.Invoking(s => s.CreateAsync(request, CancellationToken.None)).Should().ThrowAsync<NotFoundException>();
+        await _service.Invoking(s => s.CreateAsync(ValidCreate(roleId: 6), CancellationToken.None)).Should().ThrowAsync<NotFoundException>();
     }
 
     [Fact]

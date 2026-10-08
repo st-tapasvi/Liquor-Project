@@ -14,6 +14,8 @@ namespace ST.LiquorTNT.Business.Roles;
 /// <summary>
 /// Master roles of a company and the rights inside each role.
 /// <list type="bullet">
+/// <item>A role belongs to one supplier code of the company ("Operator RJ CL 772", own rights per supplier code) or is
+/// company-level (Plant Admin, Agent Manager). The supplier code is chosen on create and never changes.</item>
 /// <item>A company user only ever sees and changes the roles of their own company.</item>
 /// <item>Super Admin without a picked supplier code sees the roles of no company: Super Admin and the default templates.</item>
 /// <item>Super Admin cannot be changed. Admin roles (Plant Admin) and ADMIN-scope rights need user.manageadmin.</item>
@@ -48,8 +50,8 @@ public sealed class RoleService : IRoleService
         _rightsValidator = rightsValidator;
     }
 
-    public async Task<IReadOnlyList<RoleResponse>> GetListAsync(CancellationToken ct) =>
-        await _roles.GetListAsync(await _access.CompanyScopeAsync(ct), ct);
+    public async Task<IReadOnlyList<RoleResponse>> GetListAsync(int? supplierCodeId, CancellationToken ct) =>
+        await _roles.GetListAsync(await _access.CompanyScopeAsync(ct), supplierCodeId, ct);
 
     public async Task<RoleResponse> GetByIdAsync(int id, CancellationToken ct)
     {
@@ -70,21 +72,25 @@ public sealed class RoleService : IRoleService
             await _access.EnsureCanManageAdminsAsync("Creating an admin role", ct);
         }
 
-        await EnsureNameFreeAsync(companyId, name, excludeRoleId: null, ct);
+        // "Operator" for RJ CL 772: the supplier code must be one of the company's (active) supplier codes.
+        var supplierCodeName = await CheckSupplierCodeAsync(companyId, request, ct);
+
+        await EnsureNameFreeAsync(companyId, request.SupplierCodeId, name, excludeRoleId: null, ct);
         await EnsurePolicyExistsAsync(request.PasswordPolicyId, ct);
 
         var now = _clock.IndiaNow;
         var userId = _access.UserId;
-        var role = ROLES.Create(companyId, name, request.Description, request.IsAdminRole, now, userId);
+        var role = ROLES.Create(companyId, name, request.Description, request.IsAdminRole, now, userId,
+            request.SupplierCodeId, request.PerSupplierCode);
 
         // The policy link needs the generated role id, so the role is saved first (same pattern as user create).
         await _roles.AddAsync(role, ct);
         await _roles.SaveChangesAsync(ct);
         await _roles.AddPolicyLinkAsync(ROLE_PASSWORD_POLICY.Create(role.Id, request.PasswordPolicyId, now, userId), ct);
 
-        var response = Map(role, request.PasswordPolicyId);
+        var response = Map(role, request.PasswordPolicyId, supplierCodeName);
         await _log.WriteAsync(UserLogEntry.Success(UserLogActions.RoleCreated, UserLogModules.Roles, EntityName,
-            role.Id.ToString(), $"Role '{role.RoleName}' created.", newValue: response), ct);
+            role.Id.ToString(), $"Role '{response.DisplayName}' created.", newValue: response), ct);
         await _roles.SaveChangesAsync(ct);
 
         return response;
@@ -103,14 +109,25 @@ public sealed class RoleService : IRoleService
             await _access.EnsureCanManageAdminsAsync("Changing an admin role", ct);
         }
 
+        // The supplier code of a role is fixed: its users hold it for that supplier code.
+        if (request.SupplierCodeId != role.SupplierCodeId)
+        {
+            throw new ValidationException(new Dictionary<string, string[]>
+            {
+                ["supplierCodeId"] = new[] { "The supplier code of a role cannot be changed. Create a new role for the other supplier code." },
+            });
+        }
+
+        EnsureAdminRoleIsCompanyLevel(request);
+
         var name = request.RoleName.Trim();
-        await EnsureNameFreeAsync(role.CompanyId, name, role.Id, ct);
+        await EnsureNameFreeAsync(role.CompanyId, role.SupplierCodeId, name, role.Id, ct);
         await EnsurePolicyExistsAsync(request.PasswordPolicyId, ct);
 
         var before = await ToResponseAsync(role, ct);
         var now = _clock.IndiaNow;
 
-        role.Update(name, request.Description, request.IsAdminRole, now, _access.UserId);
+        role.Update(name, request.Description, request.IsAdminRole, now, _access.UserId, request.PerSupplierCode);
 
         var link = await _roles.GetPolicyLinkAsync(role.Id, ct);
         if (link is null)
@@ -122,9 +139,9 @@ public sealed class RoleService : IRoleService
             link.ChangePolicy(request.PasswordPolicyId, now, _access.UserId);
         }
 
-        var after = Map(role, request.PasswordPolicyId);
+        var after = Map(role, request.PasswordPolicyId, before.SupplierCodeName);
         await _log.WriteAsync(UserLogEntry.Success(UserLogActions.RoleUpdated, UserLogModules.Roles, EntityName,
-            role.Id.ToString(), $"Role '{role.RoleName}' updated.", oldValue: before, newValue: after), ct);
+            role.Id.ToString(), $"Role '{after.DisplayName}' updated.", oldValue: before, newValue: after), ct);
         await _roles.SaveChangesAsync(ct);
 
         return after;
@@ -140,19 +157,21 @@ public sealed class RoleService : IRoleService
             await _access.EnsureCanManageAdminsAsync("Deleting an admin role", ct);
         }
 
+        var name = (await ToResponseAsync(role, ct)).DisplayName;
+
         // A role still held by users cannot disappear under them: take it away from the users first.
         if (await _roles.IsAssignedAsync(role.Id, ct))
         {
             throw new BusinessException(ErrorCodes.RoleInUse, "This role is still assigned to users.",
-                $"Remove '{role.RoleName}' from every user before deleting it.");
+                $"Remove '{name}' from every user before deleting it.");
         }
 
         await _roles.RemoveAsync(role, ct);
         await _log.WriteAsync(UserLogEntry.Success(UserLogActions.RoleDeleted, UserLogModules.Roles, EntityName,
-            role.Id.ToString(), $"Role '{role.RoleName}' deleted."), ct);
+            role.Id.ToString(), $"Role '{name}' deleted."), ct);
         await _roles.SaveChangesAsync(ct);
 
-        return MessageResponse.Of($"Role '{role.RoleName}' deleted.");
+        return MessageResponse.Of($"Role '{name}' deleted.");
     }
 
     public async Task<RoleRightsResponse> GetRightsAsync(int id, CancellationToken ct)
@@ -243,7 +262,8 @@ public sealed class RoleService : IRoleService
             action.Granted = granted.Contains(action.PageActionId);
         }
 
-        return new RoleRightsResponse { RoleId = role.Id, RoleName = role.RoleName, Pages = pages };
+        var displayName = (await ToResponseAsync(role, ct)).DisplayName;
+        return new RoleRightsResponse { RoleId = role.Id, RoleName = role.RoleName, DisplayName = displayName, Pages = pages };
     }
 
     /// <summary>The role, if it exists AND the caller may see it (own company; Super Admin sees all). Otherwise 404.</summary>
@@ -273,12 +293,57 @@ public sealed class RoleService : IRoleService
         }
     }
 
-    private async Task EnsureNameFreeAsync(int? companyId, string name, int? excludeRoleId, CancellationToken ct)
+    /// <summary>"Operator" may exist once per supplier code (and once among the company-level roles).</summary>
+    private async Task EnsureNameFreeAsync(int? companyId, int? supplierCodeId, string name, int? excludeRoleId, CancellationToken ct)
     {
-        if (await _roles.NameExistsAsync(companyId, name, excludeRoleId, ct))
+        if (await _roles.NameExistsAsync(companyId, supplierCodeId, name, excludeRoleId, ct))
         {
             throw new BusinessException(ErrorCodes.RoleNameTaken, "A role with this name already exists.",
-                $"Choose another name than '{name}'.");
+                supplierCodeId is null
+                    ? $"Choose another name than '{name}'."
+                    : $"This supplier code already has a role '{name}'. Choose another name.");
+        }
+    }
+
+    /// <summary>
+    /// A new role's supplier code: none for a template, otherwise an active supplier code of the caller's company
+    /// (another company's is "not found"). Returns its name ("RJ CL 772"), or null for a company-level role.
+    /// </summary>
+    private async Task<string?> CheckSupplierCodeAsync(int? companyId, SaveRoleRequest request, CancellationToken ct)
+    {
+        EnsureAdminRoleIsCompanyLevel(request);
+
+        if (request.SupplierCodeId is not int supplierCodeId)
+        {
+            return null;
+        }
+
+        if (companyId is null)
+        {
+            throw new ValidationException(new Dictionary<string, string[]>
+            {
+                ["supplierCodeId"] = new[] { "A default template has no supplier code. Use perSupplierCode to copy it for every supplier code." },
+            });
+        }
+
+        var supplierCode = await _roles.GetSupplierCodeAsync(supplierCodeId, ct);
+        if (supplierCode is null || supplierCode.CompanyId != companyId)
+        {
+            throw new NotFoundException("Supplier code");
+        }
+
+        return supplierCode.DisplayName;
+    }
+
+    /// <summary>An admin role (Plant Admin) runs the whole company, so it is never tied to one supplier code.</summary>
+    private static void EnsureAdminRoleIsCompanyLevel(SaveRoleRequest request)
+    {
+        if (request.IsAdminRole && request.SupplierCodeId is not null)
+        {
+            throw new ValidationException(new Dictionary<string, string[]>
+            {
+                ["isAdminRole"] = new[] { "An admin role covers the whole company; leave supplierCodeId empty." },
+            });
         }
     }
 
@@ -290,17 +355,22 @@ public sealed class RoleService : IRoleService
         }
     }
 
+    /// <summary>The role as stored now (read from the database, so it is the "before" picture while editing).</summary>
     private async Task<RoleResponse> ToResponseAsync(ROLES role, CancellationToken ct) =>
-        Map(role, (await _roles.GetPolicyLinkAsync(role.Id, ct))?.PasswordPolicyId);
+        await _roles.GetResponseAsync(role.Id, ct) ?? throw new NotFoundException("Role");
 
-    private static RoleResponse Map(ROLES role, int? passwordPolicyId) => new()
+    private static RoleResponse Map(ROLES role, int? passwordPolicyId, string? supplierCodeName) => new()
     {
         Id = role.Id,
         CompanyId = role.CompanyId,
+        SupplierCodeId = role.SupplierCodeId,
+        SupplierCodeName = supplierCodeName,
         RoleName = role.RoleName,
+        DisplayName = RoleNames.Display(role.RoleName, supplierCodeName),
         Description = role.Description,
         IsSystem = role.IsSystem,
         IsTemplate = role.IsTemplate,
+        PerSupplierCode = role.PerSupplierCode,
         IsAdminRole = role.IsAdminRole,
         IsActive = role.IsActive,
         PasswordPolicyId = passwordPolicyId,

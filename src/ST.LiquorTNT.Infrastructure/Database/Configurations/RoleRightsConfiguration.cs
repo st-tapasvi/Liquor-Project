@@ -18,5 +18,8 @@ public sealed class RoleRightsConfiguration : IEntityTypeConfiguration<ROLE_RIGH
         builder.Property(r => r.CreatedAt).HasColumnName("CREATED_AT");
 
         builder.HasIndex(r => new { r.RoleId, r.PageActionId }).IsUnique().HasDatabaseName("UQ_ROLE_RIGHTS");
+
+        // The rights depend on the role (FK_ROLE_RIGHTS_ROLE cascades in the database too), so EF deletes them first.
+        builder.HasOne<ROLES>().WithMany().HasForeignKey(r => r.RoleId).OnDelete(DeleteBehavior.Cascade);
     }
 }

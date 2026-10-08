@@ -11,6 +11,7 @@ namespace ST.LiquorTNT.Business.Auth;
 public sealed class SecurityQuestionService : ISecurityQuestionService
 {
     private readonly ISecurityQuestionRepository _questions;
+    private readonly ISessionRepository _sessions;
     private readonly CredentialVerifier _credentials;
     private readonly ISecurityConfigProvider _config;
     private readonly IPasswordHasher _hasher;
@@ -21,6 +22,7 @@ public sealed class SecurityQuestionService : ISecurityQuestionService
 
     public SecurityQuestionService(
         ISecurityQuestionRepository questions,
+        ISessionRepository sessions,
         CredentialVerifier credentials,
         ISecurityConfigProvider config,
         IPasswordHasher hasher,
@@ -30,6 +32,7 @@ public sealed class SecurityQuestionService : ISecurityQuestionService
         IValidator<SetSecurityQuestionRequest> validator)
     {
         _questions = questions;
+        _sessions = sessions;
         _credentials = credentials;
         _config = config;
         _hasher = hasher;
@@ -81,9 +84,16 @@ public sealed class SecurityQuestionService : ISecurityQuestionService
             await _questions.AddUserQuestionAsync(USER_SECURITY_QUESTION.Create(user.Id, question.Id, answerHash, now), ct);
         }
 
+        // First-login step done: sessions held on the security-question screen may now reach every screen.
+        foreach (var session in await _sessions.GetActiveForUserAsync(user.Id, now, ct))
+        {
+            session.SecurityQuestionSet();
+        }
+
         await _log.WriteAsync(UserLogEntry.Success(UserLogActions.SecurityQuestionChanged, UserLogModules.Auth,
             "USER_SECURITY_QUESTION", null, $"Security question set to #{question.Id}.", actorUserId: user.Id), ct);
         await _questions.SaveChangesAsync(ct);
+        await _sessions.SaveChangesAsync(ct);
 
         return MessageResponse.Of($"Security question saved: \"{question.QuestionText}\"");
     }
