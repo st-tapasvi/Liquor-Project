@@ -3,20 +3,11 @@ import type { FieldValues, Path, UseFormSetError } from 'react-hook-form';
 import { isValidationError } from './app-error';
 
 export interface ApplyServerErrorsOptions<TFieldValues extends FieldValues> {
-  /** When given, only these fields receive messages; the rest go to the form-level `root.server` error. */
   fields?: readonly Path<TFieldValues>[] | undefined;
-  /** API field name → form field name, for the cases where they differ (`password` → `newPassword`). */
   rename?: Readonly<Partial<Record<string, Path<TFieldValues>>>> | undefined;
 }
 
-/**
- * Maps a 400 VALIDATION_FAILED response onto react-hook-form fields.
- * Field names from the API are camelCase and match the form's field names by convention; `rename`
- * covers the exceptions. Messages for fields the form does not have go to `root.server` so nothing is lost.
- *
- * Returns true when the error was a validation error (and has been applied), false otherwise so the
- * caller can let other errors reach its own handling.
- */
+
 export function applyServerErrors<TFieldValues extends FieldValues>(
   setError: UseFormSetError<TFieldValues>,
   error: unknown,

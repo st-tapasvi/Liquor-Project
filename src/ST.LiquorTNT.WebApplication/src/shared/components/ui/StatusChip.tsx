@@ -8,7 +8,6 @@ interface StatusChipProps {
   size?: ChipProps['size'];
 }
 
-/** Small coloured label for a state (Active, Locked, Inactive…). */
 export function StatusChip({ label, tone, size = 'small' }: StatusChipProps) {
   return (
     <Chip

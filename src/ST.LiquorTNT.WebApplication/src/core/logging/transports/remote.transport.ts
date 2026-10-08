@@ -1,16 +1,5 @@
 import type { LogEntry, LogTransport } from '../types';
 
-/**
- * Production transport: batches entries and posts them to the API's client-log endpoint.
- *
- * Uses `fetch` with `keepalive` (not the axios instance) on purpose: it must work while the page is
- * unloading and it must never trigger the error interceptor (a failing log call must not log itself).
- * The endpoint is same-origin, so the session cookie is attached and the API can tag entries with the
- * user. Entries are already redacted by the logger before they get here.
- *
- * Until `POST /api/client-logs` exists in the API this transport is created with `enabled: false`
- * and simply drops entries; enabling it is a one-line change in logger.ts.
- */
 export interface RemoteTransportOptions {
   url: string;
   enabled: boolean;

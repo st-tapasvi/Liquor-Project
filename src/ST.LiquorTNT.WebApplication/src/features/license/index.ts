@@ -1,1 +1,0 @@
-export { licenseRoutes } from './routes';

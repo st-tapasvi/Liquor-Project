@@ -1,7 +1,3 @@
-/**
- * Every `errorCode` the API can return (docs/05-user-module-api.md §5).
- * Screen logic is built on these codes, never on message text.
- */
 export const ERROR_CODES = [
   'VALIDATION_FAILED',
   'INVALID_CREDENTIALS',
@@ -23,6 +19,17 @@ export const ERROR_CODES = [
   'PASSWORD_POLICY_NOT_CONFIGURED',
   'CANNOT_DEACTIVATE_SELF',
   'CANNOT_CHANGE_OWN_ROLE',
+  'PERMISSION_DENIED',
+  'SUPPLIER_CODE_NOT_SELECTED',
+  'SUPPLIER_CODE_NOT_ASSIGNED',
+  'CANNOT_CHANGE_OWN_ACCESS',
+  'ADMIN_USER_PROTECTED',
+  'RIGHT_NOT_GRANTABLE',
+  'ROLE_NOT_EDITABLE',
+  'ROLE_NAME_TAKEN',
+  'ROLE_IN_USE',
+  'SUPPLIER_CODE_TAKEN',
+  'LIQUOR_CATEGORY_CODE_TAKEN',
   'SESSION_LIMIT_REACHED',
   'SECURITY_QUESTION_NOT_SET',
   'SECURITY_QUESTION_DISABLED',
@@ -39,10 +46,8 @@ export const ERROR_CODES = [
 
 export type ErrorCode = (typeof ERROR_CODES)[number];
 
-/** Codes that end the session: the app clears its state and shows the login page. */
 export const SESSION_ENDED_CODES: readonly ErrorCode[] = ['UNAUTHENTICATED', 'SESSION_INVALID', 'SESSION_TIMED_OUT'];
 
-/** The hard limit: the user re-enters the password in place and the failed call is retried. */
 export const SESSION_EXPIRED_CODE: ErrorCode = 'SESSION_EXPIRED';
 
 export function isKnownErrorCode(value: unknown): value is ErrorCode {

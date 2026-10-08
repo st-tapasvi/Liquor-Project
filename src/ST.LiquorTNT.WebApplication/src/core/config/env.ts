@@ -1,12 +1,5 @@
 import { z } from 'zod';
 
-/**
- * Validated, typed view of `import.meta.env`.
- *
- * Every VITE_* variable is public (compiled into the bundle), so nothing here is a secret.
- * Validation runs once at module load: a misconfigured build fails immediately with a clear
- * message instead of misbehaving at runtime.
- */
 const envSchema = z.object({
   MODE: z.enum(['development', 'production', 'test']),
   DEV: z.boolean(),
@@ -16,7 +9,6 @@ const envSchema = z.object({
     .trim()
     .min(1)
     .default('/api')
-    // Same-origin relative path or an absolute https URL. Plain http is only tolerated in development.
     .refine(
       (v) => v.startsWith('/') || /^https?:\/\//.test(v),
       'VITE_API_BASE_URL must be a relative path or an absolute URL',

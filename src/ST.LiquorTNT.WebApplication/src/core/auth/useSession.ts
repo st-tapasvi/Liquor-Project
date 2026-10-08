@@ -3,7 +3,6 @@ import { useShallow } from 'zustand/react/shallow';
 import { hasAnyPermission, hasPermission, type PermissionKey } from './permissions';
 import { type SessionUser, useSessionStore } from './session.store';
 
-/** The current user and session facts, for components. Subscribes only to what it returns. */
 export function useSession() {
   return useSessionStore(
     useShallow((s) => ({
@@ -17,7 +16,6 @@ export function useSession() {
   );
 }
 
-/** The authenticated user. Only call inside routes protected by RequireAuth. */
 export function useCurrentUser(): SessionUser {
   const user = useSessionStore((s) => s.user);
   if (!user) throw new Error('useCurrentUser() called outside an authenticated route');
@@ -30,4 +28,8 @@ export function usePermission(key: PermissionKey): boolean {
 
 export function useAnyPermission(keys: readonly PermissionKey[]): boolean {
   return useSessionStore((s) => (s.user ? hasAnyPermission(s.user.permissions, keys) : false));
+}
+
+export function useCompanyScope(): number {
+  return useSessionStore((s) => s.user?.activeSupplierCode?.id ?? 0);
 }

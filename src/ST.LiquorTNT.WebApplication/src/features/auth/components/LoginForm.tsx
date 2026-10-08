@@ -9,7 +9,7 @@ import { FormProvider, useForm } from 'react-hook-form';
 import { Link as RouterLink, useNavigate } from 'react-router';
 
 import type { LoginRequest } from '@/core/api';
-import { authApi, useSessionStore } from '@/core/auth';
+import { authApi, loadAccess, type SessionAccess, useSessionStore } from '@/core/auth';
 import {
   applyServerErrors,
   isApiError,
@@ -27,18 +27,24 @@ import { type LoginFormValues, loginSchema } from '../auth.schema';
 
 import { SessionLimitPanel } from './SessionLimitPanel';
 
-/**
- * The device limit is kept with the credentials that produced it, so "sign out and continue" replays
- * exactly the login the server already accepted — editing the form afterwards cannot send the chosen
- * session id under a different user name.
- */
 interface DeviceLimit {
   error: SessionLimitError;
   values: LoginFormValues;
 }
 
-/** One id for every login outcome, so a retry replaces the last message instead of stacking toasts. */
 const LOGIN_TOAST_ID = 'login';
+
+async function accessAfterLogin(
+  supplierCodes: SessionAccess['supplierCodes'],
+  activeSupplierCode: SessionAccess['activeSupplierCode'],
+): Promise<SessionAccess> {
+  try {
+    return await loadAccess();
+  } catch (error) {
+    logger.warn('rights could not be loaded after login', { error });
+    return { isSuperAdmin: false, granted: [], activeSupplierCode, supplierCodes };
+  }
+}
 
 export function LoginForm() {
   const navigate = useNavigate();
@@ -70,12 +76,14 @@ export function LoginForm() {
       const result = await login.mutateAsync(request);
       setLimit(null);
       snackbar.dismiss(LOGIN_TOAST_ID);
-      setAuthenticated(result.user, { expiresAt: result.expiresAt, idleTimeoutMinutes: result.idleTimeoutMinutes });
+      setAuthenticated(
+        result.user,
+        { expiresAt: result.expiresAt, idleTimeoutMinutes: result.idleTimeoutMinutes },
+        await accessAfterLogin(result.supplierCodes, result.activeSupplierCode),
+      );
       logger.info('login succeeded', { endedAnotherSession: endSessionId !== undefined });
-      // No navigate here: RequireAnonymous (AuthLayout) reacts to the session and sends the user on.
     } catch (error) {
       if (isSessionLimitError(error)) {
-        // Keep the password: the panel's buttons re-submit this same login with a session to end.
         setLimit({ error, values });
         snackbar.dismiss(LOGIN_TOAST_ID);
         logger.info('login refused: device limit reached', { deviceCount: error.sessions.length });
@@ -91,8 +99,7 @@ export function LoginForm() {
         return;
       }
 
-      // Server down: the persistent "offline" toast already says so, and the password is kept so the user
-      // can simply press Log in again once it is back.
+
       if (isNetworkError(error) && !error.isTimeout) {
         snackbar.dismiss(LOGIN_TOAST_ID);
         return;

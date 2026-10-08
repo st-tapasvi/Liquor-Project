@@ -8,7 +8,7 @@ import { SecurityConfigGrid } from '../components/SecurityConfigGrid';
 export default function SecuritySettingsPage() {
   const config = useSecurityConfig();
   const update = useUpdateSecurityConfig();
-  const canEdit = usePermission('settings.manage');
+  const canEdit = usePermission('securityconfig.edit');
 
   return (
     <>

@@ -8,10 +8,6 @@ type FormTextFieldProps<TFieldValues extends FieldValues> = Omit<
   name: FieldPath<TFieldValues>;
 };
 
-/**
- * Text input bound to react-hook-form. Shows the field's validation message (client or server) below it.
- * `autoComplete` should be set explicitly by password fields ("current-password" / "new-password").
- */
 export function FormTextField<TFieldValues extends FieldValues>({
   name,
   helperText,

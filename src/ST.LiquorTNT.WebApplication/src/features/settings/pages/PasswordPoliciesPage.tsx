@@ -9,7 +9,7 @@ import { PasswordPolicyForm } from '../components/PasswordPolicyForm';
 export default function PasswordPoliciesPage() {
   const policies = usePasswordPolicies();
   const update = useUpdatePasswordPolicy();
-  const canEdit = usePermission('settings.manage');
+  const canEdit = usePermission('passwordpolicy.edit');
 
   return (
     <>

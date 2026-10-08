@@ -1,7 +1,3 @@
-/**
- * Every route path of the application, in one place. Components navigate with `PATHS.users.edit(id)`,
- * never with hand-written strings.
- */
 export const PATHS = {
   root: '/',
   login: '/login',
@@ -14,42 +10,14 @@ export const PATHS = {
     list: '/users',
     new: '/users/new',
     edit: (id: string | number = ':id') => `/users/${id}/edit`,
+    roles: '/roles',
   },
 
-  // --- always-present modules ---
-  company: { list: '/company' },
-  brands: {
-    list: '/brands',
-    new: '/brands/new',
-    edit: (id: string | number = ':id') => `/brands/${id}/edit`,
+  company: {
+    list: '/company',
+    supplierCodes: '/company/supplier-codes',
+    liquorCategories: '/company/liquor-categories',
   },
-  batches: {
-    list: '/batches',
-    new: '/batches/new',
-    edit: (id: string | number = ':id') => `/batches/${id}/edit`,
-  },
-  caseData: {
-    search: '/case-data',
-    report: '/case-data/report',
-  },
-  portalSync: { list: '/portal-sync' },
-  reports: {
-    activity: '/reports/user-activity',
-    dispatch: '/reports/dispatch',
-    hologramWastage: '/reports/hologram-wastage',
-  },
-  license: { status: '/license' },
-
-  // --- flag-controlled modules (absent from the menu and unreachable when switched off) ---
-  plant: { list: '/plant' },
-  plans: { list: '/plans' },
-  codePool: { list: '/code-pool' },
-  palette: { list: '/palette' },
-  dispatch: {
-    list: '/dispatch',
-    xmlViewer: '/dispatch/xml-viewer',
-  },
-  outbox: { list: '/outbox' },
 
   settings: {
     security: '/settings/security',
@@ -58,10 +26,7 @@ export const PATHS = {
   },
 } as const;
 
-/**
- * Validates a post-login redirect target. Only same-origin, absolute-path targets are accepted, which
- * rules out open redirects (`//evil.example`, `https://…`, `javascript:`) by construction.
- */
+
 export function safeRedirectPath(candidate: string | null | undefined, fallback: string = PATHS.dashboard): string {
   if (!candidate) return fallback;
   if (!candidate.startsWith('/') || candidate.startsWith('//') || candidate.startsWith('/\\')) return fallback;

@@ -1,1 +1,0 @@
-export { brandRoutes } from './routes';

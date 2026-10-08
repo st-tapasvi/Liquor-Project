@@ -5,7 +5,6 @@ import type { PermissionKey } from '../../auth/permissions';
 import { useAnyPermission } from '../../auth/useSession';
 import { PATHS } from '../paths';
 
-/** Route-level right check. A user without the right sees the Forbidden page (the API enforces it too). */
 export function RequirePermission({
   right,
   children,

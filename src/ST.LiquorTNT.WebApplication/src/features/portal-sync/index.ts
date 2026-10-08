@@ -1,1 +1,0 @@
-export { portalSyncRoutes } from './routes';

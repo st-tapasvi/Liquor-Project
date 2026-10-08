@@ -10,7 +10,6 @@ type FormNumberFieldProps<TFieldValues extends FieldValues> = Omit<
   max?: number;
 };
 
-/** Integer input. The form value is a `number`, or `null` when the box is empty (never a string). */
 export function FormNumberField<TFieldValues extends FieldValues>({
   name,
   min,

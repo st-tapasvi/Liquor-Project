@@ -3,6 +3,8 @@ export type {
   LoginRequest,
   LoginResponse,
   CurrentUserResponse,
+  MyPermissionsResponse,
+  SelectSupplierCodeRequest,
   ChangePasswordRequest,
   ActiveSessionSummary,
   SessionResponse,
@@ -13,19 +15,39 @@ export type {
   ForgotPasswordVerifyRequest,
   ForgotPasswordResetRequest,
 } from './auth';
-export type { UserResponse, UserListParams, CreateUserRequest, UpdateUserRequest } from './users';
+export type {
+  UserResponse,
+  UserListParams,
+  CreateUserRequest,
+  UpdateUserRequest,
+  UserRoleAssignment,
+  UserRightAssignment,
+  UserAccessResponse,
+  UserRoleResponse,
+  UserRightResponse,
+  UpdateUserRolesRequest,
+  UpdateUserRightsRequest,
+} from './users';
+export type {
+  SupplierCodeResponse,
+  SupplierCodeListParams,
+  CreateSupplierCodeRequest,
+  UpdateSupplierCodeRequest,
+  CompanyResponse,
+  ExciseResponse,
+  LiquorCategoryResponse,
+  SaveLiquorCategoryRequest,
+  RoleResponse,
+  SaveRoleRequest,
+  GrantScope,
+  PageActionResponse,
+  PageResponse,
+  RoleRightsResponse,
+  UpdateRoleRightsRequest,
+} from './access';
 export type {
   SecurityConfigResponse,
   UpdateSecurityConfigRequest,
   PasswordPolicyResponse,
   UpdatePasswordPolicyRequest,
 } from './security';
-export type {
-  ModuleFlagsResponse,
-  CompanyOption,
-  PlantOption,
-  TenantContextResponse,
-  FieldKind,
-  FieldConfig,
-  ScreenConfigResponse,
-} from './platform';

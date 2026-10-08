@@ -1,1 +1,0 @@
-export { reportRoutes } from './routes';

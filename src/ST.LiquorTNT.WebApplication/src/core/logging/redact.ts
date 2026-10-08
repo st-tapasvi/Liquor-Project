@@ -3,11 +3,7 @@ const SENSITIVE_KEY =
 const MAX_DEPTH = 4;
 const MAX_STRING = 500;
 
-/**
- * Masks anything that looks like a credential before it can reach a log line, in any transport.
- * Keys are matched case-insensitively; nested objects and arrays are walked to a bounded depth.
- * Errors are reduced to name + message (no stack in remote logs; the API has the correlation id).
- */
+
 export function redact(value: unknown, depth = 0): unknown {
   if (value === null || value === undefined) return value;
   if (typeof value === 'string') return value.length > MAX_STRING ? `${value.slice(0, MAX_STRING)}…` : value;

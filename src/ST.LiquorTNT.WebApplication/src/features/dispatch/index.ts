@@ -1,1 +1,0 @@
-export { dispatchRoutes } from './routes';

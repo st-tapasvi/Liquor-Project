@@ -1,15 +1,17 @@
-import type { CurrentUserResponse, LoginRequest, LoginResponse, MessageResponse } from '../api/contracts';
+import type {
+  CurrentUserResponse,
+  LoginRequest,
+  LoginResponse,
+  MessageResponse,
+  MyPermissionsResponse,
+  SupplierCodeResponse,
+} from '../api/contracts';
 import { http } from '../api/http';
 
-/**
- * Session-level endpoints. They live in core (not features/auth) because the AuthProvider, the
- * re-authentication dialog and the logout menu all need them.
- */
+import type { SessionAccess } from './session.store';
+
 export const authApi = {
-  /**
-   * Opens a session. The API answers with Set-Cookie: jwt=… (HttpOnly) and XSRF-TOKEN=…; the browser keeps
-   * both. The `accessToken` in the body is for the desktop application and is not kept here.
-   */
+
   login: async (request: LoginRequest, options?: { forReauth?: boolean }): Promise<LoginResponse> => {
     const { data } = await http.post<LoginResponse>('/auth/login', request, {
       meta: options?.forReauth ? { skipReauth: true, silentUnauthorized: true } : { silentUnauthorized: true },
@@ -25,11 +27,52 @@ export const authApi = {
     return data;
   },
 
-  /** Who am I? Used at start-up to restore the session after a page reload. A 401 here is normal. */
   me: async (): Promise<CurrentUserResponse> => {
     const { data } = await http.get<CurrentUserResponse>('/auth/me', {
       meta: { silentUnauthorized: true, skipReauth: true },
     });
     return data;
   },
+
+  myPermissions: async (): Promise<MyPermissionsResponse> => {
+    const { data } = await http.get<MyPermissionsResponse>('/auth/mypermissions', {
+      meta: { silentUnauthorized: true },
+    });
+    return data;
+  },
+
+  mySupplierCodes: async (): Promise<SupplierCodeResponse[]> => {
+    const { data } = await http.get<SupplierCodeResponse[]>('/auth/mysuppliercodes', {
+      meta: { silentUnauthorized: true },
+    });
+    return data;
+  },
+
+  selectSupplierCode: async (supplierCodeId: number): Promise<MyPermissionsResponse> => {
+    const { data } = await http.post<MyPermissionsResponse>('/auth/selectsuppliercode', { supplierCodeId });
+    return data;
+  },
 };
+
+export async function loadAccess(): Promise<SessionAccess> {
+  const [rights, supplierCodes] = await Promise.all([authApi.myPermissions(), authApi.mySupplierCodes()]);
+  return {
+    isSuperAdmin: rights.isSuperAdmin,
+    granted: rights.permissions,
+    activeSupplierCode: rights.activeSupplierCode,
+    supplierCodes,
+  };
+}
+
+export async function selectSupplierCode(
+  supplierCodeId: number,
+  supplierCodes: readonly SupplierCodeResponse[],
+): Promise<SessionAccess> {
+  const rights = await authApi.selectSupplierCode(supplierCodeId);
+  return {
+    isSuperAdmin: rights.isSuperAdmin,
+    granted: rights.permissions,
+    activeSupplierCode: rights.activeSupplierCode,
+    supplierCodes,
+  };
+}

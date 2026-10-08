@@ -11,7 +11,6 @@ export interface ConfirmOptions {
   message: ReactNode;
   confirmLabel?: string;
   cancelLabel?: string;
-  /** Destructive actions render the confirm button in error colour. */
   destructive?: boolean;
 }
 

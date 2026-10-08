@@ -6,11 +6,9 @@ interface FormActionsProps {
   submitLabel?: string;
   cancelLabel?: string;
   onCancel?: () => void;
-  /** Overrides the submitting state derived from the form (e.g. a mutation's isPending). */
   busy?: boolean;
 }
 
-/** Save / Cancel row. Submit is disabled while submitting; Cancel is always available. */
 export function FormActions({ submitLabel = 'Save', cancelLabel = 'Cancel', onCancel, busy }: FormActionsProps) {
   const {
     formState: { isSubmitting },

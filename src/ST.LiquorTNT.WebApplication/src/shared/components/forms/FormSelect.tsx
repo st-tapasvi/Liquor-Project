@@ -10,7 +10,6 @@ type FormSelectProps<TFieldValues extends FieldValues> = Omit<
 > & {
   name: FieldPath<TFieldValues>;
   options: readonly Option[];
-  /** Adds an empty first option that maps to null. */
   allowEmpty?: boolean;
   emptyLabel?: string;
 };

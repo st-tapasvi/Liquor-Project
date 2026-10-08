@@ -6,16 +6,8 @@ import { consoleTransport } from './transports/console.transport';
 import { createRemoteTransport } from './transports/remote.transport';
 import { LOG_LEVEL_ORDER, type LogContext, type LogEntry, type LogLevel, type LogTransport } from './types';
 
-/**
- * The application logger. `logger.info('users updated', { userId })`.
- *
- * - Attaches app version, user id, current route and the last correlation id automatically.
- * - Redacts credential-like keys before any transport sees the entry.
- * - Development: console. Production: remote batch transport (disabled until the API endpoint exists).
- */
 let lastCorrelationId: string | null = null;
 
-/** Called by the correlation interceptor so log entries can be joined with API logs. */
 export function setLastCorrelationId(id: string | null): void {
   lastCorrelationId = id;
 }

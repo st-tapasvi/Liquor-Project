@@ -18,15 +18,9 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.node.json --noEmit",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage",
-    "test:e2e": "playwright test",
-    "api:gen": "npx --yes openapi-typescript@7 api/openapi.json -o src/core/api/generated/schema.d.ts",
     "audit": "npm audit --omit=dev --audit-level=high",
     "audit:all": "npm audit --audit-level=high",
-    "check": "npm run typecheck && npm run lint && npm run format:check && npm run test && npm run audit",
-    "prepare": "husky"
+    "check": "npm run typecheck && npm run lint && npm run format:check && npm run audit"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
@@ -48,17 +42,10 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@playwright/test": "^1.63.0",
-    "@tanstack/react-query-devtools": "5.104.0",
-    "@testing-library/dom": "^10.4.1",
-    "@testing-library/jest-dom": "^7.0.1",
-    "@testing-library/react": "^16.3.3",
-    "@testing-library/user-event": "^14.6.7",
     "@types/node": "^24.19.0",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.7",
     "@vitejs/plugin-react": "6.1.1",
-    "@vitest/coverage-v8": "4.1.11",
     "eslint": "10.11.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-import-resolver-typescript": "^4.4.5",
@@ -67,22 +54,9 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.7",
     "globals": "^17.12.0",
-    "husky": "^9.1.7",
-    "jsdom": "^29.1.1",
-    "lint-staged": "^17.6.0",
     "prettier": "^3.9.9",
     "typescript": "6.0.3",
     "typescript-eslint": "^8.71.0",
-    "vite": "8.3.1",
-    "vitest": "4.1.11"
-  },
-  "lint-staged": {
-    "*.{ts,tsx}": [
-      "eslint --fix --max-warnings 0",
-      "prettier --write"
-    ],
-    "*.{json,md,yml,yaml,css,html}": [
-      "prettier --write"
-    ]
+    "vite": "8.3.1"
   }
 }

@@ -11,7 +11,6 @@ interface ErrorStateProps {
   onRetry?: () => void;
 }
 
-/** Inline error panel for a failed query. Shows the correlation reference when the API sent one. */
 export function ErrorState({ error, title = 'Could not load data', onRetry }: ErrorStateProps) {
   const reference = isApiError(error) ? error.correlationId : undefined;
   return (

@@ -10,6 +10,7 @@ import { useCreateUser, useUpdateUser } from '../api/users.mutations';
 import { useUser } from '../api/users.queries';
 import { userStatus } from '../components/user-status';
 import { UserForm } from '../components/UserForm';
+import { UserRolesSection } from '../components/UserRolesSection';
 import { fromUser, toCreateRequest, toUpdateRequest } from '../users.schema';
 
 /** Serves both /users/new and /users/:id/edit. */
@@ -72,6 +73,7 @@ function EditView({ userId, onDone }: { userId: number; onDone: () => void }) {
           }}
         />
       </Section>
+      <UserRolesSection userId={userId} />
     </>
   );
 }

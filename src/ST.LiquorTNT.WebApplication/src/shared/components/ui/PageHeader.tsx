@@ -6,7 +6,6 @@ import type { ReactNode } from 'react';
 interface PageHeaderProps {
   title: string;
   subtitle?: string | undefined;
-  /** Primary and secondary actions, right-aligned. */
   actions?: ReactNode;
 }
 

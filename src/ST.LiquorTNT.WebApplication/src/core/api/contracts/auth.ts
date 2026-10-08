@@ -1,22 +1,13 @@
+import type { SupplierCodeResponse } from './access';
 import type { IstDateTime } from './common';
 
 /** POST /api/auth/login */
 export interface LoginRequest {
   userName: string;
   password: string;
-  /**
-   * One of this account's own open sessions to end before signing in, so the login fits inside the
-   * device limit. Sent only after a 409 SESSION_LIMIT_REACHED, with an id taken from that response.
-   * The API honours it only while SESSION_FULL_BEHAVIOUR is REJECT_ALLOW_EVICT.
-   */
   endSessionId?: number;
 }
 
-/**
- * One open session, as listed in the body of a 409 SESSION_LIMIT_REACHED so the login screen can offer
- * to end one. Same shape as {@link SessionResponse} minus `isCurrent`, which has no meaning before a
- * session exists on this device.
- */
 export interface ActiveSessionSummary {
   id: number;
   loginAt: IstDateTime;
@@ -26,35 +17,33 @@ export interface ActiveSessionSummary {
   userAgent: string | null;
 }
 
-/**
- * The logged-in user, as returned by login and by GET /api/auth/me.
- *
- * `permissions` is the list of rights the API grants this user (closed keys, see core/auth/permissions.ts).
- * The UI only uses it to show or hide; the API enforces every call regardless.
- */
 export interface CurrentUserResponse {
   userId: number;
   userName: string;
   fullName: string | null;
-  roleId: number | null;
   companyId: number | null;
   forcePasswordChange: boolean;
   passwordExpiresAt: IstDateTime | null;
-  isAdministrator?: boolean;
-  permissions?: string[];
 }
 
 export interface LoginResponse {
-  /**
-   * The JWT, for the desktop application's bearer header. The web app does not keep it: the same token
-   * arrives in the HttpOnly `jwt` cookie, which the browser sends on its own.
-   */
   accessToken: string;
-  /** Hard limit of this session (IST). After it every call answers 401 SESSION_EXPIRED. */
   expiresAt: IstDateTime;
-  /** Minutes without any API call after which the session ends with 401 SESSION_TIMED_OUT. */
   idleTimeoutMinutes: number;
   user: CurrentUserResponse;
+  supplierCodes: SupplierCodeResponse[];
+  activeSupplierCode: SupplierCodeResponse | null;
+}
+
+export interface SelectSupplierCodeRequest {
+  supplierCodeId: number;
+}
+
+/** GET /api/auth/mypermissions and the answer of POST /api/auth/selectsuppliercode */
+export interface MyPermissionsResponse {
+  isSuperAdmin: boolean;
+  activeSupplierCode: SupplierCodeResponse | null;
+  permissions: string[];
 }
 
 /** POST /api/auth/changepassword (public: also the forced first-login change) */

@@ -7,16 +7,11 @@ import type { ServerPaging } from './AppDataGrid';
 
 
 export interface ServerGridState {
-  /** 1-based page as the API expects. */
   page: number;
   pageSize: number;
   search: string;
 }
 
-/**
- * Keeps grid paging and the search text in the URL (`?page=2&pageSize=50&search=ravi`) so a screen is
- * bookmarkable, survives refresh and can be shared. Values are clamped to what the API accepts.
- */
 export function useServerGrid(defaults?: Partial<ServerGridState>) {
   const [params, setParams] = useSearchParams();
 

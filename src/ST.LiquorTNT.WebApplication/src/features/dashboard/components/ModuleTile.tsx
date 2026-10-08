@@ -1,26 +1,22 @@
 import Box from '@mui/material/Box';
 import ButtonBase from '@mui/material/ButtonBase';
+import type { SvgIconProps } from '@mui/material/SvgIcon';
 import Typography from '@mui/material/Typography';
+import type { ComponentType } from 'react';
 import { Link as RouterLink } from 'react-router';
 
-import type { ModuleKey } from '@/core/modules';
 import { tokens } from '@/core/theme';
-
-import { ModuleIcon } from '@/shared/components/ui';
 
 const { color, icon } = tokens;
 
 interface ModuleTileProps {
-  module: ModuleKey;
   label: string;
   to: string;
-  /** False when this installation does not have the module: shown greyed, not clickable. */
-  enabled: boolean;
-  /** The user's rights in the module, e.g. "view · manage". */
+  icon: ComponentType<SvgIconProps>;
   rights: string;
 }
 
-export function ModuleTile({ module, label, to, enabled, rights }: ModuleTileProps) {
+export function ModuleTile({ label, to, icon: Icon, rights }: ModuleTileProps) {
   const body = (
     <>
       <Box
@@ -31,17 +27,17 @@ export function ModuleTile({ module, label, to, enabled, rights }: ModuleTilePro
           display: 'grid',
           placeItems: 'center',
           mb: 1.25,
-          bgcolor: enabled ? color.iconTint : color.iconTintMuted,
-          color: enabled ? color.accent : color.secondary,
+          bgcolor: color.iconTint,
+          color: color.accent,
         }}
       >
-        <ModuleIcon module={module} sx={{ fontSize: icon.lg }} />
+        <Icon sx={{ fontSize: icon.lg }} />
       </Box>
       <Typography variant="subtitle1" sx={{ color: color.textPrimary }}>
         {label}
       </Typography>
       <Typography variant="body2" sx={{ color: color.textSecondary, mt: 0.25 }}>
-        {enabled ? rights : 'not enabled'}
+        {rights}
       </Typography>
     </>
   );
@@ -58,18 +54,6 @@ export function ModuleTile({ module, label, to, enabled, rights }: ModuleTilePro
     border: `1px solid ${color.border}`,
     borderRadius: 1.5,
   } as const;
-
-  if (!enabled) {
-    return (
-      <Box
-        aria-disabled
-        title="This installation does not have this module"
-        sx={{ ...sx, display: 'flex', alignItems: 'center', opacity: 0.85 }}
-      >
-        {body}
-      </Box>
-    );
-  }
 
   return (
     <ButtonBase

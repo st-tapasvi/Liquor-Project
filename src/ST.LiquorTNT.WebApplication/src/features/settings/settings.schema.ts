@@ -2,7 +2,6 @@ import { z } from 'zod';
 
 import type { PasswordPolicyResponse, UpdatePasswordPolicyRequest } from '@/core/api';
 
-/** Mirrors the API rules for PUT /api/passwordpolicies/{id}. The API remains authoritative. */
 export const passwordPolicySchema = z
   .object({
     minLength: z.number().int().min(1).max(128),
@@ -45,7 +44,6 @@ export function toPolicyRequest(v: PasswordPolicyFormValues): UpdatePasswordPoli
   return { ...v, passwordExpiryDays: v.passwordExpiryEnabled ? v.passwordExpiryDays : null };
 }
 
-/** Security config values are strings typed by `dataType`; validate what we can before sending. */
 export function validateConfigValue(dataType: string, value: string): string | null {
   const v = value.trim();
   if (v.length === 0) return 'A value is required.';

@@ -60,7 +60,7 @@ export function UserGrid({ grid }: { grid: ReturnType<typeof useServerGrid> }) {
         valueGetter: (v: string | null) => v ?? '',
       },
       { field: 'email', headerName: 'E-mail', flex: 1.2, minWidth: 160, valueGetter: (v: string | null) => v ?? '' },
-      { field: 'roleId', headerName: 'Role', width: 80 },
+      { field: 'phone', headerName: 'Phone', width: 140, valueGetter: (v: string | null) => v ?? '' },
       {
         field: 'status',
         headerName: 'Status',
@@ -85,8 +85,8 @@ export function UserGrid({ grid }: { grid: ReturnType<typeof useServerGrid> }) {
         sortable: false,
         align: 'right',
         renderCell: ({ row }) => (
-          <Can right="users.manage">
-            <Stack direction="row" spacing={0.5} sx={{ height: '100%', alignItems: 'center' }}>
+          <Stack direction="row" spacing={0.5} sx={{ height: '100%', alignItems: 'center' }}>
+            <Can right="user.unlock">
               {(row.lockedUntil !== null || row.isBlocked) && (
                 <Tooltip title="Unlock">
                   <IconButton size="small" aria-label={`Unlock ${row.userName}`} onClick={() => unlock.mutate(row.id)}>
@@ -94,6 +94,8 @@ export function UserGrid({ grid }: { grid: ReturnType<typeof useServerGrid> }) {
                   </IconButton>
                 </Tooltip>
               )}
+            </Can>
+            <Can right="user.status">
               {row.isActive ? (
                 <Tooltip title="Deactivate">
                   <span>
@@ -127,8 +129,8 @@ export function UserGrid({ grid }: { grid: ReturnType<typeof useServerGrid> }) {
                   </IconButton>
                 </Tooltip>
               )}
-            </Stack>
-          </Can>
+            </Can>
+          </Stack>
         ),
       },
     ],

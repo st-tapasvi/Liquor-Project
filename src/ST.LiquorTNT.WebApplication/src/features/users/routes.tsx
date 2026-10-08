@@ -6,19 +6,21 @@ export const userRoutes: RouteObject[] = [
   createProtectedRoute({
     path: PATHS.users.list,
     page: () => import('./pages/UserListPage'),
-    permission: ['users.view', 'users.manage'],
-    module: 'users',
+    permission: 'user.view',
   }),
   createProtectedRoute({
     path: PATHS.users.new,
     page: () => import('./pages/UserEditPage'),
-    permission: 'users.manage',
-    module: 'users',
+    permission: 'user.add',
   }),
   createProtectedRoute({
     path: PATHS.users.edit(),
     page: () => import('./pages/UserEditPage'),
-    permission: ['users.view', 'users.manage'],
-    module: 'users',
+    permission: 'user.view',
+  }),
+  createProtectedRoute({
+    path: PATHS.users.roles,
+    page: () => import('./pages/RoleListPage'),
+    permission: 'role.view',
   }),
 ];

@@ -1,44 +1,42 @@
 import { create } from 'zustand';
 
-import type { CurrentUserResponse, IstDateTime } from '../api/contracts';
+import type { CurrentUserResponse, IstDateTime, SupplierCodeResponse } from '../api/contracts';
 
-import { type PermissionKey, interimRights, toPermissionSet } from './permissions';
+import { effectivePermissions, type PermissionKey } from './permissions';
 
-/**
- * Session state as the browser knows it. It holds NO credential: the `jwt` cookie is HttpOnly and the
- * browser attaches it on its own. This store is only a cache of "who is logged in" for rendering.
- *
- * - `unknown`       app just started; AuthProvider is asking GET /api/auth/me
- * - `anonymous`     no valid session (never logged in, logged out, timed out, revoked)
- * - `authenticated` the API confirmed the session
- *
- * The store is in memory only and is never persisted (no localStorage). A page reload goes through
- * `unknown` → /me again, which is exactly the check the server-side session needs.
- */
 export type SessionStatus = 'unknown' | 'anonymous' | 'authenticated';
-
-/**
- * Why the last session ended: shown on the login page so the user understands what happened.
- * `unreachable` is not a session end at all - the start-up check could not reach the API - and is worded so.
- */
 export type SessionEndReason = 'logout' | 'timed_out' | 'invalid' | 'expired' | 'unauthenticated' | 'unreachable';
+
+export interface SessionAccess {
+  isSuperAdmin: boolean;
+  granted: readonly string[];
+  activeSupplierCode: SupplierCodeResponse | null;
+  supplierCodes: readonly SupplierCodeResponse[];
+}
+
+export const NO_ACCESS: SessionAccess = {
+  isSuperAdmin: false,
+  granted: [],
+  activeSupplierCode: null,
+  supplierCodes: [],
+};
 
 export interface SessionUser {
   userId: number;
   userName: string;
   fullName: string | null;
-  roleId: number | null;
   companyId: number | null;
   forcePasswordChange: boolean;
   passwordExpiresAt: IstDateTime | null;
-  isAdministrator: boolean;
+  isSuperAdmin: boolean;
+  activeSupplierCode: SupplierCodeResponse | null;
+  supplierCodes: readonly SupplierCodeResponse[];
   permissions: ReadonlySet<PermissionKey>;
 }
 
 interface SessionState {
   status: SessionStatus;
   user: SessionUser | null;
-  /** Hard limit of the current session (IST string from the API). */
   expiresAt: IstDateTime | null;
   idleTimeoutMinutes: number | null;
   endReason: SessionEndReason | null;
@@ -46,28 +44,35 @@ interface SessionState {
   setAuthenticated: (
     user: CurrentUserResponse,
     session?: { expiresAt: IstDateTime; idleTimeoutMinutes: number },
+    access?: SessionAccess,
   ) => void;
+  setAccess: (access: Partial<SessionAccess>) => void;
   setAnonymous: (reason: SessionEndReason | null) => void;
-  /** Called after a re-login in place (SESSION_EXPIRED): only the deadline changes. */
   renew: (session: { expiresAt: IstDateTime; idleTimeoutMinutes: number }) => void;
   clearEndReason: () => void;
 }
 
-export function toSessionUser(dto: CurrentUserResponse): SessionUser {
-  const fallback = interimRights(dto.roleId);
-  const isAdministrator = dto.isAdministrator ?? fallback.isAdministrator;
-  const permissions = dto.permissions ?? fallback.permissions;
-
+export function toSessionUser(dto: CurrentUserResponse, access: SessionAccess = NO_ACCESS): SessionUser {
   return {
     userId: dto.userId,
     userName: dto.userName,
     fullName: dto.fullName,
-    roleId: dto.roleId,
     companyId: dto.companyId,
     forcePasswordChange: dto.forcePasswordChange,
     passwordExpiresAt: dto.passwordExpiresAt,
-    isAdministrator,
-    permissions: toPermissionSet(permissions),
+    isSuperAdmin: access.isSuperAdmin,
+    activeSupplierCode: access.activeSupplierCode,
+    supplierCodes: access.supplierCodes,
+    permissions: effectivePermissions(access.granted),
+  };
+}
+
+function accessOf(user: SessionUser): SessionAccess {
+  return {
+    isSuperAdmin: user.isSuperAdmin,
+    granted: [...user.permissions],
+    activeSupplierCode: user.activeSupplierCode,
+    supplierCodes: user.supplierCodes,
   };
 }
 
@@ -78,14 +83,29 @@ export const useSessionStore = create<SessionState>()((set) => ({
   idleTimeoutMinutes: null,
   endReason: null,
 
-  setAuthenticated: (user, session) =>
+  setAuthenticated: (user, session, access) =>
     set((state) => ({
       status: 'authenticated',
-      user: toSessionUser(user),
+      user: toSessionUser(user, access ?? (state.user ? accessOf(state.user) : NO_ACCESS)),
       expiresAt: session?.expiresAt ?? state.expiresAt,
       idleTimeoutMinutes: session?.idleTimeoutMinutes ?? state.idleTimeoutMinutes,
       endReason: null,
     })),
+
+  setAccess: (access) =>
+    set((state) => {
+      if (!state.user) return state;
+      const next = { ...accessOf(state.user), ...access };
+      return {
+        user: {
+          ...state.user,
+          isSuperAdmin: next.isSuperAdmin,
+          activeSupplierCode: next.activeSupplierCode,
+          supplierCodes: next.supplierCodes,
+          permissions: effectivePermissions(next.granted),
+        },
+      };
+    }),
 
   setAnonymous: (reason) =>
     set({ status: 'anonymous', user: null, expiresAt: null, idleTimeoutMinutes: null, endReason: reason }),
@@ -95,8 +115,8 @@ export const useSessionStore = create<SessionState>()((set) => ({
   clearEndReason: () => set({ endReason: null }),
 }));
 
-/** Non-hook access for interceptors and the logger (outside React). */
 export const sessionStore = {
   get: () => useSessionStore.getState(),
   setAnonymous: (reason: SessionEndReason | null) => useSessionStore.getState().setAnonymous(reason),
+  clearActiveSupplierCode: () => useSessionStore.getState().setAccess({ activeSupplierCode: null, granted: [] }),
 };

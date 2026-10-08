@@ -13,10 +13,8 @@ import { type ReactElement, useState } from 'react';
 import { NavLink, useLocation } from 'react-router';
 
 import { type SessionUser, useCurrentUser } from '@/core/auth';
-import { isModuleEnabled, MODULES, useModuleFlagsStore } from '@/core/modules';
+import { appConfig } from '@/core/config';
 import { tokens } from '@/core/theme';
-
-import { ModuleIcon } from '@/shared/components/ui';
 
 import { type MenuItem, type MenuLink, MENU } from './menu.config';
 
@@ -24,8 +22,6 @@ const { shell } = tokens;
 
 const OPEN_WIDTH = shell.sidebarWidth;
 const MINI_WIDTH = 68;
-
-const COMPANY = 'Sundaram Technologies';
 
 const widthTransition = (t: Theme) =>
   t.transitions.create('width', { easing: t.transitions.easing.sharp, duration: t.transitions.duration.shorter });
@@ -76,17 +72,15 @@ export function Sidebar({
 }: {
   open: boolean;
   onClose: () => void;
-  /** Asked when a collapsed group is clicked in the rail: the drawer opens so its pages can be shown. */
   onExpand?: () => void;
   variant: 'permanent' | 'temporary';
 }) {
   const user = useCurrentUser();
-  const enabledModules = useModuleFlagsStore((s) => s.enabled);
 
   const mini = variant === 'permanent' && !open;
   const width = mini ? MINI_WIDTH : OPEN_WIDTH;
 
-  const items = MENU.filter((item) => isModuleEnabled(item.module, enabledModules)).flatMap((item): MenuItem[] => {
+  const items = MENU.flatMap((item): MenuItem[] => {
     if (!item.children) return canSee(item, user) ? [item] : [];
     const children = item.children.filter((c) => canSee(c, user));
     return children.length > 0 ? [{ ...item, children }] : [];
@@ -137,10 +131,9 @@ export function Sidebar({
               <RailTooltip key={item.to} title={item.label} mini={mini}>
                 <ListItemButton component={NavLink} to={item.to} onClick={closeIfTemporary} sx={rowSx}>
                   <ListItemIcon>
-                    <ModuleIcon module={item.module} sx={{ fontSize: tokens.icon.md }} />
+                    <item.icon sx={{ fontSize: tokens.icon.md }} />
                   </ListItemIcon>
                   <ListItemText primary={item.label} sx={hiddenWhenMini(mini)} />
-                  {MODULES[item.module].availability === 'flag' && <FlagDot mini={mini} />}
                 </ListItemButton>
               </RailTooltip>
             ),
@@ -152,6 +145,7 @@ export function Sidebar({
 }
 
 function Brand({ mini }: { mini: boolean }) {
+  const company = useCurrentUser().activeSupplierCode?.companyName;
   return (
     <Box
       sx={{
@@ -180,40 +174,27 @@ function Brand({ mini }: { mini: boolean }) {
             fontWeight: 700,
             letterSpacing: '0.04em',
             lineHeight: 1.2,
+            whiteSpace: 'normal',
           }}
         >
-          EXCISE T&amp;T
+          {appConfig.name}
         </Typography>
-        <Typography
-          component="div"
-          sx={{
-            color: shell.sidebarTextMuted,
-            fontSize: tokens.font.overline,
-            letterSpacing: '0.05em',
-            textTransform: 'uppercase',
-          }}
-        >
-          {COMPANY}
-        </Typography>
+        {company && (
+          <Typography
+            component="div"
+            noWrap
+            sx={{
+              color: shell.sidebarTextMuted,
+              fontSize: tokens.font.overline,
+              letterSpacing: '0.05em',
+              textTransform: 'uppercase',
+            }}
+          >
+            {company}
+          </Typography>
+        )}
       </Box>
     </Box>
-  );
-}
-
-function FlagDot({ mini }: { mini: boolean }) {
-  return (
-    <Box
-      component="span"
-      title="Available only where the installation enables it"
-      sx={{
-        width: 7,
-        height: 7,
-        borderRadius: '50%',
-        bgcolor: shell.sidebarTextMuted,
-        flexShrink: 0,
-        ...hiddenWhenMini(mini),
-      }}
-    />
   );
 }
 
@@ -254,7 +235,7 @@ function GroupItem({
           sx={rowSx}
         >
           <ListItemIcon>
-            <ModuleIcon module={item.module} sx={{ fontSize: tokens.icon.md }} />
+            <item.icon sx={{ fontSize: tokens.icon.md }} />
           </ListItemIcon>
           <ListItemText primary={item.label} sx={hiddenWhenMini(mini)} />
           <ExpandMore
@@ -275,6 +256,7 @@ function GroupItem({
               key={link.to}
               component={NavLink}
               to={link.to}
+              end
               onClick={onNavigate}
               sx={{
                 minHeight: 36,

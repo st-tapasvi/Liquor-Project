@@ -1,7 +1,6 @@
 import Box from '@mui/material/Box';
 import CircularProgress from '@mui/material/CircularProgress';
 
-/** Minimal spinner owned by core (core cannot import shared/). Pages use shared feedback components. */
 export function LoadingFallback({ label = 'Loading…' }: { label?: string }) {
   return (
     <Box

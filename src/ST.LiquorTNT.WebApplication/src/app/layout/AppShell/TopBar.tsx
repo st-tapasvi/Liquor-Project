@@ -10,6 +10,7 @@ import ButtonBase from '@mui/material/ButtonBase';
 import Divider from '@mui/material/Divider';
 import IconButton from '@mui/material/IconButton';
 import ListItemIcon from '@mui/material/ListItemIcon';
+import ListItemText from '@mui/material/ListItemText';
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
 import Toolbar from '@mui/material/Toolbar';
@@ -22,10 +23,11 @@ import { useCurrentUser, useLogout } from '@/core/auth';
 import { appConfig } from '@/core/config';
 import { useConnectivity } from '@/core/network';
 import { PATHS } from '@/core/router';
-import { useTenantStore } from '@/core/tenant';
 import { tokens } from '@/core/theme';
 
 import { initials } from '@/shared/utils';
+
+import { useSwitchSupplierCode } from './useSupplierCode';
 
 const { shell, color, font, icon } = tokens;
 
@@ -63,48 +65,79 @@ export function TopBar({ onMenuClick, sidebarOpen }: { onMenuClick: () => void; 
 }
 
 function TenantSummary() {
-  const companyName = useTenantStore((s) => s.companyName);
-  const companyId = useTenantStore((s) => s.companyId);
-  const exciseCode = useTenantStore((s) => s.exciseCode);
-  const plantName = useTenantStore((s) => s.plantName);
+  const user = useCurrentUser();
+  const select = useSwitchSupplierCode();
+  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
 
-  const parts: { label: string; value: string }[] = [
-    { label: 'Company', value: companyName ? `${companyName}${companyId ? ` (${companyId})` : ''}` : '—' },
-    { label: 'Excise', value: exciseCode ?? '—' },
-    { label: 'Plant', value: plantName ?? '—' },
-  ];
+  const active = user.activeSupplierCode;
+  const canSwitch = user.supplierCodes.length > 1 || (!active && user.supplierCodes.length > 0);
+  if (!active && !canSwitch) return null;
+
+  const parts: { label: string; value: string }[] = active
+    ? [
+        ...(active.companyName ? [{ label: 'Company', value: active.companyName }] : []),
+        { label: 'Supplier code', value: active.displayName },
+      ]
+    : [];
 
   return (
-    <Box
-      aria-label="Working context"
-      sx={{
-        display: { xs: 'none', md: 'flex' },
-        alignItems: 'center',
-        height: 38,
-        px: 1.5,
-        border: `1px solid ${color.border}`,
-        borderRadius: 1,
-        bgcolor: color.surface,
-        fontSize: font.body1,
-        whiteSpace: 'nowrap',
-      }}
-    >
-      {parts.map((p, i) => (
-        <Box key={p.label} component="span" sx={{ display: 'flex', alignItems: 'center' }}>
-          {i > 0 && <Box component="span" sx={{ mx: 1.5, width: '1px', height: 18, bgcolor: color.border }} />}
-          <Box component="span" sx={{ mr: 0.75 }}>
-            {p.label}:
+    <>
+      <ButtonBase
+        aria-label="Working context"
+        aria-haspopup={canSwitch ? 'menu' : undefined}
+        disabled={!canSwitch}
+        onClick={(e) => setAnchor(e.currentTarget)}
+        sx={{
+          display: { xs: 'none', md: 'flex' },
+          alignItems: 'center',
+          height: 38,
+          px: 1.5,
+          border: `1px solid ${color.border}`,
+          borderRadius: 1,
+          bgcolor: color.surface,
+          fontSize: font.body1,
+          whiteSpace: 'nowrap',
+          '&.Mui-disabled': { color: 'inherit' },
+        }}
+      >
+        {!active && <Box component="span">Select supplier code</Box>}
+        {parts.map((p, i) => (
+          <Box key={p.label} component="span" sx={{ display: 'flex', alignItems: 'center' }}>
+            {i > 0 && <Box component="span" sx={{ mx: 1.5, width: '1px', height: 18, bgcolor: color.border }} />}
+            <Box component="span" sx={{ mr: 0.75 }}>
+              {p.label}:
+            </Box>
+            <Box component="span" sx={{ fontWeight: 700 }}>
+              {p.value}
+            </Box>
           </Box>
-          <Box component="span" sx={{ fontWeight: 700 }}>
-            {p.value}
-          </Box>
-        </Box>
-      ))}
-    </Box>
+        ))}
+        {canSwitch && <KeyboardArrowDownRounded sx={{ ml: 1, fontSize: icon.md, color: color.textSecondary }} />}
+      </ButtonBase>
+      <Menu
+        anchorEl={anchor}
+        open={anchor !== null}
+        onClose={() => setAnchor(null)}
+        slotProps={{ paper: { sx: { mt: 0.75, minWidth: 260, '& .MuiMenuItem-root': { fontSize: font.body1 } } } }}
+      >
+        {user.supplierCodes.map((code) => (
+          <MenuItem
+            key={code.id}
+            selected={code.id === active?.id}
+            disabled={select.isPending}
+            onClick={() => {
+              setAnchor(null);
+              if (code.id !== active?.id) select.mutate(code.id);
+            }}
+          >
+            <ListItemText primary={code.displayName} secondary={code.companyName ?? undefined} />
+          </MenuItem>
+        ))}
+      </Menu>
+    </>
   );
 }
 
-/** LIVE while the API answers; OFFLINE while the connectivity monitor cannot reach it. */
 function ConnectionChip() {
   const online = useConnectivity() === 'online';
   return (
@@ -137,7 +170,7 @@ function UserMenu() {
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
 
   const name = user.fullName ?? user.userName;
-  const role = user.isAdministrator ? 'Admin' : 'User';
+  const role = user.isSuperAdmin ? 'Super Admin' : user.activeSupplierCode?.displayName;
   const go = (to: string) => {
     setAnchor(null);
     void navigate(to);
@@ -175,7 +208,7 @@ function UserMenu() {
             {initials(name)}
           </Avatar>
           <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>
-            {user.userName} · {role}
+            {role ? `${user.userName} · ${role}` : user.userName}
           </Box>
           <KeyboardArrowDownRounded sx={{ fontSize: icon.md, color: color.textSecondary }} />
         </ButtonBase>
@@ -193,7 +226,7 @@ function UserMenu() {
         <Box sx={{ px: 2, py: 1 }}>
           <Typography variant="subtitle2">{name}</Typography>
           <Typography variant="body2" sx={{ color: color.textSecondary }}>
-            {user.userName} · {role}
+            {role ? `${user.userName} · ${role}` : user.userName}
           </Typography>
         </Box>
         <Divider />

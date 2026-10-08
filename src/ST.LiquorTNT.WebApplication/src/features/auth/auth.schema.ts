@@ -1,10 +1,5 @@
 import { z } from 'zod';
 
-/**
- * Client-side validation is a usability aid only. The API is authoritative: it applies the role's
- * password policy and returns 400 VALIDATION_FAILED with per-field messages, which the forms show.
- * Limits here mirror the API's validators so obviously wrong input never leaves the browser.
- */
 export const userNameSchema = z.string().trim().min(1, 'User name is required.').max(50, 'User name is too long.');
 
 export const passwordSchema = z.string().min(1, 'Password is required.').max(128, 'Password is too long.');

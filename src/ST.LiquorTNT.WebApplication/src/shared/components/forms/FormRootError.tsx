@@ -1,7 +1,6 @@
 import Alert from '@mui/material/Alert';
 import { useFormContext } from 'react-hook-form';
 
-/** Shows the form-level server error (`root.server`) set by applyServerErrors, or a custom root error. */
 export function FormRootError() {
   const {
     formState: { errors },

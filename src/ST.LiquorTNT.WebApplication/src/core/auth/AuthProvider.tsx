@@ -5,13 +5,22 @@ import { isApiError } from '../errors';
 import { logger } from '../logging/logger';
 import { useConnectivity } from '../network';
 
-import { authApi } from './auth.api';
-import { useSessionStore } from './session.store';
+import { authApi, loadAccess } from './auth.api';
+import { NO_ACCESS, useSessionStore } from './session.store';
 
 interface AuthProviderProps {
   children: ReactNode;
-  /** Shown while the start-up /me check is in flight (status 'unknown'). */
   fallback: ReactNode;
+}
+
+async function restoreSession() {
+  const user = await authApi.me();
+  const access = await loadAccess().catch((error: unknown) => {
+    if (isApiError(error) && error.status === 401) throw error;
+    logger.warn('rights could not be loaded; continuing with none until the next reload', { error });
+    return NO_ACCESS;
+  });
+  return { user, access };
 }
 
 export function AuthProvider({ children, fallback }: AuthProviderProps) {
@@ -23,15 +32,13 @@ export function AuthProvider({ children, fallback }: AuthProviderProps) {
   const online = useConnectivity() === 'online';
   const queryClient = useQueryClient();
 
-  // Why an effect: this is a one-time side effect (network call) that decides the initial state.
   useEffect(() => {
     if (status !== 'unknown') return;
     let cancelled = false;
 
-    authApi
-      .me()
-      .then((user) => {
-        if (!cancelled) setAuthenticated(user);
+    restoreSession()
+      .then(({ user, access }) => {
+        if (!cancelled) setAuthenticated(user, undefined, access);
       })
       .catch((error: unknown) => {
         if (cancelled) return;
@@ -52,10 +59,9 @@ export function AuthProvider({ children, fallback }: AuthProviderProps) {
     if (!online || status !== 'anonymous' || endReason !== 'unreachable') return;
     let cancelled = false;
 
-    authApi
-      .me()
-      .then((user) => {
-        if (!cancelled) setAuthenticated(user);
+    restoreSession()
+      .then(({ user, access }) => {
+        if (!cancelled) setAuthenticated(user, undefined, access);
       })
       .catch((error: unknown) => {
         if (cancelled) return;
@@ -67,8 +73,6 @@ export function AuthProvider({ children, fallback }: AuthProviderProps) {
     };
   }, [online, status, endReason, setAuthenticated, clearEndReason]);
 
-  // Why an effect: when the session ends for any reason, server data cached for the previous user
-  // must not survive into the next login.
   useEffect(() => {
     if (status === 'anonymous') queryClient.clear();
   }, [status, queryClient]);

@@ -4,11 +4,6 @@ import type { IstDateTime } from '@/core/api/contracts/common';
 import { ApiError, type FieldErrors, SessionLimitError, ValidationError } from './app-error';
 import { isKnownErrorCode } from './error-codes';
 
-/**
- * Shape of every error body the API writes (ExceptionMiddleware): RFC 7807 plus `errorCode` and
- * `correlationId`. Unknown extra members (`stackTrace`, `exceptionType`) are ignored on purpose:
- * they are for developers reading the raw response, never for the UI.
- */
 export interface ProblemDetails {
   status?: number;
   title?: string;
@@ -16,7 +11,6 @@ export interface ProblemDetails {
   errorCode?: string;
   correlationId?: string | null;
   errors?: Record<string, string[]>;
-  /** Extension members of a 409 SESSION_LIMIT_REACHED. */
   sessions?: ActiveSessionSummary[];
   canEndOtherSession?: boolean;
 }
@@ -25,7 +19,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
-/** Defensive parse: the body may be missing, HTML (proxy error page), or a string. */
 export function parseProblemDetails(body: unknown): ProblemDetails | undefined {
   if (!isRecord(body)) return undefined;
 
@@ -54,11 +47,7 @@ export function parseProblemDetails(body: unknown): ProblemDetails | undefined {
   };
 }
 
-/**
- * The open sessions carried by a 409 SESSION_LIMIT_REACHED. Every field is checked: this list is rendered
- * on the login page, before anyone is authenticated, so a malformed body must produce an empty list
- * rather than `undefined` fields reaching the UI. Entries without a usable id are dropped.
- */
+
 function parseSessions(raw: unknown): ActiveSessionSummary[] | undefined {
   if (!Array.isArray(raw)) return undefined;
 
@@ -67,7 +56,6 @@ function parseSessions(raw: unknown): ActiveSessionSummary[] | undefined {
     if (!isRecord(item)) continue;
     if (typeof item['id'] !== 'number' || typeof item['loginAt'] !== 'string') continue;
 
-    // The API sends IST strings without a zone designator; branding them is the contract, not a conversion.
     const ist = (value: unknown): IstDateTime | null => (typeof value === 'string' ? (value as IstDateTime) : null);
     const loginAt = item['loginAt'] as IstDateTime;
 
@@ -84,7 +72,6 @@ function parseSessions(raw: unknown): ActiveSessionSummary[] | undefined {
   return parsed;
 }
 
-/** Converts an HTTP error response into the matching AppError subclass. */
 export function toApiError(status: number, body: unknown, fallbackCorrelationId?: string, cause?: unknown): ApiError {
   const problem = parseProblemDetails(body);
   const code = isKnownErrorCode(problem?.errorCode) ? problem.errorCode : 'UNKNOWN';

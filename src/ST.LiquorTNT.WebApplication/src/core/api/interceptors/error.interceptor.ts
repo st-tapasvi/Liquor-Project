@@ -7,13 +7,9 @@ import { NetworkError, parseProblemDetails, SESSION_ENDED_CODES, SESSION_EXPIRED
 import { logger } from '../../logging/logger';
 import { connectivity, requestConnectivityCheck } from '../../network';
 
-/** Per-request flags. Set with `http.get(url, { meta: { … } })`. */
 export interface RequestMeta {
-  /** True for the login call made by the re-authentication dialog: its own 401 must not open the dialog again. */
   skipReauth?: boolean;
-  /** True for calls where a 401 is a normal answer (e.g. the boot-time /me check) and must not clear state. */
   silentUnauthorized?: boolean;
-  /** Internal: set when a request has already been retried after re-authentication. */
   retriedAfterReauth?: boolean;
 }
 
@@ -87,6 +83,11 @@ export function installErrorInterceptor(http: AxiosInstance): void {
           logger.info('session ended', { reason, url: config.url });
           sessionStore.setAnonymous(reason);
         }
+      }
+
+      if (status === 409 && apiError.code === 'SUPPLIER_CODE_NOT_SELECTED') {
+        logger.info('no supplier code selected for this session; asking the user to pick one', { url: config?.url });
+        sessionStore.clearActiveSupplierCode();
       }
 
       if (status >= 500) {

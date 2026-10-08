@@ -22,14 +22,7 @@ import tseslint from 'typescript-eslint';
  */
 export default tseslint.config(
   {
-    ignores: [
-      'dist/**',
-      'coverage/**',
-      'node_modules/**',
-      'src/core/api/generated/**',
-      'playwright-report/**',
-      'test-results/**',
-    ],
+    ignores: ['dist/**', 'node_modules/**'],
   },
 
   js.configs.recommended,
@@ -64,9 +57,8 @@ export default tseslint.config(
         { type: 'entities', pattern: 'src/entities/*', capture: ['entity'], mode: 'folder' },
         { type: 'shared', pattern: 'src/shared/**' },
         { type: 'core', pattern: 'src/core/**' },
-        { type: 'test', pattern: 'src/test/**' },
       ],
-      'boundaries/ignore': ['**/*.test.{ts,tsx}', 'src/main.tsx'],
+      'boundaries/ignore': ['src/main.tsx'],
     },
     rules: {
       // ---- React ----
@@ -147,7 +139,6 @@ export default tseslint.config(
             },
             { from: { element: { type: 'shared' } }, allow: { to: { element: { type: ['shared', 'core'] } } } },
             { from: { element: { type: 'core' } }, allow: { to: { element: { type: 'core' } } } },
-            { from: { element: { type: 'test' } }, allow: { to: { element: { type: '*' } } } },
           ],
         },
       ],
@@ -206,7 +197,7 @@ export default tseslint.config(
 
   // The single place that owns the HTTP client.
   {
-    files: ['src/core/api/http.ts', 'src/core/api/http.test.ts', 'src/core/api/interceptors/**'],
+    files: ['src/core/api/http.ts', 'src/core/api/interceptors/**'],
     rules: { 'no-restricted-imports': 'off' },
   },
   // The grid wrapper may import MUI X.
@@ -226,7 +217,7 @@ export default tseslint.config(
   },
   // The toast wrapper and the connectivity toast are the only users of react-hot-toast.
   {
-    files: ['src/shared/hooks/useSnackbar.tsx', 'src/shared/components/feedback/ConnectivityToasts.tsx', 'src/test/**'],
+    files: ['src/shared/hooks/useSnackbar.tsx', 'src/shared/components/feedback/ConnectivityToasts.tsx'],
     rules: {
       'no-restricted-imports': [
         'error',
@@ -248,17 +239,6 @@ export default tseslint.config(
   {
     files: ['src/shared/hooks/**', 'src/core/auth/**'],
     rules: { 'react-refresh/only-export-components': 'off' },
-  },
-  // Tests: relaxed typing for focused component and unit test fixtures.
-  {
-    files: ['src/**/*.test.{ts,tsx}', 'src/test/**', 'e2e/**'],
-    rules: {
-      '@typescript-eslint/no-non-null-assertion': 'off',
-      '@typescript-eslint/no-unsafe-assignment': 'off',
-      '@typescript-eslint/no-unsafe-member-access': 'off',
-      '@typescript-eslint/no-unsafe-argument': 'off',
-      'react-refresh/only-export-components': 'off',
-    },
   },
   // Node-side config files and dev scripts: plain JS is linted without type information.
   {

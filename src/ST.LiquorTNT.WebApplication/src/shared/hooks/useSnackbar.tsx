@@ -73,7 +73,6 @@ function show(
   }
 }
 
-/** Module-level and stable: safe in effect dependency lists. */
 export const snackbar: SnackbarApi = {
   success: (text, options) => show('success', text, undefined, options),
   info: (text, options) => show('info', text, undefined, options),

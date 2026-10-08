@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import type { UpdatePasswordPolicyRequest, UpdateSecurityConfigRequest } from '@/core/api';
-import { useCompanyScope } from '@/core/tenant';
+import { useCompanyScope } from '@/core/auth';
 
 import { useSnackbar } from '@/shared/hooks';
 

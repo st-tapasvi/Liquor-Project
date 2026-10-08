@@ -11,15 +11,10 @@ import { logger } from '../logging/logger';
 
 import { PATHS } from './paths';
 
-/**
- * Route-level error UI (React Router `errorElement`). A crash in one page keeps the shell usable.
- * The correlation id is shown so support can find the matching API log entry.
- */
 export function RouteErrorFallback() {
   const error = useRouteError();
   const navigate = useNavigate();
 
-  // Why an effect: log once per error instance, not on every render.
   useEffect(() => {
     logger.error('route error', { error });
   }, [error]);

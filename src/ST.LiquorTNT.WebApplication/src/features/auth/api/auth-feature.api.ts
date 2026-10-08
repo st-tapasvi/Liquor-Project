@@ -11,7 +11,6 @@ import {
   type SetSecurityQuestionRequest,
 } from '@/core/api';
 
-/** Feature-level auth endpoints (login/logout/me live in @/core/auth). One function per endpoint. */
 export const authFeatureApi = {
   changePassword: async (request: ChangePasswordRequest): Promise<MessageResponse> => {
     const { data } = await http.post<MessageResponse>('/auth/changepassword', request, {

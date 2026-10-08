@@ -6,13 +6,11 @@ export const settingsRoutes: RouteObject[] = [
   createProtectedRoute({
     path: PATHS.settings.security,
     page: () => import('./pages/SecuritySettingsPage'),
-    permission: ['settings.view', 'settings.manage'],
-    module: 'settings',
+    permission: 'securityconfig.view',
   }),
   createProtectedRoute({
     path: PATHS.settings.passwordPolicies,
     page: () => import('./pages/PasswordPoliciesPage'),
-    permission: ['settings.view', 'settings.manage'],
-    module: 'settings',
+    permission: 'passwordpolicy.view',
   }),
 ];

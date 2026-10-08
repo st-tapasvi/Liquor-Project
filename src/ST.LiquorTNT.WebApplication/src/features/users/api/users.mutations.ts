@@ -1,14 +1,13 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import type { CreateUserRequest, UpdateUserRequest, UserResponse } from '@/core/api';
-import { useCompanyScope } from '@/core/tenant';
+import { useCompanyScope } from '@/core/auth';
 
 import { useSnackbar } from '@/shared/hooks';
 
 import { usersApi } from './users.api';
 import { userKeys } from './users.keys';
 
-/** Shared plumbing: after any change, refresh every cached view of users and announce success. */
 function useUserMutation<TVariables>(
   key: string,
   mutationFn: (variables: TVariables) => Promise<UserResponse>,
@@ -17,15 +16,14 @@ function useUserMutation<TVariables>(
 ) {
   const qc = useQueryClient();
   const snackbar = useSnackbar();
-  const companyId = useCompanyScope();
+  const scope = useCompanyScope();
   return useMutation({
     mutationKey: ['users', key],
     mutationFn,
-    // Validation errors are shown on the form; everything else through the global handler.
     meta: { silent: options?.silent ?? false },
     onSuccess: async (user) => {
-      qc.setQueryData(userKeys.detail(companyId, user.id), user);
-      await qc.invalidateQueries({ queryKey: userKeys.lists(companyId) });
+      qc.setQueryData(userKeys.detail(scope, user.id), user);
+      await qc.invalidateQueries({ queryKey: userKeys.lists(scope) });
       snackbar.success(message(user));
     },
   });

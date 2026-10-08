@@ -2,13 +2,9 @@ import type { ActiveSessionSummary } from '@/core/api/contracts/auth';
 
 import type { ErrorCode } from './error-codes';
 
-/** Field name → list of messages, exactly as the API sends `errors` on 400 VALIDATION_FAILED. */
 export type FieldErrors = Readonly<Record<string, readonly string[]>>;
 
-/**
- * Base class for every error the application raises on purpose.
- * Components never inspect HTTP status codes; they switch on these classes and on `code`.
- */
+
 export class AppError extends Error {
   readonly correlationId: string | undefined;
 
@@ -19,7 +15,6 @@ export class AppError extends Error {
   }
 }
 
-/** The API answered with an RFC 7807 problem (4xx/5xx) that is not a field-validation failure. */
 export class ApiError extends AppError {
   readonly status: number;
   readonly code: ErrorCode | 'UNKNOWN';
@@ -47,7 +42,6 @@ export class ApiError extends AppError {
   }
 }
 
-/** 400 VALIDATION_FAILED: the server rejected specific fields. Mapped onto the form by `applyServerErrors`. */
 export class ValidationError extends ApiError {
   readonly errors: FieldErrors;
 
@@ -58,14 +52,6 @@ export class ValidationError extends ApiError {
   }
 }
 
-/**
- * 409 SESSION_LIMIT_REACHED: the account is signed in on as many devices as the server allows.
- *
- * The password was already accepted at this point — the limit is checked after it — so the API sends the
- * account's open sessions with the refusal and the login screen can offer to end one. `canEndOther` is
- * the server's SESSION_FULL_BEHAVIOUR: when it is false the list is shown as information only and the
- * user has to log out on the other device itself.
- */
 export class SessionLimitError extends ApiError {
   readonly sessions: readonly ActiveSessionSummary[];
   readonly canEndOther: boolean;
@@ -83,7 +69,6 @@ export class SessionLimitError extends ApiError {
   }
 }
 
-/** No response at all: offline, DNS, timeout, aborted. */
 export class NetworkError extends AppError {
   readonly isTimeout: boolean;
 
@@ -110,7 +95,6 @@ export function isSessionLimitError(error: unknown): error is SessionLimitError 
   return error instanceof SessionLimitError;
 }
 
-/** 4xx errors are the caller's fault: never retried by TanStack Query. */
 export function isClientError(error: unknown): boolean {
   return isApiError(error) && error.status >= 400 && error.status < 500;
 }
@@ -118,12 +102,10 @@ export function isClientError(error: unknown): boolean {
 const CHUNK_LOAD_PATTERN =
   /Failed to fetch dynamically imported module|error loading dynamically imported module|Importing a module script failed|ChunkLoadError/i;
 
-/** A lazily loaded screen could not be downloaded (new deployment, dropped connection, dev-server restart). */
 export function isChunkLoadError(error: unknown): boolean {
   return error instanceof Error && CHUNK_LOAD_PATTERN.test(`${error.name} ${error.message}`);
 }
 
-/** A short, safe message for a snackbar or fallback UI. Never includes stack traces, file names or URLs. */
 export function describeError(error: unknown): string {
   if (isValidationError(error)) return 'Some fields need attention.';
   if (isApiError(error)) return error.detail ?? error.title;

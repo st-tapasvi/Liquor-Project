@@ -22,10 +22,6 @@ interface ChangePasswordState {
   reason?: 'PASSWORD_CHANGE_REQUIRED' | 'PASSWORD_EXPIRED';
 }
 
-/**
- * Public on purpose (like the API): the forced first-login change and the expired-password change both
- * happen before a session exists. The current password proves identity.
- */
 export default function ChangePasswordPage() {
   const navigate = useNavigate();
   const state = (useLocation().state as ChangePasswordState | null) ?? {};

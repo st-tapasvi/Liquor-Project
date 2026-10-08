@@ -1,11 +1,15 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import Grid from '@mui/material/Grid';
-import { FormProvider, useForm } from 'react-hook-form';
+import { useEffect } from 'react';
+import { FormProvider, useForm, useWatch } from 'react-hook-form';
 
+import { useCurrentUser } from '@/core/auth';
 import { applyServerErrors, describeError } from '@/core/errors';
 
-import { FormActions, FormCheckbox, FormNumberField, FormRootError, FormTextField } from '@/shared/components/forms';
+import { FormActions, FormCheckbox, FormRootError, FormSelect, FormTextField } from '@/shared/components/forms';
+import type { Option } from '@/shared/types';
 
+import { useCompanyOptions, useRoles, useSupplierCodeOptions } from '../api/users.queries';
 import {
   type CreateUserFormValues,
   createUserSchema,
@@ -30,22 +34,20 @@ interface EditProps {
 
 type UserFormProps = CreateProps | EditProps;
 
-/**
- * Create and edit share one layout. Role and company are plain numbers until the Roles / Company
- * modules exist and provide select components in entities/.
- */
 export function UserForm(props: UserFormProps) {
   return props.mode === 'create' ? <CreateForm {...props} /> : <EditForm {...props} />;
 }
 
 function CreateForm({ onSubmit, onCancel, busy }: CreateProps) {
+  const me = useCurrentUser();
   const form = useForm<CreateUserFormValues>({
     resolver: zodResolver(createUserSchema),
     defaultValues: {
       userName: '',
       password: '',
+      companyId: me.isSuperAdmin ? null : (me.activeSupplierCode?.companyId ?? me.companyId),
       roleId: null as unknown as number,
-      companyId: null,
+      supplierCodeId: me.activeSupplierCode?.id ?? null,
       fullName: '',
       email: '',
       phone: '',
@@ -54,7 +56,37 @@ function CreateForm({ onSubmit, onCancel, busy }: CreateProps) {
     },
   });
 
+  const companyId = useWatch({ control: form.control, name: 'companyId' });
+  const companies = useCompanyOptions(me.isSuperAdmin);
+  const allSupplierCodes = useSupplierCodeOptions(me.isSuperAdmin);
+  const roles = useRoles();
+
+  const companyOptions: Option<number>[] = (companies.data ?? []).map((c) => ({
+    value: c.id,
+    label: c.companyName ?? `Company ${c.id}`,
+  }));
+
+  const supplierCodes = me.isSuperAdmin
+    ? (allSupplierCodes.data ?? []).filter((s) => s.companyId === companyId)
+    : me.supplierCodes;
+  const supplierCodeOptions: Option<number>[] = supplierCodes.map((s) => ({ value: s.id, label: s.displayName }));
+
+  const roleOptions: Option<number>[] = (roles.data ?? [])
+    .filter((r) => r.isActive && !r.isSystem && !r.isTemplate)
+    .filter((r) => !me.isSuperAdmin || r.companyId === companyId)
+    .map((r) => ({ value: r.id, label: r.roleName }));
+
+  useEffect(() => {
+    if (!me.isSuperAdmin) return;
+    form.resetField('roleId');
+    form.setValue('supplierCodeId', null);
+  }, [companyId, me.isSuperAdmin, form]);
+
   const submit = form.handleSubmit(async (values) => {
+    if (me.isSuperAdmin && values.companyId === null) {
+      form.setError('companyId', { type: 'required', message: 'Company is required.' });
+      return;
+    }
     try {
       await onSubmit(values);
     } catch (error) {
@@ -86,7 +118,39 @@ function CreateForm({ onSubmit, onCancel, busy }: CreateProps) {
               autoComplete="new-password"
             />
           </Grid>
-          <CommonFields />
+          <ProfileFields />
+          {me.isSuperAdmin && (
+            <Grid size={{ xs: 12, md: 4 }}>
+              <FormSelect<CreateUserFormValues>
+                name="companyId"
+                label="Company"
+                required
+                options={companyOptions}
+                allowEmpty
+                emptyLabel="Select a company"
+              />
+            </Grid>
+          )}
+          <Grid size={{ xs: 12, md: 4 }}>
+            <FormSelect<CreateUserFormValues>
+              name="roleId"
+              label="Role"
+              required
+              options={roleOptions}
+              disabled={me.isSuperAdmin && companyId === null}
+              helperText={roles.isError ? 'Roles could not be loaded.' : undefined}
+            />
+          </Grid>
+          <Grid size={{ xs: 12, md: 4 }}>
+            <FormSelect<CreateUserFormValues>
+              name="supplierCodeId"
+              label="Supplier code"
+              options={supplierCodeOptions}
+              allowEmpty
+              emptyLabel="All supplier codes"
+              disabled={me.isSuperAdmin && companyId === null}
+            />
+          </Grid>
           <Grid size={12}>
             <FormCheckbox<CreateUserFormValues>
               name="forcePasswordChange"
@@ -117,7 +181,7 @@ function EditForm({ defaultValues, onSubmit, onCancel, busy }: EditProps) {
       <form onSubmit={submit} noValidate>
         <FormRootError />
         <Grid container spacing={2}>
-          <CommonFields />
+          <ProfileFields />
         </Grid>
         <FormActions submitLabel="Save changes" onCancel={onCancel} busy={busy} />
       </form>
@@ -125,8 +189,7 @@ function EditForm({ defaultValues, onSubmit, onCancel, busy }: EditProps) {
   );
 }
 
-/** Fields shared by create and edit. UpdateUserFormValues is a subset of CreateUserFormValues, so the typing holds for both. */
-function CommonFields() {
+function ProfileFields() {
   return (
     <>
       <Grid size={{ xs: 12, md: 6 }}>
@@ -135,17 +198,11 @@ function CommonFields() {
       <Grid size={{ xs: 12, md: 6 }}>
         <FormTextField<UpdateUserFormValues> name="email" label="E-mail" type="email" autoComplete="off" />
       </Grid>
-      <Grid size={{ xs: 12, md: 4 }}>
+      <Grid size={{ xs: 12, md: 6 }}>
         <FormTextField<UpdateUserFormValues> name="phone" label="Phone" autoComplete="off" />
       </Grid>
-      <Grid size={{ xs: 12, md: 4 }}>
+      <Grid size={{ xs: 12, md: 6 }}>
         <FormTextField<UpdateUserFormValues> name="employeeCode" label="Employee code" autoComplete="off" />
-      </Grid>
-      <Grid size={{ xs: 6, md: 2 }}>
-        <FormNumberField<UpdateUserFormValues> name="roleId" label="Role id" required min={1} />
-      </Grid>
-      <Grid size={{ xs: 6, md: 2 }}>
-        <FormNumberField<UpdateUserFormValues> name="companyId" label="Company id" min={1} />
       </Grid>
     </>
   );

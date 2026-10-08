@@ -9,7 +9,7 @@ import Stack from '@mui/material/Stack';
 import { useMutation } from '@tanstack/react-query';
 import { FormProvider, useForm } from 'react-hook-form';
 
-import { authApi, useReauthStore, useSession, useSessionStore } from '@/core/auth';
+import { authApi, selectSupplierCode, useReauthStore, useSession, useSessionStore } from '@/core/auth';
 import { ApiError, applyServerErrors, describeError } from '@/core/errors';
 import { logger } from '@/core/logging';
 
@@ -17,17 +17,13 @@ import { FormRootError, FormTextField } from '@/shared/components/forms';
 
 import { type ReauthFormValues, reauthSchema } from '../auth.schema';
 
-/**
- * Opens when a request answered 401 SESSION_EXPIRED (the 24 h hard limit). The user re-enters the
- * password in place; the API opens a new session (new cookie) and every parked request is retried.
- * Nothing on the screen is lost. Cancelling ends the session and shows the login page.
- */
 export function SessionExpiredDialog() {
   const isOpen = useReauthStore((s) => s.isOpen);
   const resolve = useReauthStore((s) => s.resolve);
   const reject = useReauthStore((s) => s.reject);
   const { user } = useSession();
   const renew = useSessionStore((s) => s.renew);
+  const setAccess = useSessionStore((s) => s.setAccess);
   const setAnonymous = useSessionStore((s) => s.setAnonymous);
 
   const form = useForm<ReauthFormValues>({ resolver: zodResolver(reauthSchema), defaultValues: { password: '' } });
@@ -42,6 +38,10 @@ export function SessionExpiredDialog() {
     try {
       const result = await login.mutateAsync(values.password);
       renew({ expiresAt: result.expiresAt, idleTimeoutMinutes: result.idleTimeoutMinutes });
+      const previous = user?.activeSupplierCode;
+      if (previous && result.activeSupplierCode?.id !== previous.id) {
+        setAccess(await selectSupplierCode(previous.id, result.supplierCodes));
+      }
       form.reset();
       logger.info('session renewed after hard limit');
       resolve();

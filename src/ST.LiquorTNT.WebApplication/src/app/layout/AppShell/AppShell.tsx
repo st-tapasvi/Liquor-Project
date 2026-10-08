@@ -10,6 +10,7 @@ import { SessionExpiredDialog } from '@/features/auth';
 
 import { SessionCountdown } from './SessionCountdown';
 import { Sidebar } from './Sidebar';
+import { SupplierCodePicker } from './SupplierCodePicker';
 import { TopBar } from './TopBar';
 
 export function AppShell() {
@@ -45,6 +46,7 @@ export function AppShell() {
           </Box>
         </Box>
       </Box>
+      <SupplierCodePicker />
       <SessionExpiredDialog />
     </RequireAuth>
   );

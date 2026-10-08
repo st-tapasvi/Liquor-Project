@@ -6,16 +6,10 @@ import { appConfig } from '@/core/config';
 
 import { minutesUntil } from '@/shared/utils';
 
-/**
- * Warns before the hard session limit so the user can finish what they are doing.
- * Uses `expiresAt` from the login response; the actual enforcement is the API's.
- */
 export function SessionCountdown() {
   const { expiresAt } = useSession();
-  // A tick counter forces a re-render once a minute; the remaining minutes are derived during render.
   const [, setTick] = useState(0);
 
-  // Why an effect: an interval is an external system that must be cleared on unmount.
   useEffect(() => {
     const handle = setInterval(() => setTick((t) => t + 1), 60_000);
     return () => clearInterval(handle);

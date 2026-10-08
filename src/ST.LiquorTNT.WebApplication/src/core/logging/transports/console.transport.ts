@@ -1,6 +1,5 @@
 import type { LogEntry, LogTransport } from '../types';
 
-/** Development transport. The only file in the codebase allowed to call `console`. */
 export const consoleTransport: LogTransport = {
   write(entry: LogEntry) {
     const line = `[${entry.timestamp}] ${entry.level.toUpperCase()} ${entry.message}`;

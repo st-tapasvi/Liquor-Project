@@ -10,13 +10,6 @@ import type { SessionLimitError } from '@/core/errors';
 
 import { formatDateTime } from '@/shared/utils';
 
-/**
- * Shown under the login form when the account has reached its device limit (409 SESSION_LIMIT_REACHED).
- *
- * The API only sends this list once the password has been accepted, so whoever sees it has already
- * proven they hold the credential. When the server allows it, each row offers to end that session and
- * sign in here; otherwise the list is read-only and the user has to log out on the other device.
- */
 export function SessionLimitPanel({
   error,
   onEndSession,
@@ -80,10 +73,6 @@ export function SessionLimitPanel({
   );
 }
 
-/**
- * A short label a person can match to one of their own devices. Deliberately coarse: the raw user agent
- * is long, and the goal is only "which of my two browsers is this", not fingerprinting.
- */
 function describeDevice(userAgent: string | null): string {
   if (userAgent === null || userAgent.trim() === '') return 'Unknown device';
 

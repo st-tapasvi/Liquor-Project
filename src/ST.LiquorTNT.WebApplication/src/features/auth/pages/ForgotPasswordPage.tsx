@@ -31,10 +31,6 @@ import { BackToLoginLink } from '../components/BackToLoginLink';
 
 const STEPS = ['User name', 'Security question', 'New password'];
 
-/**
- * Three-step recovery by security question. The request token lives in component state only
- * (never in the URL or storage) and dies with the page.
- */
 export default function ForgotPasswordPage() {
   const [step, setStep] = useState(0);
   const [requestToken, setRequestToken] = useState<string | null>(null);
