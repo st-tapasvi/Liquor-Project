@@ -290,6 +290,54 @@ public sealed class RoleServiceTests
         ex.Which.ErrorCode.Should().Be(ErrorCodes.RightNotGrantable);
     }
 
+    // ---------- web and line application ----------
+
+    [Fact]
+    public async Task Pages_FilteredByApplication()
+    {
+        _roles.LineActions.Add(UserUnlock);           // pretend user.unlock sits on a LINE page
+
+        var line = await _service.GetPagesAsync("line", CancellationToken.None);
+        var all = await _service.GetPagesAsync(null, CancellationToken.None);
+
+        line.Should().ContainSingle().Which.ApplicationType.Should().Be("LINE");
+        line.Single().Actions.Select(a => a.PageActionId).Should().Equal(UserUnlock);
+        all.Select(p => p.ApplicationType).Should().BeEquivalentTo("WEB", "LINE");
+    }
+
+    [Fact]
+    public async Task Pages_UnknownApplication_Returns400()
+    {
+        var ex = await _service.Invoking(s => s.GetPagesAsync("mobile", CancellationToken.None)).Should().ThrowAsync<ValidationException>();
+
+        ex.Which.Errors.Should().ContainKey("applicationType");
+    }
+
+    [Fact]
+    public async Task UpdateRights_ForOneApplication_KeepsTheOtherApplicationsRights()
+    {
+        _roles.LineActions.Add(UserUnlock);
+        _roles.Rights[10] = new HashSet<int> { RoleView, UserUnlock };   // one WEB right, one LINE right
+
+        // the LINE grid is saved empty: only the LINE right goes, the WEB right stays
+        var response = await _service.UpdateRightsAsync(10, new UpdateRoleRightsRequest { ApplicationType = "LINE" }, CancellationToken.None);
+
+        _roles.Rights[10].Should().BeEquivalentTo(new[] { RoleView });
+        response.Pages.Should().OnlyContain(p => p.ApplicationType == "LINE");
+    }
+
+    [Fact]
+    public async Task UpdateRights_ForOneApplication_ActionOfTheOtherApplication_Returns400()
+    {
+        _roles.LineActions.Add(UserUnlock);
+
+        var ex = await _service.Invoking(s => s.UpdateRightsAsync(10,
+                new UpdateRoleRightsRequest { ApplicationType = "LINE", PageActionIds = new() { RoleView } }, CancellationToken.None))
+            .Should().ThrowAsync<ValidationException>();
+
+        ex.Which.Errors.Should().ContainKey("pageActionIds");
+    }
+
     [Fact]
     public async Task UpdateRights_AddingAdminRight_WithoutManageAdmin_Returns403()
     {

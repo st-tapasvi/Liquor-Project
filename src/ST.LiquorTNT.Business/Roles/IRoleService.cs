@@ -16,10 +16,11 @@ public interface IRoleService
 
     Task<MessageResponse> DeleteAsync(int id, CancellationToken ct);
 
-    Task<RoleRightsResponse> GetRightsAsync(int id, CancellationToken ct);
+    /// <summary>The role's rights grid; <paramref name="applicationType"/> "WEB" / "LINE" shows only that application's pages.</summary>
+    Task<RoleRightsResponse> GetRightsAsync(int id, string? applicationType, CancellationToken ct);
 
     Task<RoleRightsResponse> UpdateRightsAsync(int id, UpdateRoleRightsRequest request, CancellationToken ct);
 
-    /// <summary>Every page with its actions: the empty rights grid.</summary>
-    Task<IReadOnlyList<PageResponse>> GetPagesAsync(CancellationToken ct);
+    /// <summary>Every page with its actions: the empty rights grid. "WEB" / "LINE" → only that application's pages.</summary>
+    Task<IReadOnlyList<PageResponse>> GetPagesAsync(string? applicationType, CancellationToken ct);
 }

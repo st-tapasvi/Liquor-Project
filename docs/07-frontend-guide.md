@@ -463,7 +463,8 @@ Profile fields only (send all four; roles and status have their own APIs):
 ```
 
 ### Save custom rights · `PUT /api/users/{id}/rights` — `user.access` (the FULL list, may be empty)
-Each right is a page action (from `GET /api/pages`, B9) for one supplier code, or `supplierCodeId: null` = all supplier codes.
+Each right is a page action (from `GET /api/pages`, B9 — show the application next to the page name) for one supplier code,
+or `supplierCodeId: null` = all supplier codes. This list always holds the user's custom rights of both applications.
 ```json
 // request
 { "rights": [ { "pageActionId": 5, "supplierCodeId": 30 } ] }
@@ -587,11 +588,20 @@ Refused with `409 ROLE_IN_USE` while any user holds the role — remove it from 
 
 ## B9. Pages and the rights grid
 
+### Two applications
+
+Roles and rights are shared by **two applications**: the **web application** (this one, on the server) and the **line
+application** (desktop, at the production line). Every page belongs to exactly one of them — `applicationType` is
+`"WEB"` or `"LINE"`. One role can hold rights of both (e.g. "Operator RJ CL 772" gets line-application rights). A job done
+in both apps has two pages with their own keys (e.g. `batch` WEB, `linebatch` LINE). Today every page is `WEB`; line pages
+will be added by us when the line application is built.
+
 ### Pages and their actions (seeded by us)
 
-`GET /api/pages` — `role.view`. Rows of the grid; each page has its **own** actions (not a fixed View/Add/Edit/Delete set):
+`GET /api/pages` — `role.view`. Rows of the grid; each page has its **own** actions (not a fixed View/Add/Edit/Delete set).
+`GET /api/pages?applicationType=WEB` (or `LINE`) → only that application's pages. Web pages come first.
 
-| Page (module) | Actions → permission key (id) |
+| Page (module) — all `WEB` today | Actions → permission key (id) |
 |---|---|
 | User (Administration) | View `user.view` (1) · Create `user.add` (2) · Edit `user.edit` (3) · Activate / deactivate `user.status` (4) · Unlock `user.unlock` (5) · Assign roles and rights `user.access` (6) · Manage admin users `user.manageadmin` (7, ADMIN) |
 | Role (Administration) | View `role.view` (8) · Create `role.add` (9) · Edit (name and rights) `role.edit` (10) · Delete `role.delete` (11) |
@@ -609,7 +619,7 @@ only, never tickable (show disabled).
 
 ```json
 [
-  { "pageId": 1, "pageKey": "user", "pageName": "User", "moduleName": "Administration",
+  { "pageId": 1, "pageKey": "user", "pageName": "User", "moduleName": "Administration", "applicationType": "WEB",
     "actions": [
       { "pageActionId": 1, "actionKey": "view", "permissionKey": "user.view", "actionName": "View", "grantScope": "ANY", "granted": false },
       { "pageActionId": 2, "actionKey": "add", "permissionKey": "user.add", "actionName": "Create", "grantScope": "ANY", "granted": false },
@@ -621,26 +631,35 @@ only, never tickable (show disabled).
 ```
 
 ### A role's grid · `GET /api/roles/{id}/rights` — `role.view`
-Same pages, with `granted` ticked:
+Same pages, with `granted` ticked. `?applicationType=WEB` or `LINE` → only that application's pages.
 ```json
 { "roleId": 98, "roleName": "Operator", "displayName": "Operator RJ CL 772",
-  "pages": [ { "pageId": 1, "pageKey": "user", "pageName": "User", "moduleName": "Administration",
+  "pages": [ { "pageId": 1, "pageKey": "user", "pageName": "User", "moduleName": "Administration", "applicationType": "WEB",
                "actions": [ { "pageActionId": 1, "permissionKey": "user.view", "actionName": "View", "grantScope": "ANY", "granted": false }, "…" ] }, "…" ] }
 ```
 
 ### Save · `PUT /api/roles/{id}/rights` — `role.edit` (ids of ALL ticked actions)
 ```json
-// request
+// request — both applications in one grid: ALL ticked ids of both
 { "pageActionIds": [16, 19, 1] }
-// 200 → the grid again (RoleRightsResponse) with these ticked
+
+// request — one application's tab: ALL ticked ids of THAT application; the other application's rights are kept
+{ "pageActionIds": [16, 19, 1], "applicationType": "WEB" }
+
+// 200 → the grid again (RoleRightsResponse) with these ticked (only that application when applicationType was sent)
 ```
+**Important:** if the screen shows only one application's pages, always send `applicationType` with the save. Without it the
+list is taken as the full list of both applications, and the other application's rights would be removed. An id of the
+other application together with `applicationType` → `400` (`errors.pageActionIds`); an unknown `applicationType` → `400`
+(`errors.applicationType`).
 ```json
 // a SYSTEM action → 403
 { "errorCode": "RIGHT_NOT_GRANTABLE", "title": "These rights cannot be given to a role.", "detail": "suppliercode.add belong to Super Admin only." }
 ```
 
-**Grid screen:** rows = pages grouped by `moduleName`, cells = that page's actions as checkboxes, "select all" per row,
-one Save. Users holding the role get the change on their next call.
+**Grid screen:** two tabs, **Web application** and **Line application** (load each with `?applicationType=…`, save each with
+`applicationType`). In a tab: rows = pages grouped by `moduleName`, cells = that page's actions as checkboxes, "select
+all" per row, one Save. Hide the Line tab while it has no pages. Users holding the role get the change on their next call.
 
 ---
 
@@ -857,9 +876,13 @@ export interface SaveRoleRequest {
 }
 export type GrantScope = "ANY" | "ADMIN" | "SYSTEM";
 export interface PageActionResponse { pageActionId: number; actionKey: string; permissionKey: string; actionName: string; grantScope: GrantScope; granted: boolean; }
-export interface PageResponse { pageId: number; pageKey: string; pageName: string; moduleName?: string | null; actions: PageActionResponse[]; }
+export type ApplicationType = "WEB" | "LINE";
+export interface PageResponse { pageId: number; pageKey: string; pageName: string; moduleName?: string | null; applicationType: ApplicationType; actions: PageActionResponse[]; }
 export interface RoleRightsResponse { roleId: number; roleName: string; displayName: string; pages: PageResponse[]; }
-export interface UpdateRoleRightsRequest { pageActionIds: number[]; }   // ALL ticked ids
+export interface UpdateRoleRightsRequest {
+  pageActionIds: number[];             // ALL ticked ids (of applicationType when sent, else of both applications)
+  applicationType?: ApplicationType;   // send it when the grid shows one application
+}
 
 // ---------- settings ----------
 export interface SecurityConfigResponse { key: string; value: string; dataType: "INT" | "BOOL" | "STRING"; description?: string | null; updatedAt: string; }

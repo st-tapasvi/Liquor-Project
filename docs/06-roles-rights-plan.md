@@ -24,6 +24,7 @@
 | Plant | No plant entity. Hierarchy **Company → Excise → Supplier Code**. "Plant Admin" / "Plant Manager" are role names only |
 | Masters | `COMPANY`, `SUPPLIER_CODE` and `LIQUOR_CATEGORY` are maintained by Super Admin (they come from the CRM) |
 | Generic actions | A page can have any actions, not only view/add/edit/delete. Approve / reject / cancel etc. are added per page when that page is built |
+| Two applications | Pages belong to the **web** application (server) or the **line** application (desktop at the line) — `PAGES.APPLICATION_TYPE`, never both (a job in both = two pages). Roles and rights are shared; no login restriction per application yet (owner, 2026-10-08) |
 
 ---
 
@@ -49,7 +50,7 @@ Super Admin (Sundaram Tech, no company)
 | `LIQUOR_CATEGORY` | `CATEGORY_CODE` (unique), `CATEGORY_NAME`, `DESCRIPTION`. Seeded with IMFL, CL, FL |
 | `SUPPLIER_CODE` | One supplier code: `COMPANY_ID`, `FRANCHISE_NAME` (text), `EXCISE_ID`, `SUPPLIER_CODE`, `LIQUOR_CATEGORY_ID`. **Unique (excise, code)** |
 | `COMPANY` | `EXCISE_CODE` and `SUPPLIER_CODE` moved out to `SUPPLIER_CODE`; company name is unique |
-| `PAGES` | One screen (`PAGE_KEY`, `MODULE_NAME`, `SORT_ORDER`) |
+| `PAGES` | One screen (`PAGE_KEY`, `MODULE_NAME`, `SORT_ORDER`, `APPLICATION_TYPE` = `WEB` / `LINE` (013): the web application or the line application). `PAGE_NAME` unique per application, `PAGE_KEY` unique overall |
 | `PAGE_ACTIONS` | The actions of a page. `PERMISSION_KEY` = `<page>.<action>` (unique); `GRANT_SCOPE` = `ANY` / `ADMIN` / `SYSTEM` |
 | `ROLES` | + `COMPANY_ID`, `SUPPLIER_CODE_ID` (012; null = company-level), `IS_SYSTEM` (Super Admin), `IS_TEMPLATE` (default role), `PER_SUPPLIER_CODE` (012; templates copied per supplier code), `IS_ADMIN_ROLE` (Plant Admin, always company-level). Name is unique per company + supplier code |
 | `ROLE_RIGHTS` | Rebuilt: one row = role has one page action |
@@ -132,9 +133,9 @@ All responses have a body; errors are ProblemDetails with `errorCode` (see `05-u
 | `GET /api/roles` · `GET /api/roles/{id}` | `role.view` | Roles of the company with `displayName` ("Operator RJ CL 772"); `?supplierCodeId=` → that supplier code's roles + company-level (Super Admin without a supplier code: Super Admin + templates) |
 | `POST /api/roles` · `PUT /api/roles/{id}` | `role.add` / `role.edit` | `{ roleName, supplierCodeId, description, isAdminRole, perSupplierCode, passwordPolicyId }`; `supplierCodeId` is fixed after create |
 | `DELETE /api/roles/{id}` | `role.delete` | Only when no user holds it |
-| `GET /api/roles/{id}/rights` | `role.view` | The grid: every page and action with `granted` |
-| `PUT /api/roles/{id}/rights` `{ pageActionIds: [] }` | `role.edit` | The **full** list of ticked actions |
-| `GET /api/pages` | `role.view` | Every page with its actions (empty grid) |
+| `GET /api/roles/{id}/rights` | `role.view` | The grid: every page and action with `granted`; `?applicationType=WEB` or `LINE` → one application |
+| `PUT /api/roles/{id}/rights` `{ pageActionIds: [], applicationType? }` | `role.edit` | The **full** list of ticked actions (with `applicationType`: of that application only; the other one is kept) |
+| `GET /api/pages` | `role.view` | Every page with its actions and `applicationType` (empty grid); `?applicationType=WEB` or `LINE` |
 | `POST /api/users` | `user.add` | Takes `roles: [{ roleId }]` (at least one; the supplier code comes with the role); `companyId` is used only for Super Admin |
 | `GET /api/users/{id}/access` | `user.view` | The user's roles and custom rights, with supplier code names |
 | `PUT /api/users/{id}/roles` `{ roles: [] }` | `user.access` | The **full** list of roles |
@@ -165,7 +166,7 @@ Changed for the frontend: `UserResponse` and `CurrentUserResponse` no longer hav
 
 ## 9. Adding a page later (batch, plan …)
 
-1. In the page's SQL script, insert its `PAGES` row and its `PAGE_ACTIONS` (for batch e.g. `view, add, edit, delete, submit, approve,
+1. In the page's SQL script, insert its `PAGES` row (with `APPLICATION_TYPE` `WEB` or `LINE`) and its `PAGE_ACTIONS` (for batch e.g. `view, add, edit, delete, submit, approve,
    cancel, approvecancel`) with the right `GRANT_SCOPE`, and give the default templates their rights (e.g. Operator → submit,
    Supervisor → approve, Plant Manager → approvecancel).
 2. Add the keys to `Business/Access/Permissions.cs` and put `[HasPermission(...)]` on each endpoint.

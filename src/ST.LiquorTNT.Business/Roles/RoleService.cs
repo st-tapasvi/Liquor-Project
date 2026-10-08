@@ -174,15 +174,17 @@ public sealed class RoleService : IRoleService
         return MessageResponse.Of($"Role '{name}' deleted.");
     }
 
-    public async Task<RoleRightsResponse> GetRightsAsync(int id, CancellationToken ct)
+    public async Task<RoleRightsResponse> GetRightsAsync(int id, string? applicationType, CancellationToken ct)
     {
+        var application = ParseApplication(applicationType);
         var role = await RequireRoleAsync(id, ct);
-        return await BuildRightsAsync(role, ct);
+        return await BuildRightsAsync(role, application, ct);
     }
 
     public async Task<RoleRightsResponse> UpdateRightsAsync(int id, UpdateRoleRightsRequest request, CancellationToken ct)
     {
         (await _rightsValidator.ValidateAsync(request, ct)).EnsureValid();
+        var application = ParseApplication(request.ApplicationType);
 
         var role = await RequireRoleAsync(id, ct);
         await EnsureEditableAsync(role, ct);
@@ -194,6 +196,26 @@ public sealed class RoleService : IRoleService
 
         var wanted = request.PageActionIds.Distinct().ToList();
         var current = await _roles.GetRightIdsAsync(role.Id, ct);
+
+        // A grid of one application (WEB or LINE) replaces only that application's rights; the other's stay as they are.
+        if (application is not null)
+        {
+            var inApplication = (await _roles.GetPagesAsync(ct))
+                .Where(p => p.ApplicationType == application.ToString())
+                .SelectMany(p => p.Actions).Select(a => a.PageActionId).ToHashSet();
+
+            var outside = wanted.Where(a => !inApplication.Contains(a)).ToList();
+            if (outside.Count > 0)
+            {
+                throw new ValidationException(new Dictionary<string, string[]>
+                {
+                    ["pageActionIds"] = new[] { $"Page action id(s) {string.Join(", ", outside)} are not part of the {application} application." },
+                });
+            }
+
+            wanted = current.Where(a => !inApplication.Contains(a)).Concat(wanted).Distinct().ToList();
+        }
+
         var added = wanted.Except(current).ToList();
         var removed = current.Except(wanted).ToList();
 
@@ -206,10 +228,34 @@ public sealed class RoleService : IRoleService
             oldValue: current, newValue: wanted), ct);
         await _roles.SaveChangesAsync(ct);
 
-        return await BuildRightsAsync(role, ct);
+        return await BuildRightsAsync(role, application, ct);
     }
 
-    public Task<IReadOnlyList<PageResponse>> GetPagesAsync(CancellationToken ct) => _roles.GetPagesAsync(ct);
+    public async Task<IReadOnlyList<PageResponse>> GetPagesAsync(string? applicationType, CancellationToken ct) =>
+        OfApplication(await _roles.GetPagesAsync(ct), ParseApplication(applicationType));
+
+    /// <summary>"WEB" / "LINE" (any case) → the application; empty → null (both). Anything else is a 400.</summary>
+    private static ApplicationType? ParseApplication(string? applicationType)
+    {
+        if (string.IsNullOrWhiteSpace(applicationType))
+        {
+            return null;
+        }
+
+        if (Enum.TryParse<ApplicationType>(applicationType.Trim(), ignoreCase: true, out var application)
+            && Enum.IsDefined(application))
+        {
+            return application;
+        }
+
+        throw new ValidationException(new Dictionary<string, string[]>
+        {
+            ["applicationType"] = new[] { "Must be WEB or LINE (or empty for both)." },
+        });
+    }
+
+    private static IReadOnlyList<PageResponse> OfApplication(IReadOnlyList<PageResponse> pages, ApplicationType? application) =>
+        application is null ? pages : pages.Where(p => p.ApplicationType == application.ToString()).ToList();
 
     /// <summary>
     /// SYSTEM rights are never handed out; ADMIN rights only by a holder of user.manageadmin.
@@ -248,9 +294,9 @@ public sealed class RoleService : IRoleService
         }
     }
 
-    private async Task<RoleRightsResponse> BuildRightsAsync(ROLES role, CancellationToken ct)
+    private async Task<RoleRightsResponse> BuildRightsAsync(ROLES role, ApplicationType? application, CancellationToken ct)
     {
-        var pages = await _roles.GetPagesAsync(ct);
+        var pages = OfApplication(await _roles.GetPagesAsync(ct), application);
 
         // Super Admin holds every right without rows, so its grid is shown fully ticked.
         var granted = role.IsSystem

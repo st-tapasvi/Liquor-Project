@@ -68,18 +68,24 @@ internal sealed class FakeRoleRepository : IRoleRepository
         return Task.CompletedTask;
     }
 
+    /// <summary>Page action ids that belong to a LINE-application page; every other action is on a WEB page.</summary>
+    public HashSet<int> LineActions { get; } = new();
+
     public Task<IReadOnlyList<PageResponse>> GetPagesAsync(CancellationToken ct) =>
         Task.FromResult<IReadOnlyList<PageResponse>>(new List<PageResponse>
         {
-            new()
-            {
-                PageId = 1, PageKey = "all", PageName = "All",
-                Actions = Actions.Select(a => new PageActionResponse
-                {
-                    PageActionId = a.Id, PermissionKey = a.PermissionKey, GrantScope = a.GrantScope.ToString(),
-                }).ToList(),
-            },
+            Page(1, "web", "WEB", Actions.Where(a => !LineActions.Contains(a.Id))),
+            Page(2, "line", "LINE", Actions.Where(a => LineActions.Contains(a.Id))),
         });
+
+    private static PageResponse Page(int id, string key, string application, IEnumerable<PAGE_ACTIONS> actions) => new()
+    {
+        PageId = id, PageKey = key, PageName = key, ApplicationType = application,
+        Actions = actions.Select(a => new PageActionResponse
+        {
+            PageActionId = a.Id, PermissionKey = a.PermissionKey, GrantScope = a.GrantScope.ToString(),
+        }).ToList(),
+    };
 
     public Task<IReadOnlyList<PAGE_ACTIONS>> GetPageActionsAsync(IReadOnlyCollection<int> ids, CancellationToken ct) =>
         Task.FromResult<IReadOnlyList<PAGE_ACTIONS>>(Actions.Where(a => ids.Contains(a.Id)).ToList());

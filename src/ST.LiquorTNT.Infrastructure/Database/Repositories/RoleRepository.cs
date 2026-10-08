@@ -5,6 +5,7 @@ using ST.LiquorTNT.Business.Roles;
 using ST.LiquorTNT.Contracts.Roles;
 using ST.LiquorTNT.Contracts.SupplierCodes;
 using ST.LiquorTNT.Domain.Entities;
+using ST.LiquorTNT.Domain.Rules;
 
 namespace ST.LiquorTNT.Infrastructure.Database.Repositories;
 
@@ -79,7 +80,9 @@ public sealed class RoleRepository : IRoleRepository
 
     public async Task<IReadOnlyList<PageResponse>> GetPagesAsync(CancellationToken ct)
     {
-        var pages = await _db.PAGES.AsNoTracking().Where(p => p.IsActive).OrderBy(p => p.SortOrder).ThenBy(p => p.PageName).ToListAsync(ct);
+        var pages = await _db.PAGES.AsNoTracking().Where(p => p.IsActive)
+            .OrderBy(p => p.ApplicationType == ApplicationType.WEB ? 0 : 1)       // web application first, then line
+            .ThenBy(p => p.SortOrder).ThenBy(p => p.PageName).ToListAsync(ct);
         var actions = await _db.PAGE_ACTIONS.AsNoTracking().Where(a => a.IsActive).OrderBy(a => a.SortOrder).ToListAsync(ct);
         var byPage = actions.ToLookup(a => a.PageId);
 
@@ -89,7 +92,8 @@ public sealed class RoleRepository : IRoleRepository
             PageKey = p.PageKey ?? string.Empty,
             PageName = p.PageName,
             ModuleName = p.ModuleName,
-            Actions = byPage[p.Id].Select(a => new PageActionResponse
+            ApplicationType = p.ApplicationType.ToString(),
+            Actions =byPage[p.Id].Select(a => new PageActionResponse
             {
                 PageActionId = a.Id,
                 ActionKey = a.ActionKey,

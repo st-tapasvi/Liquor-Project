@@ -81,7 +81,7 @@ The `USERS`, `ROLES`, `PAGES`, `COMPANY`, `EXCISE`, `ALLOTEDPLANTS`, `USER_LOG` 
 | `Controllers/PasswordResetController.cs` | `api/auth/forgotpassword`: `start`, `verify`, `reset` (anonymous) |
 | `Controllers/SecurityQuestionsController.cs` | `api/securityquestions`: list (anonymous), `mine` (PUT) |
 | `Controllers/UsersController.cs` | `api/users`: create (201 + Location), get, paged list, update, activate, deactivate, unlock, `{id}/access`, `{id}/roles`, `{id}/rights` |
-| `Controllers/RolesController.cs` · `PagesController.cs` | `api/roles` (CRUD + `{id}/rights` grid), `api/pages` (every page with its actions) |
+| `Controllers/RolesController.cs` · `PagesController.cs` | `api/roles` (CRUD + `{id}/rights` grid), `api/pages` (every page with its actions; `?applicationType=WEB` or `LINE`) |
 | `Controllers/SupplierCodesController.cs` · `LiquorCategoriesController.cs` | `api/suppliercodes`, `api/liquorcategories`: list / get for the company; create / edit / activate for Super Admin |
 | `Controllers/CompaniesController.cs` · `ExcisesController.cs` | `api/companies` (Super Admin, `company.view`), `api/excises` (`suppliercode.view`) — dropdown lists |
 | `Controllers/SecurityConfigController.cs` · `PasswordPoliciesController.cs` | `api/securityconfig`, `api/passwordpolicies`: admin read/update of `SECURITY_CONFIG` and `PASSWORD_POLICY` |
@@ -128,7 +128,7 @@ Next here: `Companies/`, `Brands/`, `Batches/`…, `Excise/` capability interfac
 | `ROLES` | `Create` (company role or template), `CopyOf` (template → company), `Update` (Super Admin never) |
 | `ROLE_RIGHTS`, `USER_ROLES`, `USER_RIGHTS`, `ROLE_PASSWORD_POLICY` | `Create` (+ `ChangePolicy`) |
 | `SUPPLIER_CODE`, `LIQUOR_CATEGORY` | `Create`, `Update`, `SetActive` |
-| `PAGES`, `PAGE_ACTIONS` (`GrantScope` from `Rules/`), `EXCISE`, `COMPANY`, `SECURITY_QUESTION` | read models for lookups |
+| `PAGES` (`ApplicationType` WEB / LINE from `Rules/`), `PAGE_ACTIONS` (`GrantScope` from `Rules/`), `EXCISE`, `COMPANY`, `SECURITY_QUESTION` | read models for lookups |
 | `USER_SECURITY_QUESTION` | `Create` (hash only), `Deactivate` |
 | `PASSWORD_RESET_REQUEST` | `Create`, `RegisterFailedVerify`, `MarkVerified`/`MarkUsed`/`MarkExpired`, `IsExpiredAt`, `IsOpen` |
 | `SECURITY_CONFIG` | `UpdateValue` |

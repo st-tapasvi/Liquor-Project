@@ -64,6 +64,9 @@ public sealed class PageResponse
     public string PageKey { get; set; } = string.Empty;
     public string PageName { get; set; } = string.Empty;
     public string? ModuleName { get; set; }
+
+    /// <summary>"WEB" (web application) or "LINE" (line application). Group the rights grid by it.</summary>
+    public string ApplicationType { get; set; } = string.Empty;
     public IReadOnlyCollection<PageActionResponse> Actions { get; set; } = Array.Empty<PageActionResponse>();
 }
 
@@ -96,4 +99,10 @@ public sealed class RoleRightsResponse
 public sealed class UpdateRoleRightsRequest
 {
     public List<int> PageActionIds { get; set; } = new();
+
+    /// <summary>
+    /// "WEB" or "LINE": the list is the full ticked list of that application only, and the other application's rights
+    /// stay as they are. Empty: the list is the full ticked list of both applications.
+    /// </summary>
+    public string? ApplicationType { get; set; }
 }

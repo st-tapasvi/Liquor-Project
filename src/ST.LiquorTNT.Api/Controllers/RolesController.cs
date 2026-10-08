@@ -48,13 +48,16 @@ public sealed class RolesController : ControllerBase
     public async Task<ActionResult<MessageResponse>> DeleteAsync(int id, CancellationToken ct)
         => Ok(await _roles.DeleteAsync(id, ct));
 
-    /// <summary>The rights grid of a role: every page and action, with "granted" ticked.</summary>
+    /// <summary>The rights grid of a role: every page and action, with "granted" ticked. <c>?applicationType=WEB|LINE</c> → one application.</summary>
     [HttpGet("{id:int}/rights")]
     [HasPermission(Permissions.RoleView)]
-    public async Task<ActionResult<RoleRightsResponse>> GetRightsAsync(int id, CancellationToken ct)
-        => Ok(await _roles.GetRightsAsync(id, ct));
+    public async Task<ActionResult<RoleRightsResponse>> GetRightsAsync(int id, [FromQuery] string? applicationType, CancellationToken ct)
+        => Ok(await _roles.GetRightsAsync(id, applicationType, ct));
 
-    /// <summary>Send the FULL list of ticked page actions; anything not in it is removed from the role.</summary>
+    /// <summary>
+    /// Send the FULL list of ticked page actions; anything not in it is removed from the role. With "applicationType"
+    /// in the body, only that application's rights are replaced.
+    /// </summary>
     [HttpPut("{id:int}/rights")]
     [HasPermission(Permissions.RoleEdit)]
     public async Task<ActionResult<RoleRightsResponse>> UpdateRightsAsync(int id, UpdateRoleRightsRequest request, CancellationToken ct)

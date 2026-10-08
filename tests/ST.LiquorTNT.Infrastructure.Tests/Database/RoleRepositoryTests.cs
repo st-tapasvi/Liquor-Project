@@ -25,6 +25,22 @@ public sealed class RoleRepositoryTests
             .Options);
 
     [Fact]
+    public async Task Pages_CarryTheirApplication_WebPagesFirst()
+    {
+        await using var db = NewContext();
+
+        var pages = await new RoleRepository(db).GetPagesAsync(CancellationToken.None);
+
+        pages.Single(p => p.PageKey == "user").ApplicationType.Should().Be("WEB");
+        pages.Select(p => p.ApplicationType).Should().OnlyContain(a => a == "WEB" || a == "LINE");
+        var firstLine = pages.ToList().FindIndex(p => p.ApplicationType == "LINE");
+        if (firstLine >= 0)
+        {
+            pages.Skip(firstLine).Should().OnlyContain(p => p.ApplicationType == "LINE", "web pages come first");
+        }
+    }
+
+    [Fact]
     public async Task RoleOfASupplierCode_IsNamedWithIt_AndDeletesWithRightsAndPolicy()
     {
         var tag = Guid.NewGuid().ToString("N")[..6];
