@@ -129,6 +129,6 @@ public sealed class CurrentAccess
 
         return _tenant.CompanyId
                ?? throw new ForbiddenException(ErrorCodes.PermissionDenied,
-                   "Your account is not linked to a company.", "Ask Super Admin to assign your account to a company.");
+                   "Your account is not linked to a company.", "Ask the administrator to assign your account to a company.");
     }
 }

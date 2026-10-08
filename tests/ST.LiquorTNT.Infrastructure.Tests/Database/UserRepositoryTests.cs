@@ -40,7 +40,7 @@ public sealed class UserRepositoryTests
         user.Should().NotBeNull();
         user!.UserName.Should().Be("admin");
         user.IsActive.Should().BeTrue();
-        user.CompanyId.Should().BeNull();  // Super Admin belongs to no company
+        user.CompanyId.Should().BeNull();  // admin belongs to no company
     }
 
     [Fact]

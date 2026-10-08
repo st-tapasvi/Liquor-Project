@@ -27,18 +27,18 @@ every API with request, response and errors; give it to the AI assistant as the 
 | **Master role** | A named set of rights. **Each supplier code has its own roles** ("Operator RJ CL 772", "Operator RJ IMFL 1028"), so each can get different rights. **Company-level roles** (Plant Admin, Agent Manager) cover every supplier code of the company. A user can hold several roles. |
 | **Right (permission key)** | One thing a user may do on one page, written `page.action`: `user.add`, `role.edit`. Pages and their actions are fixed by us (seeded in the database). |
 | **Custom right** | A right given straight to one user, on top of the roles (for one supplier code or all). It only adds; it never takes a role's right away. |
-| **Super Admin** | Sundaram Tech's own user `admin`. Every right in every company. Not linked to a company. |
+| **Admin** | The `admin` user of this installation (system role "Admin"): every right in every company. Not linked to a company. Not the same as a company's **Plant Admin** role. |
 
 ## A2. The whole flow, start to end
 
 ```
 NEW INSTALLATION
- 1. Super Admin logs in: admin / Admin@123 ............... 403 PASSWORD_CHANGE_REQUIRED
+ 1. Admin logs in: admin / Admin@123 ............... 403 PASSWORD_CHANGE_REQUIRED
  2. "Set new password" screen ............................ POST /api/auth/changepassword
  3. Logs in with the new password ........................ 200, user.securityQuestionRequired = true
  4. "Set security question" screen ....................... PUT /api/securityquestions/mine
  5. Supplier code screen: picks a supplier code ......... POST /api/auth/selectsuppliercode
-    -> the company of that supplier code is now "his" company for the screens below
+    -> the company of that supplier code is now the company for the screens below
  6. Dashboard; menu from the permissions in that response
 
 SUPER ADMIN SETS UP THE COMPANY
@@ -46,7 +46,7 @@ SUPER ADMIN SETS UP THE COMPANY
        Plant Admin, Agent Manager                  (company-level)
        Plant Manager / Supervisor / Operator / Viewer  RJ CL 772
        Plant Manager / Supervisor / Operator / Viewer  RJ IMFL 1028   ...
-    He may edit their rights (rights grid), create new roles ("Packer RJ CL 772"), delete unused ones.
+    Admin may edit their rights (rights grid), create new roles ("Packer RJ CL 772"), delete unused ones.
  8. Users screen: creates a user with a TEMPORARY password and one or more roles.
  9. User access screen: changes roles, adds custom rights.
 10. Settings screen: security settings (lockout, sessions, security question, reset, log mode).
@@ -89,15 +89,15 @@ LATER
 1. **Show / hide by permission key.** Show "Add user" only if `permissions` contains `user.add`. The server checks every call
    anyway; hiding keeps the screen clean.
 2. **Never send company or supplier code yourself** (except: the picker, a role's supplier code in the role form, a custom
-   right's supplier code, and Super Admin's `companyId` when creating a user). The server takes them from the session.
+   right's supplier code, and Admin's `companyId` when creating a user). The server takes them from the session.
 3. **Handle errors by `errorCode`**, never by message text (table in B3).
 4. **Full-list saves.** Role rights, user roles and user custom rights are saved as the complete list; anything missing is removed.
 5. **Rights change at once.** When an admin changes someone's roles or rights, it applies on that user's next API call (no
    new login). Re-read `mypermissions` after switching supplier code and on page refresh.
 6. **The picker only shows the user's own supplier codes.** A supplier code where the user has no role or right never appears.
-7. **Super Admin works in the company of the supplier code he picked.** Roles and users lists show that company. Without a
-   picked supplier code, the roles list shows only Super Admin + the default templates.
-8. **Nobody changes their own roles or rights** (except Super Admin). Hide the Save buttons on your own access screen.
+7. **Admin works in the company of the picked supplier code.** Roles and users lists show that company. Without a
+   picked supplier code, the roles list shows only the Admin role + the default templates.
+8. **Nobody changes their own roles or rights** (except Admin). Hide the Save buttons on your own access screen.
 
 ---
 
@@ -339,7 +339,7 @@ Clears the cookies. Go to the login page.
 response's `supplierCodes`, or `GET /api/auth/mysuppliercodes`). Even a user with one supplier code sees it and picks it.
 Picking one calls `selectsuppliercode` and opens the dashboard. The header keeps a "switch" dropdown with the same list.
 
-`GET /api/auth/mysuppliercodes` → only the user's supplier codes (Super Admin: every active one of every company)
+`GET /api/auth/mysuppliercodes` → only the user's supplier codes (Admin: every active one of every company)
 ```json
 [
   { "id": 32, "companyId": 20, "companyName": "Globus Spirits Ltd", "exciseCode": "JK", "supplierCode": "369", "liquorCategoryCode": "IMFL", "displayName": "JK IMFL 369", "…": "…" },
@@ -347,7 +347,7 @@ Picking one calls `selectsuppliercode` and opens the dashboard. The header keeps
   { "id": 31, "companyId": 20, "companyName": "Globus Spirits Ltd", "exciseCode": "RJ", "supplierCode": "1028", "liquorCategoryCode": "IMFL", "displayName": "RJ IMFL 1028", "…": "…" }
 ]
 ```
-For Super Admin, group the picker by `companyName`.
+For Admin, group the picker by `companyName`.
 
 `POST /api/auth/selectsuppliercode` → picks or switches; returns the permissions directly
 ```json
@@ -362,7 +362,7 @@ For Super Admin, group the picker by `companyName`.
 ```
 Not the user's supplier code → `403 SUPPLIER_CODE_NOT_ASSIGNED`.
 
-`GET /api/auth/mypermissions` → same shape. `permissions` is empty while no supplier code is picked (Super Admin always has
+`GET /api/auth/mypermissions` → same shape. `permissions` is empty while no supplier code is picked (Admin always has
 all keys). Build the menu and buttons from it; show `activeSupplierCode.displayName` in the header with a "switch" dropdown.
 
 ---
@@ -412,7 +412,7 @@ then tick its roles from `GET /api/roles?supplierCodeId=…`; repeat for another
 ```
 
 - `roles`: at least one; send only `roleId` (the supplier code comes with the role). Role 98 = "Operator RJ CL 772".
-- `companyId`: **only Super Admin** sends it; when left out it is the company of his picked supplier code. Everyone else's
+- `companyId`: **only Admin** sends it; when left out it is the company of the picked supplier code. Everyone else's
   users always join their own company.
 - `userName`: letters, digits and `. _ @ -`, max 50, cannot be changed later.
 - The temporary password must already satisfy the password policy of the chosen roles:
@@ -438,7 +438,7 @@ Profile fields only (send all four; roles and status have their own APIs):
 | `USERNAME_TAKEN` | 409 | user name exists |
 | `PASSWORD_POLICY_NOT_CONFIGURED` | 409 | a chosen role has no password policy |
 | `VALIDATION_FAILED` | 400 | `errors.password` (policy rules), `errors.roles` (none chosen), other fields |
-| `ADMIN_USER_PROTECTED` | 403 | target is an admin user (Plant Admin / Super Admin), or an admin role is chosen, and the caller lacks `user.manageadmin` |
+| `ADMIN_USER_PROTECTED` | 403 | target is an admin user (Plant Admin / Admin), or an admin role is chosen, and the caller lacks `user.manageadmin` |
 | `CANNOT_DEACTIVATE_SELF` | 409 | deactivating yourself |
 | `NOT_FOUND` | 404 | user / role of another company, role of a deactivated supplier code, unknown company |
 
@@ -490,7 +490,7 @@ or `supplierCodeId: null` = all supplier codes. This list always holds the user'
 **Screen:** two sections. "Roles": rows of `displayName` grouped by `supplierCodeName`, add / remove, Save. "Custom rights":
 rows *Right* (`pageName → actionName`) × *Supplier code* (or "All"), add / remove, Save. In the right picker disable
 `grantScope = "SYSTEM"` actions, and `"ADMIN"` actions unless the user has `user.manageadmin`. Hide both Save buttons when
-looking at yourself (unless Super Admin).
+looking at yourself (unless Admin).
 
 | Error | Status | Meaning |
 |---|---|---|
@@ -512,14 +512,14 @@ RJ CL 772:      Plant Manager RJ CL 772 · Supervisor RJ CL 772 · Operator RJ C
 RJ IMFL 1028:   Plant Manager RJ IMFL 1028 · Supervisor … · Operator … · Viewer …
 JK IMFL 369:    Plant Manager JK IMFL 369 · Supervisor … · Operator … · Viewer …
 ```
-When Super Admin adds a supplier code, its 4 default roles are created automatically with default rights (and a new
+When Admin adds a supplier code, its 4 default roles are created automatically with default rights (and a new
 company also gets Plant Admin and Agent Manager). The company may then edit, add or delete roles.
 
 Default rights:
 
 | Role | Default rights |
 |---|---|
-| Plant Admin (admin role) | everything except Super Admin's: users (incl. `user.manageadmin`), roles, security settings, password policies, supplier code / liquor category view |
+| Plant Admin (admin role) | everything except the Admin-only (SYSTEM) rights: users (incl. `user.manageadmin`), roles, security settings, password policies, supplier code / liquor category view |
 | Agent Manager | users (not admin users), roles, supplier code / liquor category view |
 | Plant Manager | `user.view`, `role.view`, `suppliercode.view`, `liquorcategory.view` |
 | Supervisor / Operator / Viewer | `suppliercode.view`, `liquorcategory.view` (production pages add theirs later) |
@@ -541,8 +541,8 @@ Company-level first, then grouped by supplier code. `GET /api/roles?supplierCode
   "…"
 ]
 ```
-**Always show `displayName`.** Badges: `isAdminRole` → "Admin", `isSystem` → "System" (Super Admin; read-only, no Edit /
-Rights / Delete). Super Admin with no supplier code picked sees Super Admin + the default templates (`isTemplate`).
+**Always show `displayName`.** Badges: `isAdminRole` → "Company admin", `isSystem` → "System" (the Admin role; read-only, no Edit /
+Rights / Delete). Admin with no supplier code picked sees the Admin role + the default templates (`isTemplate`).
 
 `GET /api/roles/{id}` → one `RoleResponse`.
 
@@ -590,7 +590,7 @@ Refused with `409 ROLE_IN_USE` while any user holds the role — remove it from 
 |---|---|---|
 | `ROLE_NAME_TAKEN` | 409 | name already used for this supplier code (or among company-level roles) |
 | `ROLE_IN_USE` | 409 | delete refused: users hold the role |
-| `ROLE_NOT_EDITABLE` | 409 | Super Admin role, or a template edited by a company user |
+| `ROLE_NOT_EDITABLE` | 409 | Admin role, or a template edited by a company user |
 | `ADMIN_USER_PROTECTED` | 403 | admin role or ADMIN right without `user.manageadmin` |
 | `VALIDATION_FAILED` | 400 | `errors.supplierCodeId` (changed), `errors.isAdminRole` (admin role with a supplier code), `errors.roleName` |
 | `NOT_FOUND` | 404 | role of another company, supplier code not of the company, unknown password policy |
@@ -625,7 +625,7 @@ will be added by us when the line application is built.
 Use the ids from the API, not from this table. A page without actions (e.g. "Brand", not built yet) may appear — skip it.
 New pages (batch, plan …) will simply add rows; the grid code does not change.
 
-**`grantScope`:** `ANY` = anyone with `role.edit` may tick it · `ADMIN` = only with `user.manageadmin` · `SYSTEM` = Super Admin
+**`grantScope`:** `ANY` = anyone with `role.edit` may tick it · `ADMIN` = only with `user.manageadmin` · `SYSTEM` = Admin
 only, never tickable (show disabled).
 
 ```json
@@ -665,7 +665,7 @@ other application together with `applicationType` → `400` (`errors.pageActionI
 (`errors.applicationType`).
 ```json
 // a SYSTEM action → 403
-{ "errorCode": "RIGHT_NOT_GRANTABLE", "title": "These rights cannot be given to a role.", "detail": "suppliercode.add belong to Super Admin only." }
+{ "errorCode": "RIGHT_NOT_GRANTABLE", "title": "These rights cannot be given to a role.", "detail": "suppliercode.add belong to the Admin role only." }
 ```
 
 **Grid screen:** two tabs, **Web application** and **Line application** (load each with `?applicationType=…`, save each with
@@ -788,10 +788,10 @@ Keep `requestToken` in memory between the three steps. The new password follows 
 
 | Call | Right | Returns |
 |---|---|---|
-| `GET /api/suppliercodes?search=&page=1&pageSize=50` | `suppliercode.view` | paged `SupplierCodeResponse` of the company (Super Admin: all) |
+| `GET /api/suppliercodes?search=&page=1&pageSize=50` | `suppliercode.view` | paged `SupplierCodeResponse` of the company (Admin: all) |
 | `GET /api/liquorcategories` | `liquorcategory.view` | `[{ id, categoryCode: "CL", categoryName: "Country Liquor", description, isActive }]` |
 | `GET /api/excises` | `suppliercode.view` | `[{ id, exciseCode: "RJ", exciseName: "Rajasthan", isActive }]` |
-| `GET /api/companies` | `company.view` (Super Admin) | `[{ id: 20, companyName: "Globus Spirits Ltd", aliasName, city, isActive, supplierCodeCount: 3 }]` |
+| `GET /api/companies` | `company.view` (Admin) | `[{ id: 20, companyName: "Globus Spirits Ltd", aliasName, city, isActive, supplierCodeCount: 3 }]` |
 
 ---
 
@@ -848,7 +848,7 @@ export interface UserRoleAssignment { roleId: number; }             // the suppl
 export interface UserRightAssignment { pageActionId: number; supplierCodeId: number | null; }   // null = all supplier codes
 export interface CreateUserRequest {
   userName: string; password: string;
-  companyId?: number | null;           // Super Admin only
+  companyId?: number | null;           // Admin only
   roles: UserRoleAssignment[];         // at least one
   fullName?: string; email?: string; phone?: string; employeeCode?: string;
   forcePasswordChange: boolean;        // default true
@@ -882,7 +882,7 @@ export interface SaveRoleRequest {
   supplierCodeId?: number | null;      // create: the role's supplier code (null = company-level); edit: the same value
   description?: string | null;
   isAdminRole: boolean;                // company-level only
-  perSupplierCode?: boolean;           // Super Admin, templates only
+  perSupplierCode?: boolean;           // Admin, templates only
   passwordPolicyId: number;
 }
 export type GrantScope = "ANY" | "ADMIN" | "SYSTEM";
@@ -920,7 +920,7 @@ Password of every demo user: `Admin@123`. Company: Globus Spirits Ltd (RJ CL 772
 
 | User | Roles | Supplier codes on the screen after login |
 |---|---|---|
-| `admin` | Super Admin | every supplier code of every company |
+| `admin` | Admin | every supplier code of every company |
 | `globus.admin` | Plant Admin (company-level) | 3 |
 | `globus.agent` | Agent Manager (company-level) | 3 |
 | `globus.pm` | Plant Manager RJ CL 772 / RJ IMFL 1028 / JK IMFL 369 | 3 |

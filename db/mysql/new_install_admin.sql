@@ -3,7 +3,7 @@
 -- Run ONCE on a new installation, after all numbered scripts. NEVER run on the dev database: the team and the
 -- automatic tests log in there as admin / Admin@123 without the first-login steps.
 --
--- Leaves the Super Admin user 'admin' with the temporary password Admin@123 and makes the first login go through:
+-- Leaves the user 'admin' (system role Admin) with the temporary password Admin@123 and makes the first login go through:
 --   1. login with Admin@123          -> 403 PASSWORD_CHANGE_REQUIRED
 --   2. POST /api/auth/changepassword -> own password
 --   3. login with the new password    -> securityQuestionRequired = true

@@ -43,7 +43,7 @@ public sealed class UserAccessServiceTests
         _userAccess.Roles.Add(AccessRows.Role(OperatorRole, Company, "Operator", supplierCodeId: OwnSupplierCode));
         _userAccess.Roles.Add(AccessRows.Role(OtherCompanyOperator, 2, "Operator", supplierCodeId: 20));
         _userAccess.Roles.Add(AccessRows.Role(PlantAdminRole, Company, "Plant Admin", isAdminRole: true));
-        _userAccess.Roles.Add(AccessRows.Role(SuperAdminRole, null, "Super Admin", isSystem: true));
+        _userAccess.Roles.Add(AccessRows.Role(SuperAdminRole, null, "Admin", isSystem: true));
         _userAccess.Actions.Add(AccessRows.Action(UserUnlock, "user.unlock"));
         _userAccess.Actions.Add(AccessRows.Action(SecurityEdit, "securityconfig.edit", GrantScope.ADMIN));
         _userAccess.Actions.Add(AccessRows.Action(SupplierAdd, "suppliercode.add", GrantScope.SYSTEM));

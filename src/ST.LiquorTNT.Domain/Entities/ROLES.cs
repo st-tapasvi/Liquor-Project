@@ -95,7 +95,7 @@ public class ROLES
     {
         if (IsSystem)
         {
-            throw new InvalidOperationException("The Super Admin role cannot be changed.");
+            throw new InvalidOperationException("The Admin role cannot be changed.");
         }
 
         if (string.IsNullOrWhiteSpace(roleName))

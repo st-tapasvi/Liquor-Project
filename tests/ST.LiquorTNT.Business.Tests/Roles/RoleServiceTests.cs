@@ -34,7 +34,7 @@ public sealed class RoleServiceTests
 
     public RoleServiceTests()
     {
-        _roles.Roles.Add(AccessRows.Role(1, null, "Super Admin", isSystem: true));
+        _roles.Roles.Add(AccessRows.Role(1, null, "Admin", isSystem: true));
         _roles.Roles.Add(AccessRows.Role(2, null, "Operator", isTemplate: true));
         _roles.Roles.Add(AccessRows.Role(10, Company, "Operator"));
         _roles.Roles.Add(AccessRows.Role(11, Company, "Plant Admin", isAdminRole: true));

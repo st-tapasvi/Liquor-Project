@@ -283,7 +283,7 @@ public sealed class RoleService : IRoleService
         if (system.Count > 0)
         {
             throw new ForbiddenException(ErrorCodes.RightNotGrantable, "These rights cannot be given to a role.",
-                $"{string.Join(", ", system.Select(a => a.PermissionKey))} belong to Super Admin only.");
+                $"{string.Join(", ", system.Select(a => a.PermissionKey))} belong to the Admin role only.");
         }
 
         var admin = actions.Where(a => a.GrantScope == GrantScope.ADMIN).ToList();
@@ -330,12 +330,12 @@ public sealed class RoleService : IRoleService
     {
         if (role.IsSystem)
         {
-            throw new BusinessException(ErrorCodes.RoleNotEditable, "The Super Admin role cannot be changed.");
+            throw new BusinessException(ErrorCodes.RoleNotEditable, "The Admin role cannot be changed.");
         }
 
         if (role.IsTemplate && !await _access.IsSuperAdminAsync(ct))
         {
-            throw new BusinessException(ErrorCodes.RoleNotEditable, "Default role templates are changed by Super Admin only.");
+            throw new BusinessException(ErrorCodes.RoleNotEditable, "Default role templates are changed by the Admin role only.");
         }
     }
 

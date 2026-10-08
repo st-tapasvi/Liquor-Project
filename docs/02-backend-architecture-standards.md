@@ -275,7 +275,7 @@ Rules:
 - Every endpoint **MUST** carry `[HasPermission("...")]` unless it is part of the auth flow or `/health`.
 - Every async endpoint **MUST** accept and pass `CancellationToken`.
 - Request validation uses FluentValidation, registered in the pipeline; a controller never validates manually.
-- `CompanyId`, `SupplierCodeId`, `ExciseCode` **MUST NOT** be accepted as request parameters. They come from `ITenantContext`. ⛔ (Only exception: Super Admin naming the company a new supplier code or first user belongs to - that is the data being created, not the caller's scope.)
+- `CompanyId`, `SupplierCodeId`, `ExciseCode` **MUST NOT** be accepted as request parameters. They come from `ITenantContext`. ⛔ (Only exception: Admin naming the company a new supplier code or first user belongs to - that is the data being created, not the caller's scope.)
 
 **Response format**
 
@@ -451,7 +451,7 @@ Full design and API: `06-roles-rights-plan.md`. The rules every module follows:
 
 - **Model (ERPNext-style):** a user holds several **master roles**, each for one supplier code or for all supplier codes of the company
   (`USER_ROLES.SUPPLIER_CODE_ID` null), plus **custom rights** (`USER_RIGHTS`) that only ever *add*. Effective rights in the active supplier code
-  = union of both. Roles are company-wise; **Super Admin** (`ROLES.IS_SYSTEM`, Sundaram Tech) has every right in every company.
+  = union of both. Roles are company-wise; **Admin** (`ROLES.IS_SYSTEM`, the `admin` user; Sundaram Technologies' Super Admin is a separate, later feature) has every right in every company.
 - **Permission key** = `PAGE_ACTIONS.PERMISSION_KEY` (`<page>.<action>`), seeded by SQL. Every key the backend checks is a constant in
   `Business/Access/Permissions.cs`; add the constant and the seed row together.
 - **Every endpoint** carries `[HasPermission(Permissions.X)]` (`Api/Security/HasPermissionAttribute.cs`) except the auth flow and
@@ -461,8 +461,8 @@ Full design and API: `06-roles-rights-plan.md`. The rules every module follows:
 - **Rights are read per request** (one query, kept for the request by the scoped `CurrentAccess`), never put in the JWT — a change applies
   on the next call.
 - **Grant scope** (`PAGE_ACTIONS.GRANT_SCOPE`): `ANY`; `ADMIN` — only a holder of `user.manageadmin` may grant it; `SYSTEM` — never
-  granted, Super Admin only (CRM masters). Admin users (holders of an `IS_ADMIN_ROLE` role, Plant Admin) are managed only by a holder of
-  `user.manageadmin`; nobody but Super Admin changes their own roles or rights.
+  granted, Admin only (CRM masters). Admin users (holders of an `IS_ADMIN_ROLE` role, Plant Admin) are managed only by a holder of
+  `user.manageadmin`; nobody but Admin changes their own roles or rights.
 - **Password policy** with several roles = the strictest value of each rule (`PASSWORD_POLICY.Strictest`).
 
 ### 9.2 Status values and lookup tables
@@ -714,7 +714,7 @@ The published OpenAPI document is the input for the frontend's generated client;
 |---|---|
 | Solution scaffold, 13 projects, central package versions, 7 architecture rules | EF migrations (User-module schema is hand-run SQL `db/mysql/003`–`005`; the base `USERS`/`ROLES`/`COMPANY`/`USER_LOG` tables come from the legacy merge) |
 | **User module, complete:** users CRUD + activate/deactivate/unlock, role-wise password policy + validation + history, login with IST-day lockout, server-side sessions (limit/expiry/logout/revoke), change password, security questions + forgot-password (wrong answers count towards the lock), `USER_LOG` audit in the same transaction, admin editing of `SECURITY_CONFIG` and `PASSWORD_POLICY`. Two independent audits applied. | Batch page (create / approve / cancel, design in docs/06 §9); rate limiting on anonymous auth routes; row lock for concurrent logins at the session limit |
-| **Roles & rights module, complete (docs/06):** company-wise master roles + custom rights per supplier code, Super Admin, default role templates copied on a company's first supplier code, `[HasPermission]` on every endpoint, supplier code picked after login and kept in the session, admin-user protection (`user.manageadmin`), grant scopes ANY / ADMIN / SYSTEM, strictest password policy across roles, supplier code and liquor category masters. Script `db/mysql/009`. | Company and brand masters; SQL Server copy of `009` |
+| **Roles & rights module, complete (docs/06):** company-wise master roles + custom rights per supplier code, Admin, default role templates copied on a company's first supplier code, `[HasPermission]` on every endpoint, supplier code picked after login and kept in the session, admin-user protection (`user.manageadmin`), grant scopes ANY / ADMIN / SYSTEM, strictest password policy across roles, supplier code and liquor category masters. Script `db/mysql/009`. | Company and brand masters; SQL Server copy of `009` |
 | PBKDF2 hashing; JWT issue + validation; SHA-256 session/reset token hashing | Tenant filter interceptor; detail-mode logging toggle; request logging middleware |
 | ProblemDetails for every error path incl. model binding, `DATABASE_ERROR`, correlation header preserved | SQL Server provider package; Testcontainers (database tests run against the dev MySQL, overridable via `ST_TNT_TEST_CONNECTION`) |
 | 422 tests: Domain 74, Business 215, Infrastructure 21, Api 104, Architecture 7, Edge 1 (2 cookie tests in Api fail: the test helper sends the URL-encoded XSRF cookie value; not caused by roles) | Every business module after Users/Auth; Line API; outbox; portals |

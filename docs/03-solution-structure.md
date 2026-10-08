@@ -82,8 +82,8 @@ The `USERS`, `ROLES`, `PAGES`, `COMPANY`, `EXCISE`, `ALLOTEDPLANTS`, `USER_LOG` 
 | `Controllers/SecurityQuestionsController.cs` | `api/securityquestions`: list (anonymous), `mine` (PUT) |
 | `Controllers/UsersController.cs` | `api/users`: create (201 + Location), get, paged list, update, activate, deactivate, unlock, `{id}/access`, `{id}/roles`, `{id}/rights` |
 | `Controllers/RolesController.cs` · `PagesController.cs` | `api/roles` (CRUD + `{id}/rights` grid), `api/pages` (every page with its actions; `?applicationType=WEB` or `LINE`) |
-| `Controllers/SupplierCodesController.cs` · `LiquorCategoriesController.cs` | `api/suppliercodes`, `api/liquorcategories`: list / get for the company; create / edit / activate for Super Admin |
-| `Controllers/CompaniesController.cs` · `ExcisesController.cs` | `api/companies` (Super Admin, `company.view`), `api/excises` (`suppliercode.view`) — dropdown lists |
+| `Controllers/SupplierCodesController.cs` · `LiquorCategoriesController.cs` | `api/suppliercodes`, `api/liquorcategories`: list / get for the company; create / edit / activate for Admin |
+| `Controllers/CompaniesController.cs` · `ExcisesController.cs` | `api/companies` (Admin, `company.view`), `api/excises` (`suppliercode.view`) — dropdown lists |
 | `Controllers/SecurityConfigController.cs` · `PasswordPoliciesController.cs` | `api/securityconfig`, `api/passwordpolicies`: admin read/update of `SECURITY_CONFIG` and `PASSWORD_POLICY` |
 | `appsettings.json` | `ConnectionStrings:Default`, `Database:{Provider,ServerVersion}`, `Jwt:{Issuer,Audience,SigningKey}`, `Cors`, `Serilog` (Console and File sinks with `AppJsonFormatter`, indented JSON; levels are **not** set here, they follow `LOG_MODE`). No security behaviour here, it lives in the database. |
 | `Middleware/RequestLoggingMiddleware.cs` | One entry per `/api` call with its errorCode (NORMAL); DETAIL adds the query string and the request and response bodies for `/api` calls (masked, size-capped) |
@@ -112,7 +112,7 @@ All controllers are thin (one call per action, no `try/catch`) and every action 
 | `PasswordPolicies/` | `IPasswordPolicyService`/`PasswordPolicyService` + validator — admin editing of policy rules |
 | `Access/` | `CurrentAccess` (the one "may the caller do this?" answer, per request), `Permissions` (every key), `IAccessService`/`AccessService` (my supplier codes, select supplier code, my permissions), `SupplierCodeDirectory`, `IAccessRepository` |
 | `Roles/` | `IRoleService`/`RoleService` (roles + rights grid, admin-role and grant-scope rules), `RoleTemplates` (default roles into a new company), `IRoleRepository`, validators |
-| `SupplierCodes/` · `LiquorCategories/` | supplier code and category masters (Super Admin edits; first supplier code copies the default roles) |
+| `SupplierCodes/` · `LiquorCategories/` | supplier code and category masters (Admin edits; first supplier code copies the default roles) |
 | `Companies/` · `Excises/` | read-only lists (`ICompanyService`, `IExciseService` + repositories) |
 
 Next here: `Companies/`, `Brands/`, `Batches/`…, `Excise/` capability interfaces, `Line/`.
@@ -125,7 +125,7 @@ Next here: `Companies/`, `Brands/`, `Batches/`…, `Excise/` capability interfac
 | `USER_PASSWORD_HISTORY` | appended by `USERS.SetPassword` only |
 | `USER_SESSION` | `Create` (idle window + hard limit), `SelectSupplierCode`, `IsActiveAt`, `Slide` (activity; never past the hard limit), `ReachedLimitAt`, `Logout`/`Revoke`/`Expire` |
 | `PASSWORD_POLICY` | `Create`/`UpdateRules` (guards), `ExpiryFrom`, `Strictest` (several roles) |
-| `ROLES` | `Create` (company role or template), `CopyOf` (template → company), `Update` (Super Admin never) |
+| `ROLES` | `Create` (company role or template), `CopyOf` (template → company), `Update` (Admin never) |
 | `ROLE_RIGHTS`, `USER_ROLES`, `USER_RIGHTS`, `ROLE_PASSWORD_POLICY` | `Create` (+ `ChangePolicy`) |
 | `SUPPLIER_CODE`, `LIQUOR_CATEGORY` | `Create`, `Update`, `SetActive` |
 | `PAGES` (`ApplicationType` WEB / LINE from `Rules/`), `PAGE_ACTIONS` (`GrantScope` from `Rules/`), `EXCISE`, `COMPANY`, `SECURITY_QUESTION` | read models for lookups |
@@ -166,7 +166,7 @@ Logging: `LoggingSetup` (Serilog sinks from configuration, levels bound to `LogM
 
 | Project | What it covers |
 |---|---|
-| `Domain.Tests` (74) | `USERS` lockout matrix (N-th attempt, same/new IST day to the second, expired lock restart, no sliding lock, correct password while locked), password state, sessions, reset requests, policies (incl. strictest of several), config, `ROLES` (templates, copy, Super Admin) |
+| `Domain.Tests` (74) | `USERS` lockout matrix (N-th attempt, same/new IST day to the second, expired lock restart, no sliding lock, correct password while locked), password state, sessions, reset requests, policies (incl. strictest of several), config, `ROLES` (templates, copy, Admin) |
 | `Business.Tests` (215) | `CurrentAccess` + `AccessService` (supplier code pick), `RoleService` + `RoleTemplates`, `UserAccessService` (admin protection, no self-change, grant scope), `UserService` (company scope, roles, strictest policy), `AuthService` (login matrix incl. "locked now" vs "already locked", session limit, change-password counts as attempt), `SessionService`, `PasswordResetService`, `SecurityQuestionService`, `SecurityConfigService`, `PasswordPolicyService`, `PasswordPolicyValidator`, `SecuritySettings`, request validators — all with the in-memory fakes in `Fakes/` |
 | `Infrastructure.Tests` (21) | PBKDF2, SHA-256, JWT claims; EF mappings and repositories against MySQL (`ST_TNT_TEST_CONNECTION` or the dev server), incl. duplicate user name → 409, and `AccessRepositoryTests` (rights per supplier code, "all supplier codes" never leak into another company) |
 | `Api.Tests` (104) | `WebApplicationFactory` end-to-end: login → 3 wrong = lock → unlock (200 + user) → logout kills token → session limit → revoke → deactivate; forced password change; forgot-password start/verify/reset; admin config validation; error shape and correlation header; unknown route / wrong method / non-JSON, empty or broken JSON body still get ProblemDetails. `ExceptionMiddlewareTests`, `SessionValidationMiddlewareTests` (idle → TIMED_OUT, hard limit while working → EXPIRED, one write a minute), an expired-JWT → `SESSION_EXPIRED` check, `RolesRightsFlowTests` (supplier code → default roles → Agent Manager → rights apply on the next call; `SUPPLIER_CODE_NOT_SELECTED`) and `Logging/` (JSON formatter, secret masking, log-mode switch, request logging incl. malformed bodies, method-logging proxy and its registration) as unit tests. One xUnit collection (shared admin account). |

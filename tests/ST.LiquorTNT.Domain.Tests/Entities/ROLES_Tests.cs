@@ -97,7 +97,7 @@ public sealed class ROLES_Tests
     [Fact]
     public void Update_SuperAdmin_Throws()
     {
-        var superAdmin = ROLES.Create(null, "Super Admin", null, false, Now, 1);
+        var superAdmin = ROLES.Create(null, "Admin", null, false, Now, 1);
         typeof(ROLES).GetProperty(nameof(ROLES.IsSystem), BindingFlags.Public | BindingFlags.Instance)!.SetValue(superAdmin, true);
 
         var act = () => superAdmin.Update("Renamed", null, false, Now, 1);
