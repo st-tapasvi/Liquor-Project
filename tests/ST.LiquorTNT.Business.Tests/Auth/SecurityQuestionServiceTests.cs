@@ -86,7 +86,7 @@ public sealed class SecurityQuestionServiceTests
         rows.Single(q => q.QuestionId == 1).IsActive.Should().BeFalse();
         var active = rows.Single(q => q.IsActive);
         active.QuestionId.Should().Be(2);
-        active.AnswerHash.Should().Be("H:rex");                       // normalised (lower-case, trimmed), hashed
+        active.AnswerHash.Should().Be("H:rex");                       // normalised (lower-case, no spaces), hashed
         _log.Entries.Should().HaveCount(2).And.OnlyContain(e => e.ActionType == UserLogActions.SecurityQuestionChanged);
         _log.Entries.Should().OnlyContain(e => !e.Description!.Contains("Rex", StringComparison.OrdinalIgnoreCase));   // answer never audited
     }
@@ -101,7 +101,7 @@ public sealed class SecurityQuestionServiceTests
 
         var rows = _questions.UserQuestions.Where(q => q.UserId == 10).ToList();
         rows.Should().HaveCount(2);                                      // one row per (user, question), never a duplicate
-        rows.Single(q => q.QuestionId == 1).Should().Match<USER_SECURITY_QUESTION>(q => q.IsActive && q.AnswerHash == "H:back again");
+        rows.Single(q => q.QuestionId == 1).Should().Match<USER_SECURITY_QUESTION>(q => q.IsActive && q.AnswerHash == "H:backagain");
         rows.Single(q => q.QuestionId == 2).IsActive.Should().BeFalse();
     }
 

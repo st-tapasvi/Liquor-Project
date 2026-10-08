@@ -256,16 +256,24 @@ from the current one, must not contain the user name, and must not be one of the
 
 ### Step 3 — Set security question (first login)
 
-Load the list (public): `GET /api/securityquestions`
+Load the list (public): `GET /api/securityquestions` — 10 questions, show them in a dropdown
 ```json
 [
-  { "id": 1, "questionText": "What is the name of your first school?" },
-  { "id": 2, "questionText": "What is your mother's maiden name?" },
-  { "id": 3, "questionText": "What was the name of your first pet?" },
-  { "id": 4, "questionText": "In which city were you born?" },
-  { "id": 5, "questionText": "What is your favourite book?" }
+  { "id": 1,  "questionText": "What is the name of your first school?" },
+  { "id": 2,  "questionText": "What is your mother's maiden name?" },
+  { "id": 3,  "questionText": "What was the name of your first pet?" },
+  { "id": 4,  "questionText": "In which city were you born?" },
+  { "id": 5,  "questionText": "What is your favourite book?" },
+  { "id": 6,  "questionText": "What was the name of your childhood best friend?" },
+  { "id": 7,  "questionText": "What was the model of your first vehicle?" },
+  { "id": 8,  "questionText": "What is the name of the street you grew up on?" },
+  { "id": 9,  "questionText": "What was the name of the company where you had your first job?" },
+  { "id": 10, "questionText": "What is the name of your favourite teacher?" }
 ]
 ```
+Questions are fixed by us (no screen edits them). A question someone has answered never changes its text and is never
+deleted, so a saved answer always matches the question shown later in "forgot password". A question may be retired: it
+disappears from this list, but users who chose it keep it.
 
 Save (logged in): `PUT /api/securityquestions/mine`
 ```json
@@ -281,7 +289,10 @@ Until this is saved, every other API (except `GET /api/auth/me` and logout) answ
   "detail": "Choose a security question and answer (PUT /api/securityquestions/mine) before continuing." }
 ```
 
-- One question per user. The answer is case-insensitive and needs at least 2 characters.
+- One question per user. The answer needs at least 2 characters (spaces do not count).
+- **How the answer is matched later:** upper/lower case and **all spaces are ignored** — `New Delhi` = `newdelhi` =
+  `  NEW  DELHI `. Spelling and punctuation must match — `Jaipur` ≠ `Jaypur`, `St. Mary's` ≠ `St Marys`. A hint under the
+  answer box helps: "Spaces and capital letters do not matter; spelling and punctuation do."
 - The same `PUT` changes the question later (profile screen).
 - Users who already have a question, or when security questions are switched off (`SECURITY_QUESTION_ENABLED = 0`), never see this step.
 - Errors: `401 INVALID_CREDENTIALS` (wrong password), `404 NOT_FOUND` (question id), `400` (answer too short).
@@ -748,7 +759,7 @@ Rules: lengths 1–128 and max ≥ min; history 0–50; expiry days ≥ 1 when e
 // 1. 200
 { "requestToken": "vcwRKOOhuVLLM4zii2ccGnyf-0pSg_Sz1WiDYDOvk2E", "questionText": "What is the name of your first school?", "expiresAt": "2026-10-08T13:34:58.0216149" }
 
-// 2. request (answer is not case-sensitive)
+// 2. request (case and spaces are ignored: "jaipur", "JAI PUR" and "Jaipur" all match)
 { "requestToken": "vcwRKOOhuVLLM4zii2ccGnyf-0pSg_Sz1WiDYDOvk2E", "answer": "jaipur" }
 // 2. 200
 { "message": "Answer verified. Set a new password before 2026-10-08 13:34." }

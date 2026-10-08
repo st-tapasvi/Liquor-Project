@@ -240,7 +240,9 @@ was already over.
 
 ### 4.2 Security question
 
-Each user has **one** security question. They use it to reset a forgotten password.
+Each user has **one** security question. They use it to reset a forgotten password. There are 10 questions
+(`db/mysql/014`). A question that any user has answered can never change its text (database trigger) or be deleted
+(foreign key); it can only be retired (`STATUS = 0`), and users who chose it keep it.
 
 #### 7. `GET /api/securityquestions` 🌐
 The list of questions to pick from: `[ { "id": 1, "questionText": "What is the name of your first school?" }, … ]`
@@ -254,8 +256,9 @@ check.
 ```
 Response: `200` → `{ "message": "Security question saved: \"What was the name of your first pet?\"" }`.
 - Picking a different question replaces the old one.
-- The answer ignores upper/lower case and extra spaces: `"  tommy "` and `"Tommy"` count as the
-  same answer.
+- The answer ignores upper/lower case and **all** spaces: `"New Delhi"`, `"newdelhi"` and `"  NEW  DELHI "` count as the
+  same answer. Spelling and punctuation still count (`"St. Mary's"` ≠ `"St Marys"`). At least 2 characters, not
+  counting spaces.
 - A wrong `currentPassword` gives `401 INVALID_CREDENTIALS` and counts as a failed login.
 - An unknown or disabled `questionId` gives `404`.
 

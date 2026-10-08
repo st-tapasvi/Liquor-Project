@@ -12,7 +12,7 @@ namespace ST.LiquorTNT.Business.Tests.Auth;
 
 public sealed class PasswordResetServiceTests
 {
-    private const string Answer = "New Delhi";           // stored normalised: FakePasswordHasher -> "H:new delhi"
+    private const string Answer = "New Delhi";           // stored normalised: FakePasswordHasher -> "H:newdelhi"
 
     private readonly FakeSecurityQuestionRepository _questions = new();
     private readonly FakeUserRepository _users = new();
@@ -246,6 +246,8 @@ public sealed class PasswordResetServiceTests
     [InlineData("New Delhi")]
     [InlineData("new delhi")]
     [InlineData("  NEW   DELHI ")]
+    [InlineData("newdelhi")]       // no space at all
+    [InlineData("NewDelhi")]
     [InlineData("new\tdelhi")]
     [InlineData("new delhi")]     // non-breaking space
     public async Task Verify_CorrectAnswer_IgnoresCaseAndAnyWhitespace_MarksVerified(string answer)
