@@ -26,10 +26,9 @@ export interface UserListParams {
   pageSize?: number;
 }
 
-/** A role given to a user for one supplier code, or for every supplier code of the company when null. */
+/** A role given to a user. The supplier code comes from the role (null on the role = every supplier code). */
 export interface UserRoleAssignment {
   roleId: number;
-  supplierCodeId: number | null;
 }
 
 /** A custom right given to a user for one supplier code, or for every supplier code when null. */
@@ -62,6 +61,7 @@ export interface UpdateUserRequest {
 export interface UserRoleResponse {
   roleId: number;
   roleName: string;
+  displayName: string;
   supplierCodeId: number | null;
   /** "RJ CL 550", or "All supplier codes" when the role covers the whole company. */
   supplierCodeName: string;

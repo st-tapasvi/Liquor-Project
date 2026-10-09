@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
-import type { CreateUserRequest, UpdateUserRequest, UserResponse } from '@/core/api';
+import type { CreateUserRequest, UpdateUserRequest, UpdateUserRolesRequest, UserResponse } from '@/core/api';
 import { useCompanyScope } from '@/core/auth';
 
 import { useSnackbar } from '@/shared/hooks';
@@ -49,6 +49,20 @@ export function useUpdateUser(id: number) {
       silent: true,
     },
   );
+}
+
+export function useUpdateUserRoles(id: number) {
+  const qc = useQueryClient();
+  const snackbar = useSnackbar();
+  const scope = useCompanyScope();
+  return useMutation({
+    mutationKey: ['users', 'roles'],
+    mutationFn: (request: UpdateUserRolesRequest) => usersApi.updateRoles(id, request),
+    onSuccess: (access) => {
+      qc.setQueryData(userKeys.access(scope, id), access);
+      snackbar.success(`Roles of ${access.userName} saved.`);
+    },
+  });
 }
 
 export function useDeleteUser() {

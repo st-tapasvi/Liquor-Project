@@ -1,9 +1,9 @@
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import Button from '@mui/material/Button';
+import { useState } from 'react';
 import { Link as RouterLink, useMatch, useNavigate, useParams } from 'react-router';
 
-import { Can, usePermission } from '@/core/auth';
+import { Can, useCurrentUser, usePermission } from '@/core/auth';
 import { PATHS } from '@/core/router';
 
 import { ErrorState, LoadingOverlay } from '@/shared/components/feedback';
@@ -15,6 +15,7 @@ import { useUser } from '../api/users.queries';
 import { userStatus } from '../components/user-status';
 import { UserForm } from '../components/UserForm';
 import { UserRolesSection } from '../components/UserRolesSection';
+import { type UserTab, UserTabPanel, UserTabs } from '../components/UserTabs';
 import { fromUser, toCreateRequest, toUpdateRequest } from '../users.schema';
 
 /** Serves /users/new, /users/:id (read-only view) and /users/:id/edit. */
@@ -53,6 +54,9 @@ function CreateView({ onDone }: { onDone: () => void }) {
 function EditView({ userId, readOnly, onDone }: { userId: number; readOnly: boolean; onDone: () => void }) {
   const user = useUser(userId);
   const update = useUpdateUser(userId);
+  const me = useCurrentUser();
+  const canAssignRoles = usePermission('user.access');
+  const [tab, setTab] = useState<UserTab>('details');
 
   if (user.isPending) return <LoadingOverlay />;
   if (user.isError) return <ErrorState error={user.error} onRetry={() => void user.refetch()} />;
@@ -64,44 +68,46 @@ function EditView({ userId, readOnly, onDone }: { userId: number; readOnly: bool
       <PageHeader
         title={user.data.userName}
         subtitle={user.data.fullName ?? undefined}
+        status={<StatusChip label={status.label} tone={status.tone} />}
         actions={
-          <>
-            <StatusChip label={status.label} tone={status.tone} />
-            {readOnly && (
-              <>
-                <Button component={RouterLink} to={PATHS.users.list} startIcon={<ArrowBackIcon />}>
-                  Back
-                </Button>
-                <Can right="user.edit">
-                  <Button
-                    component={RouterLink}
-                    to={PATHS.users.edit(userId)}
-                    variant="contained"
-                    startIcon={<EditOutlinedIcon />}
-                  >
-                    Edit
-                  </Button>
-                </Can>
-              </>
-            )}
-          </>
+          readOnly && (
+            <Can right="user.edit">
+              <Button
+                component={RouterLink}
+                to={PATHS.users.edit(userId)}
+                variant="contained"
+                startIcon={<EditOutlinedIcon />}
+              >
+                Edit
+              </Button>
+            </Can>
+          )
         }
       />
-      <Section>
-        <UserForm
-          mode="edit"
-          key={user.data.id}
-          readOnly={readOnly}
-          defaultValues={fromUser(user.data)}
-          busy={update.isPending}
-          onCancel={onDone}
-          onSubmit={async (values) => {
-            await update.mutateAsync(toUpdateRequest(values));
-            onDone();
-          }}
+      <UserTabs value={tab} onChange={setTab} />
+      <UserTabPanel tab="details" value={tab}>
+        <Section>
+          <UserForm
+            mode="edit"
+            key={user.data.id}
+            readOnly={readOnly}
+            defaultValues={fromUser(user.data)}
+            busy={update.isPending}
+            onCancel={onDone}
+            onSubmit={async (values) => {
+              await update.mutateAsync(toUpdateRequest(values));
+              onDone();
+            }}
+          />
+        </Section>
+      </UserTabPanel>
+      <UserTabPanel tab="roles" value={tab}>
+        <UserRolesSection
+          userId={userId}
+          companyId={user.data.companyId}
+          editable={!readOnly && canAssignRoles && userId !== me.userId}
         />
-      </Section>
-      <UserRolesSection userId={userId} />
+      </UserTabPanel>
     </>
   );
 }

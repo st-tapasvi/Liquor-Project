@@ -77,7 +77,10 @@ export interface SaveLiquorCategoryRequest {
 export interface RoleResponse {
   id: number;
   companyId: number | null;
+  supplierCodeId: number | null;
+  supplierCodeName: string | null;
   roleName: string;
+  displayName: string;
   description: string | null;
   isSystem: boolean;
   isTemplate: boolean;

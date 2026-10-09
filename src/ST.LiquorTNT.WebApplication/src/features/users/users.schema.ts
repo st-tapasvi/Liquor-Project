@@ -23,9 +23,7 @@ export const createUserSchema = z.object({
     .regex(/^[A-Za-z0-9._@-]+$/, 'Only letters, digits and . _ @ - are allowed.'),
   password: z.string().min(6, 'At least 6 characters.').max(128),
   companyId: z.number().int().positive().nullable(),
-  roleId: z.number({ error: 'Role is required.' }).int().positive('Role is required.'),
-  /** null = the role applies to every supplier code of the company. */
-  supplierCodeId: z.number().int().positive().nullable(),
+  roleIds: z.array(z.number().int().positive()).min(1, 'Select at least one role.'),
   forcePasswordChange: z.boolean(),
 });
 export type CreateUserFormValues = z.infer<typeof createUserSchema>;
@@ -38,7 +36,7 @@ export function toCreateRequest(values: CreateUserFormValues): CreateUserRequest
     userName: values.userName,
     password: values.password,
     companyId: values.companyId,
-    roles: [{ roleId: values.roleId, supplierCodeId: values.supplierCodeId }],
+    roles: values.roleIds.map((roleId) => ({ roleId })),
     fullName: emptyToNull(values.fullName),
     email: emptyToNull(values.email),
     phone: emptyToNull(values.phone),
