@@ -5,9 +5,10 @@ using ST.LiquorTNT.Contracts.SupplierCodes;
 namespace ST.LiquorTNT.Infrastructure.Database.Repositories;
 
 /// <summary>
-/// Reads effective rights. A role or custom right with SUPPLIER_CODE_ID null counts for every supplier code of the
-/// user's OWN company only - the company check is repeated here, so a bad row can never leak rights into
-/// another company's supplier code.
+/// Reads effective rights. A role works in its own supplier code (ROLES.SUPPLIER_CODE_ID); a company-level role
+/// (SUPPLIER_CODE_ID null) and a custom right with SUPPLIER_CODE_ID null count for every supplier code of the user's
+/// OWN company only - the company check is repeated here, so a bad row can never leak rights into another
+/// company's supplier code.
 /// </summary>
 public sealed class AccessRepository : IAccessRepository
 {
@@ -37,7 +38,7 @@ public sealed class AccessRepository : IAccessRepository
             join pa in _db.PAGE_ACTIONS on rr.PageActionId equals pa.Id
             where ur.UserId == userId
                   && r.IsActive && pa.IsActive
-                  && (ur.SupplierCodeId == supplierCodeId || (allSupplierCodesCount && ur.SupplierCodeId == null))
+                  && (r.SupplierCodeId == supplierCodeId || (allSupplierCodesCount && r.SupplierCodeId == null))
             select pa.PermissionKey;
 
         // custom rights
@@ -59,15 +60,19 @@ public sealed class AccessRepository : IAccessRepository
     {
         var userCompany = await _db.USERS.Where(u => u.Id == userId).Select(u => u.CompanyId).FirstOrDefaultAsync(ct);
 
-        // Supplier codes named explicitly on a role or right ...
-        var namedByRole = _db.USER_ROLES.Where(r => r.UserId == userId && r.SupplierCodeId != null).Select(r => r.SupplierCodeId!.Value);
+        // Supplier codes of the user's roles and custom rights ...
+        var namedByRole =
+            from ur in _db.USER_ROLES
+            join r in _db.ROLES on ur.RoleId equals r.Id
+            where ur.UserId == userId && r.IsActive && r.SupplierCodeId != null
+            select r.SupplierCodeId!.Value;
         var namedByRight = _db.USER_RIGHTS.Where(r => r.UserId == userId && r.SupplierCodeId != null).Select(r => r.SupplierCodeId!.Value);
 
-        // ... plus every supplier code of the company when some role or right is for "all supplier codes".
+        // ... plus every supplier code of the company when some role is company-level or some right is for "all supplier codes".
         var coversAll =
             await (from ur in _db.USER_ROLES
                    join r in _db.ROLES on ur.RoleId equals r.Id
-                   where ur.UserId == userId && ur.SupplierCodeId == null && r.IsActive && !r.IsSystem
+                   where ur.UserId == userId && r.SupplierCodeId == null && r.IsActive && !r.IsSystem
                    select ur.Id).AnyAsync(ct)
             || await _db.USER_RIGHTS.AnyAsync(r => r.UserId == userId && r.SupplierCodeId == null, ct);
 

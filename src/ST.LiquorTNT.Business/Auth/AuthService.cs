@@ -32,6 +32,7 @@ public sealed class AuthService : IAuthService
     private readonly IRequestContext _request;
     private readonly IUserLogWriter _log;
     private readonly SupplierCodeDirectory _supplierCodes;
+    private readonly ISecurityQuestionRepository _questions;
     private readonly IValidator<LoginRequest> _loginValidator;
     private readonly IValidator<ChangePasswordRequest> _changePasswordValidator;
 
@@ -49,6 +50,7 @@ public sealed class AuthService : IAuthService
         IRequestContext request,
         IUserLogWriter log,
         SupplierCodeDirectory supplierCodes,
+        ISecurityQuestionRepository questions,
         IValidator<LoginRequest> loginValidator,
         IValidator<ChangePasswordRequest> changePasswordValidator)
     {
@@ -65,6 +67,7 @@ public sealed class AuthService : IAuthService
         _request = request;
         _log = log;
         _supplierCodes = supplierCodes;
+        _questions = questions;
         _loginValidator = loginValidator;
         _changePasswordValidator = changePasswordValidator;
     }
@@ -108,13 +111,16 @@ public sealed class AuthService : IAuthService
         var session = USER_SESSION.Create(user.Id, _tokenHasher.Hash(token), now, settings.SessionIdleMinutes, expiresAt,
             _request.IpAddress, _request.UserAgent);
 
-        // The supplier codes this user may work in. Exactly one → picked straight away, so the user can start working;
-        // more than one → the screen shows a picker (POST /api/auth/selectsuppliercode).
+        // The supplier codes this user may work in. Nothing is picked here, even when there is only one: after every
+        // login each user goes to the supplier code screen and picks one (POST /api/auth/selectsuppliercode).
         var supplierCodes = await _supplierCodes.ForUserAsync(user.Id, ct);
-        var activeSupplierCode = supplierCodes.Count == 1 ? supplierCodes[0] : null;
-        if (activeSupplierCode is not null)
+
+        // No security question yet (first login after the password change): the session is held on the
+        // security-question screen until one is set, so "forgot password" always has a question to ask.
+        var securityQuestionRequired = await NeedsSecurityQuestionAsync(user.Id, settings, ct);
+        if (securityQuestionRequired)
         {
-            session.SelectSupplierCode(activeSupplierCode.Id);
+            session.RequireSecurityQuestion();
         }
 
         await _sessions.AddAsync(session, ct);
@@ -134,9 +140,9 @@ public sealed class AuthService : IAuthService
             AccessToken = token,
             ExpiresAt = expiresAt,
             IdleTimeoutMinutes = settings.SessionIdleMinutes,
-            User = ToCurrentUser(user),
+            User = ToCurrentUser(user, securityQuestionRequired),
             SupplierCodes = supplierCodes,
-            ActiveSupplierCode = activeSupplierCode,
+            ActiveSupplierCode = null,
         };
     }
 
@@ -168,7 +174,8 @@ public sealed class AuthService : IAuthService
                      ?? throw new UnauthorizedException(ErrorCodes.SessionInvalid, "Not authenticated.");
 
         var user = await _users.GetByIdAsync(userId, ct) ?? throw new NotFoundException("User");
-        return ToCurrentUser(user);
+        var settings = await _config.GetAsync(ct);
+        return ToCurrentUser(user, await NeedsSecurityQuestionAsync(user.Id, settings, ct));
     }
 
     public async Task<MessageResponse> ChangePasswordAsync(ChangePasswordRequest request, CancellationToken ct)
@@ -197,7 +204,21 @@ public sealed class AuthService : IAuthService
         return MessageResponse.Of("Password changed. All sessions have been ended; log in with the new password.");
     }
 
-    private static CurrentUserResponse ToCurrentUser(USERS user) => new()
+    /// <summary>
+    /// True when security questions are switched on (SECURITY_QUESTION_ENABLED), the master list has at least one
+    /// active question to choose from, and the user has not chosen one yet.
+    /// </summary>
+    private async Task<bool> NeedsSecurityQuestionAsync(int userId, SecuritySettings settings, CancellationToken ct)
+    {
+        if (!settings.SecurityQuestionEnabled || await _questions.GetActiveForUserAsync(userId, ct) is not null)
+        {
+            return false;
+        }
+
+        return (await _questions.GetActiveQuestionsAsync(ct)).Count > 0;
+    }
+
+    private static CurrentUserResponse ToCurrentUser(USERS user, bool securityQuestionRequired) => new()
     {
         UserId = user.Id,
         UserName = user.UserName,
@@ -205,5 +226,6 @@ public sealed class AuthService : IAuthService
         CompanyId = user.CompanyId,
         ForcePasswordChange = user.ForcePasswordChange,
         PasswordExpiresAt = user.PasswordExpiresAt,
+        SecurityQuestionRequired = securityQuestionRequired,
     };
 }

@@ -68,7 +68,7 @@ public sealed class UserAccessRules
         int? companyId, IReadOnlyCollection<UserRoleAssignment> requested, CancellationToken ct)
     {
         var assignments = requested
-            .GroupBy(a => (a.RoleId, a.SupplierCodeId))
+            .GroupBy(a => a.RoleId)
             .Select(g => g.First())
             .ToList();
 
@@ -88,14 +88,14 @@ public sealed class UserAccessRules
             {
                 if (!isSuperAdmin)
                 {
-                    throw new ForbiddenException(ErrorCodes.AdminUserProtected, "Only Super Admin can give the Super Admin role.");
+                    throw new ForbiddenException(ErrorCodes.AdminUserProtected, "Only an Admin can give the Admin role.");
                 }
 
-                if (assignment.SupplierCodeId is not null || companyId is not null)
+                if (companyId is not null)
                 {
                     throw new ValidationException(new Dictionary<string, string[]>
                     {
-                        ["roles"] = new[] { "Super Admin works across every company: give it with an empty supplierCodeId, to a user without a company." },
+                        ["roles"] = new[] { "The Admin role works across every company: give it only to a user without a company." },
                     });
                 }
 
@@ -113,7 +113,9 @@ public sealed class UserAccessRules
             }
         }
 
-        await EnsureSupplierCodesBelongToAsync(companyId, assignments.Select(a => a.SupplierCodeId), ct);
+        // A role of a supplier code that was deactivated meanwhile cannot be given any more.
+        await EnsureSupplierCodesBelongToAsync(companyId,
+            assignments.Select(a => roles[a.RoleId].SupplierCodeId).Where(id => id is not null), ct);
         return assignments;
     }
 
@@ -153,7 +155,7 @@ public sealed class UserAccessRules
         if (system.Count > 0)
         {
             throw new ForbiddenException(ErrorCodes.RightNotGrantable, "These rights cannot be given to a user.",
-                $"{string.Join(", ", system)} belong to Super Admin only.");
+                $"{string.Join(", ", system)} belong to the Admin role only.");
         }
 
         var admin = changedIds.Where(id => actions.TryGetValue(id, out var a) && a.GrantScope == GrantScope.ADMIN)

@@ -3,7 +3,9 @@ using ST.LiquorTNT.Business.Common;
 using ST.LiquorTNT.Business.Common.Exceptions;
 using ST.LiquorTNT.Business.Roles;
 using ST.LiquorTNT.Contracts.Roles;
+using ST.LiquorTNT.Contracts.SupplierCodes;
 using ST.LiquorTNT.Domain.Entities;
+using ST.LiquorTNT.Domain.Rules;
 
 namespace ST.LiquorTNT.Infrastructure.Database.Repositories;
 
@@ -16,31 +18,43 @@ public sealed class RoleRepository : IRoleRepository
     public Task<ROLES?> GetByIdAsync(int id, CancellationToken ct) =>
         _db.ROLES.FirstOrDefaultAsync(r => r.Id == id, ct);
 
-    public async Task<IReadOnlyList<RoleResponse>> GetListAsync(int? companyId, CancellationToken ct) =>
-        await (from r in _db.ROLES.AsNoTracking()
-               where r.CompanyId == companyId           // EF turns this into IS NULL when companyId is null
-               join link in _db.ROLE_PASSWORD_POLICY on r.Id equals link.RoleId into links
-               from link in links.DefaultIfEmpty()
-               orderby r.IsSystem descending, r.RoleName
-               select new RoleResponse
-               {
-                   Id = r.Id,
-                   CompanyId = r.CompanyId,
-                   RoleName = r.RoleName,
-                   Description = r.Description,
-                   IsSystem = r.IsSystem,
-                   IsTemplate = r.IsTemplate,
-                   IsAdminRole = r.IsAdminRole,
-                   IsActive = r.IsActive,
-                   PasswordPolicyId = link == null ? null : link.PasswordPolicyId,
-               })
-            .ToListAsync(ct);
+    public async Task<IReadOnlyList<RoleResponse>> GetListAsync(int? companyId, int? supplierCodeId, CancellationToken ct)
+    {
+        var roles = _db.ROLES.AsNoTracking()
+            .Where(r => r.CompanyId == companyId);                // EF turns this into IS NULL when companyId is null
 
-    public Task<bool> NameExistsAsync(int? companyId, string roleName, int? excludeRoleId, CancellationToken ct) =>
-        _db.ROLES.AnyAsync(r => r.CompanyId == companyId && r.RoleName == roleName && r.Id != excludeRoleId, ct);
+        if (supplierCodeId is not null)
+        {
+            roles = roles.Where(r => r.SupplierCodeId == supplierCodeId || r.SupplierCodeId == null);
+        }
 
-    public Task<bool> CompanyHasRolesAsync(int companyId, CancellationToken ct) =>
-        _db.ROLES.AnyAsync(r => r.CompanyId == companyId, ct);
+        var list = await ProjectAsync(roles, ct);
+
+        // company-level first (Super Admin on top), then grouped by supplier code as the picker orders them, then by name
+        return list
+            .OrderByDescending(r => r.IsSystem)
+            .ThenBy(r => r.SupplierCodeId is null ? 0 : 1)
+            .ThenBy(r => r.SupplierCodeName)
+            .ThenBy(r => r.RoleName)
+            .ToList();
+    }
+
+    public async Task<RoleResponse?> GetResponseAsync(int roleId, CancellationToken ct) =>
+        (await ProjectAsync(_db.ROLES.AsNoTracking().Where(r => r.Id == roleId), ct)).FirstOrDefault();
+
+    public Task<bool> NameExistsAsync(int? companyId, int? supplierCodeId, string roleName, int? excludeRoleId, CancellationToken ct) =>
+        _db.ROLES.AnyAsync(r => r.CompanyId == companyId && r.SupplierCodeId == supplierCodeId
+                                && r.RoleName == roleName && r.Id != excludeRoleId, ct);
+
+    public Task<bool> CompanyHasCompanyRolesAsync(int companyId, CancellationToken ct) =>
+        _db.ROLES.AnyAsync(r => r.CompanyId == companyId && r.SupplierCodeId == null, ct);
+
+    public Task<bool> SupplierCodeHasRolesAsync(int supplierCodeId, CancellationToken ct) =>
+        _db.ROLES.AnyAsync(r => r.SupplierCodeId == supplierCodeId, ct);
+
+    public async Task<SupplierCodeResponse?> GetSupplierCodeAsync(int supplierCodeId, CancellationToken ct) =>
+        (await SupplierCodeQuery.ToResponsesAsync(_db, _db.SUPPLIER_CODE.Where(s => s.Id == supplierCodeId && s.IsActive), ct))
+        .FirstOrDefault();
 
     public async Task<IReadOnlyList<ROLES>> GetTemplatesAsync(CancellationToken ct) =>
         await _db.ROLES.AsNoTracking().Where(r => r.IsTemplate && r.IsActive).OrderBy(r => r.Id).ToListAsync(ct);
@@ -66,7 +80,9 @@ public sealed class RoleRepository : IRoleRepository
 
     public async Task<IReadOnlyList<PageResponse>> GetPagesAsync(CancellationToken ct)
     {
-        var pages = await _db.PAGES.AsNoTracking().Where(p => p.IsActive).OrderBy(p => p.SortOrder).ThenBy(p => p.PageName).ToListAsync(ct);
+        var pages = await _db.PAGES.AsNoTracking().Where(p => p.IsActive)
+            .OrderBy(p => p.ApplicationType == ApplicationType.WEB ? 0 : 1)       // web application first, then line
+            .ThenBy(p => p.SortOrder).ThenBy(p => p.PageName).ToListAsync(ct);
         var actions = await _db.PAGE_ACTIONS.AsNoTracking().Where(a => a.IsActive).OrderBy(a => a.SortOrder).ToListAsync(ct);
         var byPage = actions.ToLookup(a => a.PageId);
 
@@ -76,7 +92,8 @@ public sealed class RoleRepository : IRoleRepository
             PageKey = p.PageKey ?? string.Empty,
             PageName = p.PageName,
             ModuleName = p.ModuleName,
-            Actions = byPage[p.Id].Select(a => new PageActionResponse
+            ApplicationType = p.ApplicationType.ToString(),
+            Actions =byPage[p.Id].Select(a => new PageActionResponse
             {
                 PageActionId = a.Id,
                 ActionKey = a.ActionKey,
@@ -106,6 +123,43 @@ public sealed class RoleRepository : IRoleRepository
         _db.ROLE_PASSWORD_POLICY.RemoveRange(await _db.ROLE_PASSWORD_POLICY.Where(l => l.RoleId == role.Id).ToListAsync(ct));
         _db.ROLE_RIGHTS.RemoveRange(await _db.ROLE_RIGHTS.Where(r => r.RoleId == role.Id).ToListAsync(ct));
         _db.ROLES.Remove(role);
+    }
+
+    /// <summary>Roles with their password policy and the name of their supplier code ("Operator RJ CL 772").</summary>
+    private async Task<List<RoleResponse>> ProjectAsync(IQueryable<ROLES> roles, CancellationToken ct)
+    {
+        var rows = await (from r in roles
+                          join link in _db.ROLE_PASSWORD_POLICY on r.Id equals link.RoleId into links
+                          from link in links.DefaultIfEmpty()
+                          select new RoleResponse
+                          {
+                              Id = r.Id,
+                              CompanyId = r.CompanyId,
+                              SupplierCodeId = r.SupplierCodeId,
+                              RoleName = r.RoleName,
+                              Description = r.Description,
+                              IsSystem = r.IsSystem,
+                              IsTemplate = r.IsTemplate,
+                              PerSupplierCode = r.PerSupplierCode,
+                              IsAdminRole = r.IsAdminRole,
+                              IsActive = r.IsActive,
+                              PasswordPolicyId = link == null ? null : link.PasswordPolicyId,
+                          })
+                         .ToListAsync(ct);
+
+        var ids = rows.Where(r => r.SupplierCodeId != null).Select(r => r.SupplierCodeId!.Value).Distinct().ToList();
+        var names = ids.Count == 0
+            ? new Dictionary<int, string>()
+            : (await SupplierCodeQuery.ToResponsesAsync(_db, _db.SUPPLIER_CODE.Where(s => ids.Contains(s.Id)), ct))
+                .ToDictionary(s => s.Id, s => s.DisplayName);
+
+        foreach (var row in rows)
+        {
+            row.SupplierCodeName = row.SupplierCodeId is int id ? names.GetValueOrDefault(id) : null;
+            row.DisplayName = RoleNames.Display(row.RoleName, row.SupplierCodeName);
+        }
+
+        return rows;
     }
 
     public async Task SaveChangesAsync(CancellationToken ct)

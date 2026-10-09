@@ -15,8 +15,9 @@ public sealed class PagesController : ControllerBase
 
     public PagesController(IRoleService roles) => _roles = roles;
 
+    /// <summary>Every page with its actions. <c>?applicationType=WEB</c> or <c>LINE</c> → only that application's pages.</summary>
     [HttpGet]
     [HasPermission(Permissions.RoleView)]
-    public async Task<ActionResult<IReadOnlyList<PageResponse>>> GetAsync(CancellationToken ct)
-        => Ok(await _roles.GetPagesAsync(ct));
+    public async Task<ActionResult<IReadOnlyList<PageResponse>>> GetAsync([FromQuery] string? applicationType, CancellationToken ct)
+        => Ok(await _roles.GetPagesAsync(applicationType, ct));
 }

@@ -15,8 +15,8 @@ namespace ST.LiquorTNT.Business.SupplierCodes;
 /// Supplier codes of the companies. Company users may view their own company's supplier codes; creating
 /// and editing is Super Admin's job (SYSTEM-scope rights), because supplier codes come from the CRM.
 /// <para>
-/// When a company gets its FIRST supplier code, its default roles are copied from the templates
-/// (<see cref="RoleTemplates"/>), so the company can start creating users straight away.
+/// Every new supplier code gets its default roles ("Operator RJ CL 772" ...), and a new company its company-level ones,
+/// copied from the templates (<see cref="RoleTemplates"/>), so users can be created for it straight away.
 /// </para>
 /// </summary>
 public sealed class SupplierCodeService : ISupplierCodeService
@@ -93,13 +93,13 @@ public sealed class SupplierCodeService : ISupplierCodeService
         await _supplierCodes.AddAsync(supplierCode, ct);
         await _supplierCodes.SaveChangesAsync(ct);
 
-        // First supplier code of a new company: give it the default roles (no-op when it already has roles).
-        var copiedRoles = await _templates.CopyIntoCompanyAsync(supplierCode.CompanyId, ct);
+        // Default roles for the new supplier code ("Operator RJ CL 772" ...), plus the company-level ones for a new company.
+        var copiedRoles = await _templates.CopyForSupplierCodeAsync(supplierCode.CompanyId, supplierCode.Id, ct);
 
         var response = (await _supplierCodes.GetResponseAsync(supplierCode.Id, ct))!;
         await _log.WriteAsync(UserLogEntry.Success(UserLogActions.MasterCreated, UserLogModules.Masters, EntityName,
             supplierCode.Id.ToString(),
-            $"Supplier code '{response.DisplayName}' created" + (copiedRoles > 0 ? $"; {copiedRoles} default roles copied into the company." : "."),
+            $"Supplier code '{response.DisplayName}' created" + (copiedRoles > 0 ? $"; {copiedRoles} default roles created for it." : "."),
             newValue: response), ct);
         await _supplierCodes.SaveChangesAsync(ct);
 

@@ -10,7 +10,7 @@ public sealed class SetSecurityQuestionRequestValidator : AbstractValidator<SetS
         RuleFor(x => x.QuestionId).GreaterThan(0);
         RuleFor(x => x.Answer).MaximumLength(100)
             .Must(a => SecurityAnswers.Normalize(a ?? string.Empty).Length >= 2)
-            .WithMessage("Answer must have at least 2 characters.");
+            .WithMessage("Answer must have at least 2 characters (spaces do not count).");
         RuleFor(x => x.CurrentPassword).NotEmpty().MaximumLength(128);
     }
 }

@@ -43,6 +43,7 @@ public sealed class AuthController : ControllerBase
 
     [HttpPost("logout")]
     [Authorize]
+    [AllowWithoutSecurityQuestion]
     public async Task<ActionResult<MessageResponse>> LogoutAsync(CancellationToken ct)
     {
         var response = await _auth.LogoutAsync(ct);
@@ -53,6 +54,7 @@ public sealed class AuthController : ControllerBase
 
     [HttpGet("me")]
     [Authorize]
+    [AllowWithoutSecurityQuestion]
     public async Task<ActionResult<CurrentUserResponse>> MeAsync(CancellationToken ct)
         => Ok(await _auth.GetCurrentUserAsync(ct));
 

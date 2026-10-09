@@ -17,7 +17,7 @@ path starts with `/api/`. Swagger (try-it-out page): `https://localhost:7180/swa
 |---|---|
 | 🌐 **Public** | No login needed. |
 | 🔑 **Logged in** | Desktop / scripts / Swagger: header `Authorization: Bearer <accessToken>`. Web app: nothing by hand - login also set the HttpOnly `jwt` cookie, which the browser sends on its own; on POST/PUT/DELETE axios adds `X-XSRF-TOKEN` from the readable `XSRF-TOKEN` cookie. The header wins when both are present. |
-| 🛡️ **Right** | Logged in **and** the user holds the named permission key (e.g. `user.add`) in the selected supplier code, through a role or a custom right. Super Admin holds every key. See `06-roles-rights-plan.md`. |
+| 🛡️ **Right** | Logged in **and** the user holds the named permission key (e.g. `user.add`) in the selected supplier code, through a role or a custom right. Admin holds every key. See `06-roles-rights-plan.md`. |
 
 **The token.** Login gives you an `accessToken`. The server also keeps a record of it (a "session").
 A session ends in one of three ways, and each one needs a different screen:
@@ -179,7 +179,7 @@ Checks the user name and password. On success it opens a session and returns a t
   "user": { "userId": 1, "userName": "admin", "fullName": "Administrator",
             "companyId": null, "forcePasswordChange": false, "passwordExpiresAt": null },
   "supplierCodes": [ { "id": 3, "exciseCode": "RJ", "supplierCode": "550", "liquorCategoryCode": "CL", "displayName": "RJ CL 550", … } ],
-  "activeSupplierCode": { "id": 3, … }  // set when there is exactly one supplier code; else null → show a picker (POST /api/auth/selectsuppliercode)
+  "activeSupplierCode": null           // always null: after every login the user picks a supplier code (POST /api/auth/selectsuppliercode)
 }
 ```
 
@@ -240,7 +240,9 @@ was already over.
 
 ### 4.2 Security question
 
-Each user has **one** security question. They use it to reset a forgotten password.
+Each user has **one** security question. They use it to reset a forgotten password. There are 10 questions
+(`db/mysql/014`). A question that any user has answered can never change its text (database trigger) or be deleted
+(foreign key); it can only be retired (`STATUS = 0`), and users who chose it keep it.
 
 #### 7. `GET /api/securityquestions` 🌐
 The list of questions to pick from: `[ { "id": 1, "questionText": "What is the name of your first school?" }, … ]`
@@ -254,8 +256,9 @@ check.
 ```
 Response: `200` → `{ "message": "Security question saved: \"What was the name of your first pet?\"" }`.
 - Picking a different question replaces the old one.
-- The answer ignores upper/lower case and extra spaces: `"  tommy "` and `"Tommy"` count as the
-  same answer.
+- The answer ignores upper/lower case and **all** spaces: `"New Delhi"`, `"newdelhi"` and `"  NEW  DELHI "` count as the
+  same answer. Spelling and punctuation still count (`"St. Mary's"` ≠ `"St Marys"`). At least 2 characters, not
+  counting spaces.
 - A wrong `currentPassword` gives `401 INVALID_CREDENTIALS` and counts as a failed login.
 - An unknown or disabled `questionId` gives `404`.
 
@@ -320,7 +323,7 @@ Response: `201` with the new user (shape in #14).
   **cannot be changed later**.
 - `roles`: at least one. Each role is for one supplier code (`supplierCodeId`) or for every supplier code of the company (`null`).
   The roles and supplier codes must belong to the caller's company; giving an admin role (Plant Admin) needs `user.manageadmin`.
-- The new user always joins the caller's company. Only Super Admin may send `companyId` (to create the first user of a company).
+- The new user always joins the caller's company. Only Admin may send `companyId` (to create the first user of a company).
 - `password` must follow the password rules of the user's roles (with several roles, the strictest value of each rule).
 - `forcePasswordChange` is `true` by default: the user must set their own password at first login.
 - `fullName`, `email`, `phone`, `employeeCode` are optional.

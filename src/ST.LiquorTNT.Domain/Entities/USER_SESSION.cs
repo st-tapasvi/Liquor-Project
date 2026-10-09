@@ -13,6 +13,10 @@ namespace ST.LiquorTNT.Domain.Entities;
 /// <see cref="ActiveSupplierCodeId"/> is the supplier code the user picked after login (switchable). Rights and data of
 /// every call are scoped to it; it is kept here, on the server, and never taken from the request.
 /// </para>
+/// <para>
+/// <see cref="SecurityQuestionPending"/> is set at login when the user has not chosen a security question yet. While it
+/// is set, the session may only reach the security-question screen (and logout); setting the question clears it.
+/// </para>
 /// </summary>
 public class USER_SESSION
 {
@@ -30,6 +34,7 @@ public class USER_SESSION
     public int Id { get; private set; }
     public int UserId { get; private set; }
     public int? ActiveSupplierCodeId { get; private set; }
+    public bool SecurityQuestionPending { get; private set; }
     public string SessionTokenHash { get; private set; }
     public DateTime LoginAt { get; private set; }
     public DateTime? LastActivityAt { get; private set; }
@@ -91,6 +96,12 @@ public class USER_SESSION
 
     /// <summary>The user picked (or switched to) a supplier code. The caller has already checked the user really holds it.</summary>
     public void SelectSupplierCode(int supplierCodeId) => ActiveSupplierCodeId = supplierCodeId;
+
+    /// <summary>Login found no security question for the user: the session is held on that screen until one is set.</summary>
+    public void RequireSecurityQuestion() => SecurityQuestionPending = true;
+
+    /// <summary>The user has set a security question; the session may now reach every screen.</summary>
+    public void SecurityQuestionSet() => SecurityQuestionPending = false;
 
     public void Logout(DateTime now) => End(StatusLoggedOut, now);
 

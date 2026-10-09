@@ -66,7 +66,14 @@ db/mysql/007_session_sliding.sql          USER_SESSION.ABSOLUTE_EXPIRES_AT, SESS
 db/mysql/008_session_absolute_default.sql default for ABSOLUTE_EXPIRES_AT
 db/mysql/009_roles_rights.sql             roles & rights: SUPPLIER_CODE (supplier codes), LIQUOR_CATEGORY, PAGE_ACTIONS,
                                           company-wise ROLES + templates, ROLE_RIGHTS, USER_ROLES, USER_RIGHTS
-db/mysql/010_company_view.sql            company.view permission (company list for Super Admin)
+db/mysql/010_company_view.sql            company.view permission (company list for Admin)
+db/mysql/011_security_question_first_login.sql  USER_SESSION.SECURITY_QUESTION_PENDING (question set at first login)
+db/mysql/012_supplier_code_roles.sql      master roles per supplier code (ROLES.SUPPLIER_CODE_ID), converts existing data
+db/mysql/013_page_application_type.sql    PAGES.APPLICATION_TYPE (WEB / LINE application)
+db/mysql/014_security_questions.sql       10 security questions; a question in use can never change its text
+db/mysql/015_admin_role_name.sql          the admin user's system role is named "Admin"
+db/mysql/new_install_admin.sql            NEW installations only: admin must change Admin@123 and set a question
+db/mysql/demo_globus_spirits.sql          DEV only: demo company, supplier codes, roles and users
 ```
 
 Seeds use `INSERT IGNORE`, so re-running never overwrites values an administrator has changed.

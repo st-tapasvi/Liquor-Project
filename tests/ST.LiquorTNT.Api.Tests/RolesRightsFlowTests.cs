@@ -41,7 +41,7 @@ public sealed class RolesRightsFlowTests
         {
             var admin = (await LoginOk(client, AdminUser, AdminPassword)).AccessToken;
 
-            // 1. Super Admin creates the company's first supplier code -> default roles are copied into the company
+            // 1. Super Admin creates the company's first supplier code -> company-level roles + this supplier code's roles
             var supplierCode = await Created<SupplierCodeResponse>(await PostJson(client, "/api/suppliercodes", new CreateSupplierCodeRequest
             {
                 CompanyId = companyId, ExciseId = 2, SupplierCode = "E" + tag, LiquorCategoryId = 1,
@@ -50,20 +50,25 @@ public sealed class RolesRightsFlowTests
 
             await PostJson(client, "/api/auth/selectsuppliercode", new SelectSupplierCodeRequest { SupplierCodeId = supplierCode.Id }, admin);
             var roles = await GetWithToken<List<RoleResponse>>(client, "/api/roles", admin);
-            roles.Select(r => r.RoleName).Should().Contain(new[] { "Plant Admin", "Agent Manager", "Plant Manager", "Supervisor", "Operator", "Viewer" });
+            roles.Where(r => r.SupplierCodeId == null).Select(r => r.RoleName).Should().BeEquivalentTo("Plant Admin", "Agent Manager");
+            roles.Where(r => r.SupplierCodeId == supplierCode.Id).Select(r => r.DisplayName).Should().BeEquivalentTo(
+                new[] { "Plant Manager", "Supervisor", "Operator", "Viewer" }.Select(n => $"{n} {supplierCode.DisplayName}"));
             int RoleId(string name) => roles.Single(r => r.RoleName == name).Id;
 
-            // 2. an Agent Manager (all supplier codes) and an Operator (this supplier code)
+            // 2. an Agent Manager (company-level) and the Operator of this supplier code
             var agentName = "e2e_ag_" + tag;
             var operatorName = "e2e_op_" + tag;
-            await CreateCompanyUserAsync(client, admin, agentName, companyId, RoleId("Agent Manager"), null);
-            var operatorUser = await CreateCompanyUserAsync(client, admin, operatorName, companyId, RoleId("Operator"), supplierCode.Id);
+            await CreateCompanyUserAsync(client, admin, agentName, companyId, RoleId("Agent Manager"));
+            var operatorUser = await CreateCompanyUserAsync(client, admin, operatorName, companyId, RoleId("Operator"));
 
-            // the company has one supplier code -> picked automatically at login
+            // even with one supplier code nothing is picked at login: every user picks on the supplier code screen
             var agentLogin = await LoginOk(client, agentName, StrongPassword);
-            agentLogin.ActiveSupplierCode!.Id.Should().Be(supplierCode.Id);
+            agentLogin.SupplierCodes.Select(s => s.Id).Should().Equal(supplierCode.Id);
+            agentLogin.ActiveSupplierCode.Should().BeNull();
             var agent = agentLogin.AccessToken;
             var op = (await LoginOk(client, operatorName, StrongPassword)).AccessToken;
+            await PostJson(client, "/api/auth/selectsuppliercode", new SelectSupplierCodeRequest { SupplierCodeId = supplierCode.Id }, agent);
+            await PostJson(client, "/api/auth/selectsuppliercode", new SelectSupplierCodeRequest { SupplierCodeId = supplierCode.Id }, op);
 
             // 3. the Agent Manager manages users but is no administrator
             (await client.SendAsync(WithToken(HttpMethod.Get, "/api/users", agent))).StatusCode.Should().Be(HttpStatusCode.OK);
@@ -130,16 +135,16 @@ public sealed class RolesRightsFlowTests
             await PostJson(client, "/api/auth/selectsuppliercode", new SelectSupplierCodeRequest { SupplierCodeId = first.Id }, admin);
             var roles = await GetWithToken<List<RoleResponse>>(client, "/api/roles", admin);
 
-            // an Agent Manager for 2 of the company's 3 supplier codes -> the picker offers only those 2, nothing picked yet
+            // the Plant Manager of 2 of the company's 3 supplier codes -> the picker offers only those 2, nothing picked yet
             var agentName = "e2e_ag_" + tag;
-            var agentRole = roles.Single(r => r.RoleName == "Agent Manager").Id;
+            int PlantManagerOf(int supplierCodeId) => roles.Single(r => r.RoleName == "Plant Manager" && r.SupplierCodeId == supplierCodeId).Id;
             await Created<UserResponse>(await PostJson(client, "/api/users", new CreateUserRequest
             {
                 UserName = agentName, Password = StrongPassword, CompanyId = companyId, ForcePasswordChange = false,
                 Roles = new()
                 {
-                    new UserRoleAssignment { RoleId = agentRole, SupplierCodeId = first.Id },
-                    new UserRoleAssignment { RoleId = agentRole, SupplierCodeId = second.Id },
+                    new UserRoleAssignment { RoleId = PlantManagerOf(first.Id) },
+                    new UserRoleAssignment { RoleId = PlantManagerOf(second.Id) },
                 },
             }, admin));
             var login = await LoginOk(client, agentName, StrongPassword);
@@ -164,14 +169,14 @@ public sealed class RolesRightsFlowTests
         }
     }
 
-    private static async Task<UserResponse> CreateCompanyUserAsync(HttpClient client, string adminToken, string userName, int companyId, int roleId, int? supplierCodeId) =>
+    private static async Task<UserResponse> CreateCompanyUserAsync(HttpClient client, string adminToken, string userName, int companyId, int roleId) =>
         await Created<UserResponse>(await PostJson(client, "/api/users", new CreateUserRequest
         {
             UserName = userName,
             Password = StrongPassword,
             CompanyId = companyId,
             ForcePasswordChange = false,
-            Roles = new() { new UserRoleAssignment { RoleId = roleId, SupplierCodeId = supplierCodeId } },
+            Roles = new() { new UserRoleAssignment { RoleId = roleId } },
         }, adminToken));
 
     private static async Task<T> Created<T>(HttpResponseMessage response)

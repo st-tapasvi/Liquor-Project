@@ -8,8 +8,8 @@ using Xunit;
 namespace ST.LiquorTNT.Infrastructure.Tests.Database;
 
 /// <summary>
-/// The rights query against the real MySQL schema (db/mysql/009): role rights + custom rights per supplier code,
-/// "all supplier codes" rows, and that those rows never leak into another company's supplier code.
+/// The rights query against the real MySQL schema (db/mysql/009, 012): rights of a supplier code's role, of a
+/// company-level role and custom rights, and that company-wide rows never leak into another company's supplier code.
 /// Builds its own throw-away company, supplier codes, role and user, and removes them afterwards.
 /// </summary>
 public sealed class AccessRepositoryTests
@@ -40,28 +40,36 @@ public sealed class AccessRepositoryTests
         var l1 = SUPPLIER_CODE.Create(companyA, null, exciseRj, "T1" + tag, category, Now, null);
         var l2 = SUPPLIER_CODE.Create(companyA, null, exciseRj, "T2" + tag, category, Now, null);
         var l3 = SUPPLIER_CODE.Create(companyB, null, exciseRj, "T3" + tag, category, Now, null);
-        var role = ROLES.Create(companyA, "ZZ Operator " + tag, null, false, Now, null);
         var user = USERS.Create("zz_access_" + tag, "H:x", companyA, null, null, null, null, false, null, Now, null);
-        db.AddRange(l1, l2, l3, role, user);
+        db.AddRange(l1, l2, l3, user);
+        await db.SaveChangesAsync();
+
+        // "ZZ Operator" of supplier code 1 and a company-level "ZZ Agent" (covers every supplier code of company A)
+        var role = ROLES.Create(companyA, "ZZ Operator " + tag, null, false, Now, null, l1.Id);
+        var companyRole = ROLES.Create(companyA, "ZZ Agent " + tag, null, false, Now, null);
+        db.AddRange(role, companyRole);
         await db.SaveChangesAsync();
 
         try
         {
             var view = await db.PAGE_ACTIONS.SingleAsync(a => a.PermissionKey == "role.view");
             var unlock = await db.PAGE_ACTIONS.SingleAsync(a => a.PermissionKey == "user.unlock");
+            var status = await db.PAGE_ACTIONS.SingleAsync(a => a.PermissionKey == "user.status");
 
             db.AddRange(
                 ROLE_RIGHTS.Create(role.Id, view.Id, Now, null),
-                USER_ROLES.Create(user.Id, role.Id, l1.Id, Now, null),          // Operator only in supplierCode 1
-                USER_RIGHTS.Create(user.Id, unlock.Id, null, Now, null));      // custom right in all supplierCodes
+                ROLE_RIGHTS.Create(companyRole.Id, status.Id, Now, null),
+                USER_ROLES.Create(user.Id, role.Id, Now, null),                 // Operator only in supplier code 1 (from the role)
+                USER_ROLES.Create(user.Id, companyRole.Id, Now, null),          // company-level: all supplier codes of company A
+                USER_RIGHTS.Create(user.Id, unlock.Id, null, Now, null));      // custom right in all supplier codes
             await db.SaveChangesAsync();
 
             var repo = new AccessRepository(db);
 
             (await repo.GetPermissionKeysAsync(user.Id, l1.Id, CancellationToken.None))
-                .Should().BeEquivalentTo("role.view", "user.unlock");
+                .Should().BeEquivalentTo("role.view", "user.status", "user.unlock");
             (await repo.GetPermissionKeysAsync(user.Id, l2.Id, CancellationToken.None))
-                .Should().BeEquivalentTo("user.unlock");
+                .Should().BeEquivalentTo(new[] { "user.status", "user.unlock" }, "the Operator role belongs to supplier code 1 only");
             (await repo.GetPermissionKeysAsync(user.Id, l3.Id, CancellationToken.None))
                 .Should().BeEmpty("an all-supplier-codes right never reaches another company's supplier code");
 
@@ -77,7 +85,7 @@ public sealed class AccessRepositoryTests
         finally
         {
             await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM USERS WHERE ID = {user.Id}");          // roles + rights cascade
-            await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM ROLES WHERE ID = {role.Id}");          // role rights cascade
+            await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM ROLES WHERE ID IN ({role.Id}, {companyRole.Id})");   // role rights cascade
             await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM SUPPLIER_CODE WHERE COMPANY_ID IN ({companyA}, {companyB})");
             await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM COMPANY WHERE ID IN ({companyA}, {companyB})");
         }

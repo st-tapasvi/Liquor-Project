@@ -37,13 +37,14 @@ public sealed class SessionValidationMiddlewareTests
         return session;
     }
 
-    private async Task<bool> Call(DateTime at)
+    private async Task<bool> Call(DateTime at, params object[] endpointMetadata)
     {
         _clock.IndiaNow = at;
         var context = new DefaultHttpContext
         {
             User = new ClaimsPrincipal(new ClaimsIdentity(new[] { new Claim("sub", "7") }, "test")),
         };
+        context.SetEndpoint(new Endpoint(null, new EndpointMetadataCollection(endpointMetadata), "test"));
         var reachedController = false;
 
         var middleware = new SessionValidationMiddleware(_ => { reachedController = true; return Task.CompletedTask; });
@@ -163,6 +164,36 @@ public sealed class SessionValidationMiddlewareTests
         (await Call(LoginAt.AddMinutes(5))).Should().BeTrue();
 
         LastContext!.Items.ContainsKey(SessionScope.ItemKey).Should().BeFalse();
+    }
+
+    // ---------- security question on first login ----------
+
+    [Fact]
+    public async Task SecurityQuestionPending_OrdinaryEndpoint_403SecurityQuestionRequired()
+    {
+        AddSession().RequireSecurityQuestion();
+
+        var ex = await this.Invoking(t => t.Call(LoginAt.AddMinutes(5))).Should().ThrowAsync<ForbiddenException>();
+
+        ex.Which.ErrorCode.Should().Be(ErrorCodes.SecurityQuestionRequired);
+    }
+
+    [Fact]
+    public async Task SecurityQuestionPending_QuestionScreenEndpoint_GoesThrough()
+    {
+        AddSession().RequireSecurityQuestion();
+
+        (await Call(LoginAt.AddMinutes(5), new AllowWithoutSecurityQuestionAttribute())).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task SecurityQuestionSet_OrdinaryEndpoint_GoesThrough()
+    {
+        var session = AddSession();
+        session.RequireSecurityQuestion();
+        session.SecurityQuestionSet();
+
+        (await Call(LoginAt.AddMinutes(5))).Should().BeTrue();
     }
 
     // ---------- small fakes ----------

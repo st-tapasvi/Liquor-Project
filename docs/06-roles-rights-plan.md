@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Implemented 2026-10-07 (backend). Schema: `db/mysql/009_roles_rights.sql` |
+| **Status** | Implemented 2026-10-07 (backend). Schema: `db/mysql/009_roles_rights.sql`; roles per supplier code since 2026-10-08 (`012_supplier_code_roles.sql`) |
 | **Scope** | Backend API only. The React app is built separately against the APIs in section 7 |
 | **Replaced** | The interim `Administrator` policy (`SECURITY_CONFIG.ADMIN_ROLE_ID`) and the `role_id` JWT claim |
 | **Not in this module** | Batch create / approve / cancel. It comes with the batch page and only adds rows to `PAGE_ACTIONS` (section 9) |
@@ -15,28 +15,29 @@
 |---|---|
 | Model | ERPNext-style. A user holds **several master roles** plus **custom (user-specific) rights**. Effective rights = the union |
 | Custom rights | **Grant only**: they add rights and never take away a right a role gives |
-| Role ownership | **Company-wise.** Sundaram Tech's **Super Admin** stands above all companies |
-| Supplier code scope | Role names stay generic ("Operator"). A role is assigned **for a supplier code** (*Ramesh → Operator → RJ CL 550*) or for **all supplier codes** of the company |
-| Default roles | Plant Admin, Agent Manager, Plant Manager, Supervisor, Operator, Viewer. They are copied into a company when it gets its **first supplier code**; the company may edit or delete them |
+| Role ownership | **Company-wise.** The **Admin** (the `admin` user, system role "Admin", script 015) stands above all companies. The Super Admin of Sundaram Technologies is a separate, later feature and is not part of this module (owner, 2026-10-08) |
+| Supplier code scope | **Roles belong to a supplier code** (owner, 2026-10-08): "Operator RJ CL 550", "Operator RJ FL 620" — each supplier code can have its own rights. Company-level roles (Plant Admin, Agent Manager; `SUPPLIER_CODE_ID` null) cover every supplier code. *Ramesh → Operator RJ CL 550* (script 012) |
+| Default roles | Templates. Plant Admin, Agent Manager are copied once per company (with its first supplier code); Plant Manager, Supervisor, Operator, Viewer (`PER_SUPPLIER_CODE`) are copied for **every new supplier code**. The company may edit or delete its copies |
 | Agent Manager | Creates users, roles and rights for everyone **except admin users** |
-| Self-change | Nobody except Super Admin changes their **own** roles or rights |
+| Self-change | Nobody except Admin changes their **own** roles or rights |
 | Password policy | With several roles, the **strictest** value of each rule applies |
 | Plant | No plant entity. Hierarchy **Company → Excise → Supplier Code**. "Plant Admin" / "Plant Manager" are role names only |
-| Masters | `COMPANY`, `SUPPLIER_CODE` and `LIQUOR_CATEGORY` are maintained by Super Admin (they come from the CRM) |
+| Masters | `COMPANY`, `SUPPLIER_CODE` and `LIQUOR_CATEGORY` are maintained by Admin (they come from the CRM) |
 | Generic actions | A page can have any actions, not only view/add/edit/delete. Approve / reject / cancel etc. are added per page when that page is built |
+| Two applications | Pages belong to the **web** application (server) or the **line** application (desktop at the line) — `PAGES.APPLICATION_TYPE`, never both (a job in both = two pages). Roles and rights are shared; no login restriction per application yet (owner, 2026-10-08) |
 
 ---
 
 ## 2. Tenant model
 
 ```
-Super Admin (Sundaram Tech, no company)
+Admin (the `admin` user, no company)
 └─ COMPANY (customer, e.g. Globus)
    └─ SUPPLIER_CODE = EXCISE + code + LIQUOR_CATEGORY      e.g. RJ · 550 · CL
 ```
 
-- After login the user works in one **active supplier code** (`USER_SESSION.ACTIVE_SUPPLIER_CODE_ID`). It is picked automatically when the
-  user has exactly one; otherwise the user picks one with `POST /api/auth/selectsuppliercode`.
+- After login the user works in one **active supplier code** (`USER_SESSION.ACTIVE_SUPPLIER_CODE_ID`). Nothing is picked at login (owner,
+  2026-10-08): after every login every user, also with one supplier code, picks one with `POST /api/auth/selectsuppliercode`.
 - `ITenantContext` = `CompanyId`, `SupplierCodeId`, `ExciseCode`. `SessionValidationMiddleware` loads the supplier code from the session; a
   deactivated supplier code counts as not picked. Tenant values never come from a request.
 
@@ -49,11 +50,11 @@ Super Admin (Sundaram Tech, no company)
 | `LIQUOR_CATEGORY` | `CATEGORY_CODE` (unique), `CATEGORY_NAME`, `DESCRIPTION`. Seeded with IMFL, CL, FL |
 | `SUPPLIER_CODE` | One supplier code: `COMPANY_ID`, `FRANCHISE_NAME` (text), `EXCISE_ID`, `SUPPLIER_CODE`, `LIQUOR_CATEGORY_ID`. **Unique (excise, code)** |
 | `COMPANY` | `EXCISE_CODE` and `SUPPLIER_CODE` moved out to `SUPPLIER_CODE`; company name is unique |
-| `PAGES` | One screen (`PAGE_KEY`, `MODULE_NAME`, `SORT_ORDER`) |
+| `PAGES` | One screen (`PAGE_KEY`, `MODULE_NAME`, `SORT_ORDER`, `APPLICATION_TYPE` = `WEB` / `LINE` (013): the web application or the line application). `PAGE_NAME` unique per application, `PAGE_KEY` unique overall |
 | `PAGE_ACTIONS` | The actions of a page. `PERMISSION_KEY` = `<page>.<action>` (unique); `GRANT_SCOPE` = `ANY` / `ADMIN` / `SYSTEM` |
-| `ROLES` | + `COMPANY_ID`, `IS_SYSTEM` (Super Admin), `IS_TEMPLATE` (default role), `IS_ADMIN_ROLE` (Plant Admin). Name is unique per company |
+| `ROLES` | + `COMPANY_ID`, `SUPPLIER_CODE_ID` (012; null = company-level), `IS_SYSTEM` (Admin), `IS_TEMPLATE` (default role), `PER_SUPPLIER_CODE` (012; templates copied per supplier code), `IS_ADMIN_ROLE` (Plant Admin, always company-level). Name is unique per company + supplier code |
 | `ROLE_RIGHTS` | Rebuilt: one row = role has one page action |
-| `USER_ROLES` | User → role → supplier code (`SUPPLIER_CODE_ID` null = all supplier codes of the company) |
+| `USER_ROLES` | User → role. Since 012 the supplier code comes from the role (column removed); unique (user, role) |
 | `USER_RIGHTS` | Custom rights: user → page action → supplier code (null = all supplier codes) |
 | `USER_SESSION` | + `ACTIVE_SUPPLIER_CODE_ID` |
 | `USERS` | `ROLE_ID` removed (moved to `USER_ROLES`) |
@@ -68,14 +69,14 @@ business category that grows as data (`LIQUOR_CATEGORY`) gets its own table with
 
 ```
 [HasPermission("user.add")]  →  PermissionHandler  →  CurrentAccess.EnsurePermissionAsync
-   Super Admin                       → allowed (every key, every company)
+   Admin                       → allowed (every key, every company)
    no supplier code picked                 → 409 SUPPLIER_CODE_NOT_SELECTED
    key not in roles+rights of the    → 403 PERMISSION_DENIED (detail names the key)
    active supplier code
 ```
 
-- Effective keys = rights of every role assigned for the active supplier code (or all supplier codes) ∪ custom rights for it (or all supplier codes).
-  An "all supplier codes" row only applies to supplier codes of the user's **own** company; the query checks this again.
+- Effective keys = rights of the user's roles of the active supplier code and company-level roles ∪ custom rights for it (or all supplier codes).
+  A company-level role or "all supplier codes" right only applies to supplier codes of the user's **own** company; the query checks this again.
 - Rights are read **per request** (one query, kept by the scoped `CurrentAccess`). They are not in the JWT, so a change applies on the
   next call without a new login.
 - Every endpoint carries `[HasPermission(Permissions.X)]`, except the auth flow and `/health`. Keys are constants in
@@ -88,11 +89,13 @@ business category that grows as data (`LIQUOR_CATEGORY`) gets its own table with
 | Rule | Refusal |
 |---|---|
 | A company user only sees users / roles / supplier codes of their company | `404` (does not admit the record exists) |
-| Changing an **admin user** (holder of an `IS_ADMIN_ROLE` or Super Admin role), giving or editing an **admin role**, or giving / removing an **ADMIN-scope** right needs `user.manageadmin` | `403 ADMIN_USER_PROTECTED` |
+| Changing an **admin user** (holder of an `IS_ADMIN_ROLE` or Admin role), giving or editing an **admin role**, or giving / removing an **ADMIN-scope** right needs `user.manageadmin` | `403 ADMIN_USER_PROTECTED` |
 | **SYSTEM-scope** rights (supplier code / liquor category add & edit) are never put in a role or given to a user | `403 RIGHT_NOT_GRANTABLE` |
-| Nobody but Super Admin changes their own roles or rights | `409 CANNOT_CHANGE_OWN_ACCESS` |
-| Super Admin role is given only by Super Admin, without supplier code or company | `403` / `400` |
-| Super Admin role cannot change; templates are changed by Super Admin only | `409 ROLE_NOT_EDITABLE` |
+| Nobody but Admin changes their own roles or rights | `409 CANNOT_CHANGE_OWN_ACCESS` |
+| Admin role is given only by Admin, to a user without a company | `403` / `400` |
+| A role's supplier code is set on create and never changes; an admin role has none | `400` |
+| A role of a deactivated supplier code cannot be given | `404` |
+| Admin role cannot change; templates are changed by Admin only | `409 ROLE_NOT_EDITABLE` |
 | A role still assigned to users cannot be deleted | `409 ROLE_IN_USE` |
 | Every role of a user needs a password policy | `409 PASSWORD_POLICY_NOT_CONFIGURED` |
 
@@ -105,7 +108,7 @@ not give.
 
 | Role | Default rights |
 |---|---|
-| **Super Admin** (`IS_SYSTEM`) | Everything, in every company (no rows) |
+| **Admin** (`IS_SYSTEM`) | Everything, in every company (no rows) |
 | **Plant Admin** (`IS_ADMIN_ROLE`) | Every right except SYSTEM ones, incl. `user.manageadmin`, `securityconfig.*`, `passwordpolicy.*` |
 | **Agent Manager** | `user.view/add/edit/status/unlock/access`, `role.view/add/edit/delete`, `suppliercode.view`, `liquorcategory.view` |
 | **Plant Manager** | `user.view`, `role.view`, `suppliercode.view`, `liquorcategory.view` |
@@ -123,26 +126,26 @@ All responses have a body; errors are ProblemDetails with `errorCode` (see `05-u
 
 | Method & path | Right | What it does |
 |---|---|---|
-| `POST /api/auth/login` | – | Now also returns `supplierCodes[]` and `activeSupplierCode` (set when the user has exactly one) |
+| `POST /api/auth/login` | – | Also returns `supplierCodes[]` for the supplier code screen; `activeSupplierCode` is always null (nothing picked at login) |
 | `GET /api/auth/mysuppliercodes` | logged in | Supplier codes the user may pick |
 | `POST /api/auth/selectsuppliercode` `{ supplierCodeId }` | logged in | Picks / switches the supplier code; returns `MyPermissionsResponse`. Not the user's supplier code → `403 SUPPLIER_CODE_NOT_ASSIGNED` |
 | `GET /api/auth/mypermissions` | logged in | `{ isSuperAdmin, activeSupplierCode, permissions[] }` for the menu and buttons |
-| `GET /api/roles` · `GET /api/roles/{id}` | `role.view` | Roles of the company (Super Admin without a supplier code: Super Admin + templates) |
-| `POST /api/roles` · `PUT /api/roles/{id}` | `role.add` / `role.edit` | `{ roleName, description, isAdminRole, passwordPolicyId }` |
+| `GET /api/roles` · `GET /api/roles/{id}` | `role.view` | Roles of the company with `displayName` ("Operator RJ CL 772"); `?supplierCodeId=` → that supplier code's roles + company-level (Admin without a supplier code: the Admin role + templates) |
+| `POST /api/roles` · `PUT /api/roles/{id}` | `role.add` / `role.edit` | `{ roleName, supplierCodeId, description, isAdminRole, perSupplierCode, passwordPolicyId }`; `supplierCodeId` is fixed after create |
 | `DELETE /api/roles/{id}` | `role.delete` | Only when no user holds it |
-| `GET /api/roles/{id}/rights` | `role.view` | The grid: every page and action with `granted` |
-| `PUT /api/roles/{id}/rights` `{ pageActionIds: [] }` | `role.edit` | The **full** list of ticked actions |
-| `GET /api/pages` | `role.view` | Every page with its actions (empty grid) |
-| `POST /api/users` | `user.add` | Now takes `roles: [{ roleId, supplierCodeId }]` (at least one); `companyId` is used only for Super Admin |
+| `GET /api/roles/{id}/rights` | `role.view` | The grid: every page and action with `granted`; `?applicationType=WEB` or `LINE` → one application |
+| `PUT /api/roles/{id}/rights` `{ pageActionIds: [], applicationType? }` | `role.edit` | The **full** list of ticked actions (with `applicationType`: of that application only; the other one is kept) |
+| `GET /api/pages` | `role.view` | Every page with its actions and `applicationType` (empty grid); `?applicationType=WEB` or `LINE` |
+| `POST /api/users` | `user.add` | Takes `roles: [{ roleId }]` (at least one; the supplier code comes with the role); `companyId` is used only for Admin |
 | `GET /api/users/{id}/access` | `user.view` | The user's roles and custom rights, with supplier code names |
 | `PUT /api/users/{id}/roles` `{ roles: [] }` | `user.access` | The **full** list of roles |
 | `PUT /api/users/{id}/rights` `{ rights: [{ pageActionId, supplierCodeId }] }` | `user.access` | The **full** list of custom rights |
-| `GET /api/suppliercodes` · `GET /api/suppliercodes/{id}` | `suppliercode.view` | Supplier codes of the company (Super Admin: all) |
-| `POST /api/suppliercodes` · `PUT /api/suppliercodes/{id}` · `POST …/activate` · `POST …/deactivate` | `suppliercode.add` / `edit` (Super Admin) | The first supplier code of a company also copies the default roles into it |
+| `GET /api/suppliercodes` · `GET /api/suppliercodes/{id}` | `suppliercode.view` | Supplier codes of the company (Admin: all) |
+| `POST /api/suppliercodes` · `PUT /api/suppliercodes/{id}` · `POST …/activate` · `POST …/deactivate` | `suppliercode.add` / `edit` (Admin) | A new supplier code gets its default roles (Plant Manager / Supervisor / Operator / Viewer of that code); the first one of a company also the company-level ones |
 | `GET /api/liquorcategories` · `GET /api/liquorcategories/{id}` | `liquorcategory.view` | |
 | `GET /api/excises` | `suppliercode.view` | Every state excise (`id`, `exciseCode`, `exciseName`, `isActive`) for dropdowns |
-| `GET /api/companies` | `company.view` (Super Admin) | Companies with `supplierCodeCount` (script `010`) |
-| `POST` · `PUT` · `…/activate` · `…/deactivate` on `/api/liquorcategories` | `liquorcategory.add` / `edit` (Super Admin) | |
+| `GET /api/companies` | `company.view` (Admin) | Companies with `supplierCodeCount` (script `010`) |
+| `POST` · `PUT` · `…/activate` · `…/deactivate` on `/api/liquorcategories` | `liquorcategory.add` / `edit` (Admin) | |
 
 Changed for the frontend: `UserResponse` and `CurrentUserResponse` no longer have `roleId`; `UpdateUserRequest` is profile only
 (`fullName`, `email`, `phone`, `employeeCode`).
@@ -163,7 +166,7 @@ Changed for the frontend: `UserResponse` and `CurrentUserResponse` no longer hav
 
 ## 9. Adding a page later (batch, plan …)
 
-1. In the page's SQL script, insert its `PAGES` row and its `PAGE_ACTIONS` (for batch e.g. `view, add, edit, delete, submit, approve,
+1. In the page's SQL script, insert its `PAGES` row (with `APPLICATION_TYPE` `WEB` or `LINE`) and its `PAGE_ACTIONS` (for batch e.g. `view, add, edit, delete, submit, approve,
    cancel, approvecancel`) with the right `GRANT_SCOPE`, and give the default templates their rights (e.g. Operator → submit,
    Supervisor → approve, Plant Manager → approvecancel).
 2. Add the keys to `Business/Access/Permissions.cs` and put `[HasPermission(...)]` on each endpoint.

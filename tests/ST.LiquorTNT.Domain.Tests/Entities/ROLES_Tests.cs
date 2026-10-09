@@ -43,6 +43,49 @@ public sealed class ROLES_Tests
     }
 
     [Fact]
+    public void Create_ForASupplierCode_KeepsIt()
+    {
+        var role = ROLES.Create(companyId: 5, "Operator", null, isAdminRole: false, Now, 1, supplierCodeId: 30);
+
+        role.SupplierCodeId.Should().Be(30);
+        role.IsTemplate.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Create_AdminRoleForASupplierCode_Throws()
+    {
+        var act = () => ROLES.Create(5, "Plant Admin", null, isAdminRole: true, Now, 1, supplierCodeId: 30);
+        act.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
+    public void Create_TemplateWithASupplierCode_Throws()
+    {
+        var act = () => ROLES.Create(null, "Operator", null, false, Now, 1, supplierCodeId: 30);
+        act.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
+    public void PerSupplierCode_OnlyMeansSomethingForTemplates()
+    {
+        ROLES.Create(null, "Operator", null, false, Now, 1, perSupplierCode: true).PerSupplierCode.Should().BeTrue();
+        ROLES.Create(5, "Operator", null, false, Now, 1, perSupplierCode: true).PerSupplierCode.Should().BeFalse();
+    }
+
+    [Fact]
+    public void CopyOf_PerSupplierCodeTemplate_NeedsTheSupplierCode_CompanyLevelMustNotGetOne()
+    {
+        var perCode = ROLES.Create(null, "Operator", null, false, Now, 1, perSupplierCode: true);
+        var companyLevel = ROLES.Create(null, "Agent Manager", null, false, Now, 1);
+
+        ROLES.CopyOf(perCode, 9, Now, 2, supplierCodeId: 30).SupplierCodeId.Should().Be(30);
+        ROLES.CopyOf(companyLevel, 9, Now, 2).SupplierCodeId.Should().BeNull();
+
+        ((Action)(() => ROLES.CopyOf(perCode, 9, Now, 2))).Should().Throw<ArgumentException>();
+        ((Action)(() => ROLES.CopyOf(companyLevel, 9, Now, 2, supplierCodeId: 30))).Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
     public void CopyOf_CompanyRole_Throws()
     {
         var companyRole = ROLES.Create(5, "Operator", null, false, Now, 1);
@@ -54,7 +97,7 @@ public sealed class ROLES_Tests
     [Fact]
     public void Update_SuperAdmin_Throws()
     {
-        var superAdmin = ROLES.Create(null, "Super Admin", null, false, Now, 1);
+        var superAdmin = ROLES.Create(null, "Admin", null, false, Now, 1);
         typeof(ROLES).GetProperty(nameof(ROLES.IsSystem), BindingFlags.Public | BindingFlags.Instance)!.SetValue(superAdmin, true);
 
         var act = () => superAdmin.Update("Renamed", null, false, Now, 1);

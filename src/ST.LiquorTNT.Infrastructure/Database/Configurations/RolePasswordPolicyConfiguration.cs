@@ -20,5 +20,9 @@ public sealed class RolePasswordPolicyConfiguration : IEntityTypeConfiguration<R
         builder.Property(r => r.UpdatedAt).HasColumnName("UPDATED_AT");
 
         builder.HasIndex(r => r.RoleId).IsUnique().HasDatabaseName("UQ_ROLE_PASSWORD_POLICY_ROLE");
+
+        // Tells EF the link depends on the role, so deleting both in one SaveChanges removes the link first
+        // (FK_ROLE_PWPOLICY_ROLE has no cascade).
+        builder.HasOne<ROLES>().WithMany().HasForeignKey(r => r.RoleId).OnDelete(DeleteBehavior.Restrict);
     }
 }

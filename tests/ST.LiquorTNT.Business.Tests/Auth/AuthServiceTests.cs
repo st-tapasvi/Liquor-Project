@@ -24,6 +24,7 @@ public sealed class AuthServiceTests
     private readonly FakeSecurityConfigProvider _config;
     private readonly FakeCurrentUser _currentUser = new(userId: 10, userName: "alice");
     private readonly FakeAccessRepository _access = new();
+    private readonly FakeSecurityQuestionRepository _questions = new();     // empty master list → no question step
     private readonly AuthService _service;
 
     public AuthServiceTests()
@@ -44,7 +45,8 @@ public sealed class AuthServiceTests
         var rules = new PasswordRules(policies, _users, new PasswordPolicyValidator(hasher), _clock);
 
         _service = new AuthService(_users, _sessions, new CredentialVerifier(_users, hasher, _log), hasher, _tokens, new FakeTokenHasher(),
-            _config, rules, _clock, _currentUser, _request, _log, new SupplierCodeDirectory(_access), new LoginRequestValidator(), new ChangePasswordRequestValidator());
+            _config, rules, _clock, _currentUser, _request, _log, new SupplierCodeDirectory(_access), _questions,
+            new LoginRequestValidator(), new ChangePasswordRequestValidator());
     }
 
     private USERS AddUser(bool forceChange = false, DateTime? expiresAt = null)
@@ -298,6 +300,70 @@ public sealed class AuthServiceTests
         _log.Entries.Should().OnlyContain(e => e.OldValue == null && e.NewValue == null);   // nothing sensitive serialised
     }
 
+    // ---------- supplier code screen after every login ----------
+
+    [Fact]
+    public async Task Login_EvenWithOneSupplierCode_NothingIsPicked_UserGoesToTheSupplierCodeScreen()
+    {
+        AddUser();
+        _access.SupplierCodesByUser[10] = new() { FakeAccessRepository.SupplierCode(30) };
+
+        var response = await Login();
+
+        response.SupplierCodes.Select(s => s.Id).Should().Equal(30);
+        response.ActiveSupplierCode.Should().BeNull();
+        _sessions.Sessions.Single().ActiveSupplierCodeId.Should().BeNull();
+    }
+
+    // ---------- security question on first login ----------
+
+    [Fact]
+    public async Task Login_NoSecurityQuestionYet_SessionHeldOnQuestionScreen()
+    {
+        AddUser();
+        _questions.Questions.Add(SeedRows.Question(1, "First school?"));
+
+        var response = await Login();
+
+        response.User.SecurityQuestionRequired.Should().BeTrue();
+        _sessions.Sessions.Single().SecurityQuestionPending.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Login_SecurityQuestionAlreadySet_NoQuestionStep()
+    {
+        AddUser();
+        _questions.Questions.Add(SeedRows.Question(1, "First school?"));
+        _questions.UserQuestions.Add(USER_SECURITY_QUESTION.Create(10, 1, "H:x", TestData.Now));
+
+        var response = await Login();
+
+        response.User.SecurityQuestionRequired.Should().BeFalse();
+        _sessions.Sessions.Single().SecurityQuestionPending.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Login_SecurityQuestionsSwitchedOff_NoQuestionStep()
+    {
+        AddUser();
+        _questions.Questions.Add(SeedRows.Question(1, "First school?"));
+        _config.Settings = SecuritySettings.FromEntries(new Dictionary<string, string> { [SecuritySettings.Keys.SecurityQuestionEnabled] = "0" });
+
+        var response = await Login();
+
+        response.User.SecurityQuestionRequired.Should().BeFalse();
+        _sessions.Sessions.Single().SecurityQuestionPending.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task GetCurrentUser_NoSecurityQuestionYet_SaysRequired()
+    {
+        AddUser();
+        _questions.Questions.Add(SeedRows.Question(1, "First school?"));
+
+        (await _service.GetCurrentUserAsync(CancellationToken.None)).SecurityQuestionRequired.Should().BeTrue();
+    }
+
     // ---------- logout ----------
 
     [Fact]
@@ -350,7 +416,7 @@ public sealed class AuthServiceTests
         var anonymous = new AuthService(_users, _sessions, new CredentialVerifier(_users, new FakePasswordHasher(), _log), new FakePasswordHasher(),
             _tokens, new FakeTokenHasher(), _config,
             new PasswordRules(new FakePasswordPolicyRepository(), _users, new PasswordPolicyValidator(new FakePasswordHasher()), _clock),
-            _clock, new FakeCurrentUser(userId: null, userName: null), _request, _log, new SupplierCodeDirectory(_access),
+            _clock, new FakeCurrentUser(userId: null, userName: null), _request, _log, new SupplierCodeDirectory(_access), _questions,
             new LoginRequestValidator(), new ChangePasswordRequestValidator());
 
         await anonymous.Invoking(s => s.GetCurrentUserAsync(CancellationToken.None)).Should().ThrowAsync<UnauthorizedException>();

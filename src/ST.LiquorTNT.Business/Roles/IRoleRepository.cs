@@ -1,4 +1,5 @@
 using ST.LiquorTNT.Contracts.Roles;
+using ST.LiquorTNT.Contracts.SupplierCodes;
 using ST.LiquorTNT.Domain.Entities;
 
 namespace ST.LiquorTNT.Business.Roles;
@@ -12,16 +13,30 @@ public interface IRoleRepository
     Task<ROLES?> GetByIdAsync(int id, CancellationToken ct);
 
     /// <summary>
-    /// Roles of one company, projected for the list screen. <paramref name="companyId"/> null = the roles that
-    /// belong to no company: Super Admin and the default templates (only Super Admin ever sees these).
+    /// Roles of one company, projected for the list screen (company-level roles first, then by supplier code and name).
+    /// <paramref name="companyId"/> null = the roles that belong to no company: Super Admin and the default templates
+    /// (only Super Admin ever sees these). <paramref name="supplierCodeId"/> set = only the roles usable in that supplier
+    /// code: its own roles plus the company-level ones.
     /// </summary>
-    Task<IReadOnlyList<RoleResponse>> GetListAsync(int? companyId, CancellationToken ct);
+    Task<IReadOnlyList<RoleResponse>> GetListAsync(int? companyId, int? supplierCodeId, CancellationToken ct);
 
-    /// <summary>Same name already used inside the same company (or among the templates)? Case-insensitive.</summary>
-    Task<bool> NameExistsAsync(int? companyId, string roleName, int? excludeRoleId, CancellationToken ct);
+    /// <summary>One role projected like the list (with supplier code name, display name and password policy).</summary>
+    Task<RoleResponse?> GetResponseAsync(int roleId, CancellationToken ct);
 
-    /// <summary>True when the company already has at least one role (so its templates were copied before).</summary>
-    Task<bool> CompanyHasRolesAsync(int companyId, CancellationToken ct);
+    /// <summary>
+    /// Same name already used for the same supplier code of the same company (or among the company-level roles,
+    /// or among the templates)? Case-insensitive. "Operator" may exist once per supplier code.
+    /// </summary>
+    Task<bool> NameExistsAsync(int? companyId, int? supplierCodeId, string roleName, int? excludeRoleId, CancellationToken ct);
+
+    /// <summary>True when the company already has a company-level role (so its company-level templates were copied before).</summary>
+    Task<bool> CompanyHasCompanyRolesAsync(int companyId, CancellationToken ct);
+
+    /// <summary>True when the supplier code already has roles of its own (so its templates were copied before).</summary>
+    Task<bool> SupplierCodeHasRolesAsync(int supplierCodeId, CancellationToken ct);
+
+    /// <summary>An ACTIVE supplier code (for checking a new role's supplier code and naming the role), or null.</summary>
+    Task<SupplierCodeResponse?> GetSupplierCodeAsync(int supplierCodeId, CancellationToken ct);
 
     Task<IReadOnlyList<ROLES>> GetTemplatesAsync(CancellationToken ct);
 

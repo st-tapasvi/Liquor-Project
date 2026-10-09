@@ -13,17 +13,21 @@ public sealed class RolesConfiguration : IEntityTypeConfiguration<ROLES>
         builder.HasKey(r => r.Id);
         builder.Property(r => r.Id).HasColumnName("ID").ValueGeneratedOnAdd();
         builder.Property(r => r.CompanyId).HasColumnName("COMPANY_ID");
+        builder.Property(r => r.SupplierCodeId).HasColumnName("SUPPLIER_CODE_ID");
         builder.Property(r => r.RoleName).HasColumnName("ROLE_NAME").HasMaxLength(100).IsRequired();
         builder.Property(r => r.Description).HasColumnName("DESCRIPTION").HasMaxLength(255);
         builder.Property(r => r.IsSystem).HasColumnName("IS_SYSTEM");
         builder.Property(r => r.IsTemplate).HasColumnName("IS_TEMPLATE");
         builder.Property(r => r.IsAdminRole).HasColumnName("IS_ADMIN_ROLE");
+        builder.Property(r => r.PerSupplierCode).HasColumnName("PER_SUPPLIER_CODE");
         builder.Property(r => r.IsActive).HasColumnName("IS_ACTIVE");
         builder.Property(r => r.CreatedBy).HasColumnName("CREATED_BY");
         builder.Property(r => r.CreatedAt).HasColumnName("CREATED_AT");
         builder.Property(r => r.UpdatedBy).HasColumnName("UPDATED_BY");
         builder.Property(r => r.UpdatedAt).HasColumnName("UPDATED_AT");
 
-        builder.HasIndex(r => new { r.CompanyId, r.RoleName }).IsUnique().HasDatabaseName("UQ_ROLES_COMPANY_NAME");
+        // The database key is (COMPANY_ID, SUPPLIER_CODE_KEY, ROLE_NAME), SUPPLIER_CODE_KEY being a generated column that
+        // turns NULL into 0; it is not mapped here, so the name check in RoleService is what callers see first.
+        builder.HasIndex(r => new { r.CompanyId, r.SupplierCodeId, r.RoleName }).HasDatabaseName("UQ_ROLES_COMPANY_SUPPLIER_NAME");
     }
 }

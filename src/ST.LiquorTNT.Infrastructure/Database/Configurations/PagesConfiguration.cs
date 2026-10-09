@@ -15,6 +15,7 @@ public sealed class PagesConfiguration : IEntityTypeConfiguration<PAGES>
         builder.Property(p => p.PageName).HasColumnName("PAGE_NAME").HasMaxLength(100).IsRequired();
         builder.Property(p => p.ModuleName).HasColumnName("MODULE_NAME").HasMaxLength(100);
         builder.Property(p => p.PageKey).HasColumnName("PAGE_KEY").HasMaxLength(50);
+        builder.Property(p => p.ApplicationType).HasColumnName("APPLICATION_TYPE").HasMaxLength(10).HasConversion<string>();   // WEB / LINE
         builder.Property(p => p.SortOrder).HasColumnName("SORT_ORDER");
         builder.Property(p => p.IsActive).HasColumnName("IS_ACTIVE");
     }

@@ -20,6 +20,7 @@ public sealed class UserAccessServiceTests
     private const int OperatorRole = 2;
     private const int PlantAdminRole = 4;
     private const int SuperAdminRole = 99;
+    private const int OtherCompanyOperator = 7;   // "Operator" of supplier code 20, company 2
 
     private const int UserUnlock = 1;
     private const int SecurityEdit = 2;      // ADMIN scope
@@ -39,9 +40,10 @@ public sealed class UserAccessServiceTests
         _policies.ByRole[PlantAdminRole] = TestData.Policy();
         _policies.ByRole[SuperAdminRole] = TestData.Policy();
 
-        _userAccess.Roles.Add(AccessRows.Role(OperatorRole, Company, "Operator"));
+        _userAccess.Roles.Add(AccessRows.Role(OperatorRole, Company, "Operator", supplierCodeId: OwnSupplierCode));
+        _userAccess.Roles.Add(AccessRows.Role(OtherCompanyOperator, 2, "Operator", supplierCodeId: 20));
         _userAccess.Roles.Add(AccessRows.Role(PlantAdminRole, Company, "Plant Admin", isAdminRole: true));
-        _userAccess.Roles.Add(AccessRows.Role(SuperAdminRole, null, "Super Admin", isSystem: true));
+        _userAccess.Roles.Add(AccessRows.Role(SuperAdminRole, null, "Admin", isSystem: true));
         _userAccess.Actions.Add(AccessRows.Action(UserUnlock, "user.unlock"));
         _userAccess.Actions.Add(AccessRows.Action(SecurityEdit, "securityconfig.edit", GrantScope.ADMIN));
         _userAccess.Actions.Add(AccessRows.Action(SupplierAdd, "suppliercode.add", GrantScope.SYSTEM));
@@ -67,8 +69,8 @@ public sealed class UserAccessServiceTests
         _userAccess.UserRoles[id] = new() { new UserRoleAssignment { RoleId = role } };
     }
 
-    private static UpdateUserRolesRequest Roles(params (int Role, int? OwnSupplierCode)[] roles) =>
-        new() { Roles = roles.Select(r => new UserRoleAssignment { RoleId = r.Role, SupplierCodeId = r.OwnSupplierCode }).ToList() };
+    private static UpdateUserRolesRequest Roles(params int[] roles) =>
+        new() { Roles = roles.Select(r => new UserRoleAssignment { RoleId = r }).ToList() };
 
     private static UpdateUserRightsRequest Rights(params (int Action, int? OwnSupplierCode)[] rights) =>
         new() { Rights = rights.Select(r => new UserRightAssignment { PageActionId = r.Action, SupplierCodeId = r.OwnSupplierCode }).ToList() };
@@ -78,7 +80,7 @@ public sealed class UserAccessServiceTests
     [Fact]
     public async Task UpdateRoles_OrdinaryUser_ReplacesRoles_Audited()
     {
-        var response = await Service().UpdateRolesAsync(5, Roles((OperatorRole, OwnSupplierCode)), CancellationToken.None);
+        var response = await Service().UpdateRolesAsync(5, Roles(OperatorRole), CancellationToken.None);
 
         response.Roles.Should().ContainSingle(r => r.RoleId == OperatorRole && r.SupplierCodeId == OwnSupplierCode);
         _log.Has(UserLogActions.UserRolesChanged).Should().BeTrue();
@@ -88,7 +90,7 @@ public sealed class UserAccessServiceTests
     [Fact]
     public async Task UpdateRoles_Own_Returns409()
     {
-        var ex = await Service().Invoking(s => s.UpdateRolesAsync(AgentManager, Roles((OperatorRole, null)), CancellationToken.None))
+        var ex = await Service().Invoking(s => s.UpdateRolesAsync(AgentManager, Roles(OperatorRole), CancellationToken.None))
             .Should().ThrowAsync<BusinessException>();
 
         ex.Which.ErrorCode.Should().Be(ErrorCodes.CannotChangeOwnAccess);
@@ -99,13 +101,13 @@ public sealed class UserAccessServiceTests
     {
         _access.SuperAdmins.Add(AgentManager);
 
-        await Service().UpdateRolesAsync(AgentManager, Roles((OperatorRole, null)), CancellationToken.None);
+        await Service().UpdateRolesAsync(AgentManager, Roles(OperatorRole), CancellationToken.None);
     }
 
     [Fact]
     public async Task UpdateRoles_GivingAdminRole_WithoutManageAdmin_Returns403()
     {
-        var ex = await Service().Invoking(s => s.UpdateRolesAsync(5, Roles((PlantAdminRole, null)), CancellationToken.None))
+        var ex = await Service().Invoking(s => s.UpdateRolesAsync(5, Roles(PlantAdminRole), CancellationToken.None))
             .Should().ThrowAsync<ForbiddenException>();
 
         ex.Which.ErrorCode.Should().Be(ErrorCodes.AdminUserProtected);
@@ -115,7 +117,7 @@ public sealed class UserAccessServiceTests
     [Fact]
     public async Task UpdateRoles_TakingRolesFromAnAdminUser_WithoutManageAdmin_Returns403()
     {
-        await Service().Invoking(s => s.UpdateRolesAsync(6, Roles((OperatorRole, null)), CancellationToken.None))
+        await Service().Invoking(s => s.UpdateRolesAsync(6, Roles(OperatorRole), CancellationToken.None))
             .Should().ThrowAsync<ForbiddenException>();
     }
 
@@ -124,14 +126,14 @@ public sealed class UserAccessServiceTests
     {
         _access.Grant(AgentManager, OwnSupplierCode, Permissions.UserManageAdmin);
 
-        await Service().Invoking(s => s.UpdateRolesAsync(5, Roles((SuperAdminRole, null)), CancellationToken.None))
+        await Service().Invoking(s => s.UpdateRolesAsync(5, Roles(SuperAdminRole), CancellationToken.None))
             .Should().ThrowAsync<ForbiddenException>();
     }
 
     [Fact]
-    public async Task UpdateRoles_SupplierCodeOfAnotherCompany_Returns404()
+    public async Task UpdateRoles_RoleOfAnotherCompanysSupplierCode_Returns404()
     {
-        await Service().Invoking(s => s.UpdateRolesAsync(5, Roles((OperatorRole, 20)), CancellationToken.None))
+        await Service().Invoking(s => s.UpdateRolesAsync(5, Roles(OtherCompanyOperator), CancellationToken.None))
             .Should().ThrowAsync<NotFoundException>();
     }
 
