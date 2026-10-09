@@ -3,6 +3,7 @@ using FluentAssertions;
 using ST.LiquorTNT.Business.Access;
 using ST.LiquorTNT.Business.Common;
 using ST.LiquorTNT.Business.Common.Exceptions;
+using ST.LiquorTNT.Business.RoleGroups;
 using ST.LiquorTNT.Business.Tests.Fakes;
 using ST.LiquorTNT.Business.Users;
 using ST.LiquorTNT.Contracts.Users;
@@ -171,6 +172,26 @@ public sealed class UserServiceTests
         _policies.ByRole[6] = _policies.ByRole[OperatorRole];
 
         await _service.Invoking(s => s.CreateAsync(ValidCreate(roleId: 6), CancellationToken.None)).Should().ThrowAsync<NotFoundException>();
+    }
+
+    [Fact]
+    public async Task Create_WithOnlyARoleGroup_PasswordFollowsTheGroupsRoles()
+    {
+        // "Managers" holds Plant Manager (HARD policy): an easy password is refused, a strong one is fine
+        _userAccess.Groups.Add(new RoleGroupInfo(70, Company, "Managers", true, new[] { PlantManagerRole }, false));
+        var request = ValidCreate();
+        request.Roles.Clear();
+        request.RoleGroupIds.Add(70);
+        request.Password = "easy123";
+
+        (await _service.Invoking(s => s.CreateAsync(request, CancellationToken.None)).Should().ThrowAsync<ValidationException>())
+            .Which.Errors.Should().ContainKey("password");
+
+        request.Password = "Str0ng!Passw0rd#";
+        var response = await _service.CreateAsync(request, CancellationToken.None);
+
+        _userAccess.UserGroups[response.Id].Should().Equal(70);
+        _userAccess.UserRoles[response.Id].Should().BeEmpty();
     }
 
     [Fact]

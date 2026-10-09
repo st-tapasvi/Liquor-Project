@@ -8,6 +8,7 @@ using ST.LiquorTNT.Business.Excises;
 using ST.LiquorTNT.Business.Common;
 using ST.LiquorTNT.Business.Common.Abstractions;
 using ST.LiquorTNT.Business.LiquorCategories;
+using ST.LiquorTNT.Business.RoleGroups;
 using ST.LiquorTNT.Business.Roles;
 using ST.LiquorTNT.Business.SecurityConfig;
 using ST.LiquorTNT.Business.SupplierCodes;
@@ -75,6 +76,7 @@ public static class DependencyInjection
 
         // Roles and masters
         services.AddScoped<IRoleRepository, RoleRepository>();
+        services.AddScoped<IRoleGroupRepository, RoleGroupRepository>();
         services.AddScoped<ILiquorCategoryRepository, LiquorCategoryRepository>();
         services.AddScoped<ISupplierCodeRepository, SupplierCodeRepository>();
         services.AddScoped<ICompanyRepository, CompanyRepository>();

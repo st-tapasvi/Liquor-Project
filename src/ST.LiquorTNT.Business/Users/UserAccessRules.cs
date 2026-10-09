@@ -1,6 +1,7 @@
 using ST.LiquorTNT.Business.Access;
 using ST.LiquorTNT.Business.Common;
 using ST.LiquorTNT.Business.Common.Exceptions;
+using ST.LiquorTNT.Business.RoleGroups;
 using ST.LiquorTNT.Contracts.Users;
 using ST.LiquorTNT.Domain.Entities;
 using ST.LiquorTNT.Domain.Rules;
@@ -16,6 +17,8 @@ namespace ST.LiquorTNT.Business.Users;
 /// <item>Nobody but Super Admin changes their OWN roles or rights.</item>
 /// <item>Roles and supplier codes must belong to the user's company. Super Admin role is given by Super Admin only, for all supplier codes.</item>
 /// <item>SYSTEM rights are never handed out; ADMIN rights and admin roles need user.manageadmin.</item>
+/// <item>Role groups must belong to the user's company and be active; a group with an admin role needs user.manageadmin.</item>
+/// <item>A user keeps at least one role or one role group.</item>
 /// </list>
 /// </summary>
 public sealed class UserAccessRules
@@ -117,6 +120,46 @@ public sealed class UserAccessRules
         await EnsureSupplierCodesBelongToAsync(companyId,
             assignments.Select(a => roles[a.RoleId].SupplierCodeId).Where(id => id is not null), ct);
         return assignments;
+    }
+
+    /// <summary>
+    /// Checks a full list of role groups for a user of <paramref name="companyId"/>: each must be an active group of that
+    /// company (anything else is 404), and a group holding an admin role needs user.manageadmin. Returns them without duplicates.
+    /// </summary>
+    public async Task<IReadOnlyList<RoleGroupInfo>> ValidateRoleGroupsAsync(
+        int? companyId, IReadOnlyCollection<int> requested, CancellationToken ct)
+    {
+        var ids = requested.Distinct().ToList();
+        if (ids.Count == 0)
+        {
+            return Array.Empty<RoleGroupInfo>();
+        }
+
+        var groups = (await _access.GetRoleGroupsAsync(ids, ct)).ToDictionary(g => g.Id);
+        var wrong = ids.Where(id => !groups.TryGetValue(id, out var g) || !g.IsActive || g.CompanyId != companyId).ToList();
+        if (wrong.Count > 0)
+        {
+            throw new NotFoundException($"Role group {string.Join(", ", wrong)}");
+        }
+
+        foreach (var group in groups.Values.Where(g => g.HasAdminRole))
+        {
+            await _current.EnsureCanManageAdminsAsync($"Giving the role group '{group.GroupName}' (it holds an admin role)", ct);
+        }
+
+        return groups.Values.ToList();
+    }
+
+    /// <summary>A user without any role and any role group could do nothing and would have no password policy.</summary>
+    public static void EnsureSomeRoleOrGroup(int roleCount, int groupCount)
+    {
+        if (roleCount + groupCount == 0)
+        {
+            throw new ValidationException(new Dictionary<string, string[]>
+            {
+                ["roles"] = new[] { "Give the user at least one role or one role group." },
+            });
+        }
     }
 
     /// <summary>

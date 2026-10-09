@@ -71,6 +71,12 @@ public sealed class UsersController : ControllerBase
     public async Task<ActionResult<UserAccessResponse>> UpdateRolesAsync(int id, UpdateUserRolesRequest request, CancellationToken ct)
         => Ok(await _access.UpdateRolesAsync(id, request, ct));
 
+    /// <summary>The FULL list of the user's role groups; anything not in it is taken away.</summary>
+    [HttpPut("{id:int}/rolegroups")]
+    [HasPermission(Permissions.UserAccess)]
+    public async Task<ActionResult<UserAccessResponse>> UpdateRoleGroupsAsync(int id, UpdateUserRoleGroupsRequest request, CancellationToken ct)
+        => Ok(await _access.UpdateRoleGroupsAsync(id, request, ct));
+
     /// <summary>The FULL list of the user's custom rights; anything not in it is taken away.</summary>
     [HttpPut("{id:int}/rights")]
     [HasPermission(Permissions.UserAccess)]

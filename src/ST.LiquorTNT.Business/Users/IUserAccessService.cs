@@ -9,5 +9,7 @@ public interface IUserAccessService
 
     Task<UserAccessResponse> UpdateRolesAsync(int userId, UpdateUserRolesRequest request, CancellationToken ct);
 
+    Task<UserAccessResponse> UpdateRoleGroupsAsync(int userId, UpdateUserRoleGroupsRequest request, CancellationToken ct);
+
     Task<UserAccessResponse> UpdateRightsAsync(int userId, UpdateUserRightsRequest request, CancellationToken ct);
 }

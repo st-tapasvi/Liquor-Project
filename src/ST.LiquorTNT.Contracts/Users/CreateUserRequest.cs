@@ -11,8 +11,11 @@ public sealed class CreateUserRequest
     /// </summary>
     public int? CompanyId { get; set; }
 
-    /// <summary>At least one role. The supplier code comes with each role ("Operator RJ CL 772"); company-level roles cover all.</summary>
+    /// <summary>Roles given directly. The supplier code comes with each role ("Operator RJ CL 772"); company-level roles cover all.</summary>
     public List<UserRoleAssignment> Roles { get; set; } = new();
+
+    /// <summary>Role groups given to the user. At least one role or one group is needed.</summary>
+    public List<int> RoleGroupIds { get; set; } = new();
 
     public string? FullName { get; set; }
     public string? Email { get; set; }

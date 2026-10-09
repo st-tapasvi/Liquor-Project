@@ -73,6 +73,11 @@ public static class UserLogActions
     public const string RoleRightsChanged = "ROLE_RIGHTS_CHANGED";
     public const string RoleTemplatesCopied = "ROLE_TEMPLATES_COPIED";
     public const string UserRolesChanged = "USER_ROLES_CHANGED";
+    public const string UserRoleGroupsChanged = "USER_ROLE_GROUPS_CHANGED";
+    public const string RoleGroupCreated = "ROLE_GROUP_CREATED";
+    public const string RoleGroupUpdated = "ROLE_GROUP_UPDATED";
+    public const string RoleGroupDeleted = "ROLE_GROUP_DELETED";
+    public const string RoleGroupRolesChanged = "ROLE_GROUP_ROLES_CHANGED";
     public const string UserRightsChanged = "USER_RIGHTS_CHANGED";
 
     public const string MasterCreated = "MASTER_CREATED";

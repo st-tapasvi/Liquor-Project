@@ -40,8 +40,11 @@ public interface IRoleRepository
 
     Task<IReadOnlyList<ROLES>> GetTemplatesAsync(CancellationToken ct);
 
-    /// <summary>True when at least one user holds the role (it cannot be deleted then).</summary>
+    /// <summary>True when at least one user holds the role directly (it cannot be deleted then).</summary>
     Task<bool> IsAssignedAsync(int roleId, CancellationToken ct);
+
+    /// <summary>True when the role is inside at least one role group (it cannot be deleted then).</summary>
+    Task<bool> IsInRoleGroupAsync(int roleId, CancellationToken ct);
 
     /// <summary>The PAGE_ACTIONS ids the role has.</summary>
     Task<IReadOnlyList<int>> GetRightIdsAsync(int roleId, CancellationToken ct);

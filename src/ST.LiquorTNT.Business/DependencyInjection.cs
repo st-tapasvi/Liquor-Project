@@ -6,6 +6,7 @@ using ST.LiquorTNT.Business.Companies;
 using ST.LiquorTNT.Business.Excises;
 using ST.LiquorTNT.Business.LiquorCategories;
 using ST.LiquorTNT.Business.PasswordPolicies;
+using ST.LiquorTNT.Business.RoleGroups;
 using ST.LiquorTNT.Business.Roles;
 using ST.LiquorTNT.Business.SecurityConfig;
 using ST.LiquorTNT.Business.SupplierCodes;
@@ -40,6 +41,7 @@ public static class DependencyInjection
         // Roles and masters
         services.AddScoped<IRoleService, RoleService>();
         services.AddScoped<RoleTemplates>();
+        services.AddScoped<IRoleGroupService, RoleGroupService>();
         services.AddScoped<ILiquorCategoryService, LiquorCategoryService>();
         services.AddScoped<ISupplierCodeService, SupplierCodeService>();
         services.AddScoped<ICompanyService, CompanyService>();

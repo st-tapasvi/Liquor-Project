@@ -59,6 +59,11 @@ internal sealed class FakeRoleRepository : IRoleRepository
 
     public Task<bool> IsAssignedAsync(int roleId, CancellationToken ct) => Task.FromResult(AssignedRoles.Contains(roleId));
 
+    /// <summary>Roles that sit inside some role group.</summary>
+    public HashSet<int> RolesInGroups { get; } = new();
+
+    public Task<bool> IsInRoleGroupAsync(int roleId, CancellationToken ct) => Task.FromResult(RolesInGroups.Contains(roleId));
+
     public Task<IReadOnlyList<int>> GetRightIdsAsync(int roleId, CancellationToken ct) =>
         Task.FromResult<IReadOnlyList<int>>(Rights.TryGetValue(roleId, out var set) ? set.ToList() : new List<int>());
 

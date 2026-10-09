@@ -32,6 +32,8 @@ public static class ErrorCodes
     public const string RoleNotEditable        = "ROLE_NOT_EDITABLE";        // Super Admin, or a template edited by a company
     public const string RoleNameTaken          = "ROLE_NAME_TAKEN";
     public const string RoleInUse              = "ROLE_IN_USE";
+    public const string RoleGroupNameTaken     = "ROLE_GROUP_NAME_TAKEN";
+    public const string RoleGroupInUse         = "ROLE_GROUP_IN_USE";      // delete refused: users hold the group
 
     // masters
     public const string SupplierCodeTaken      = "SUPPLIER_CODE_TAKEN";

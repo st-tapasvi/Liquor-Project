@@ -2,6 +2,7 @@ using FluentAssertions;
 using ST.LiquorTNT.Business.Access;
 using ST.LiquorTNT.Business.Common;
 using ST.LiquorTNT.Business.Common.Exceptions;
+using ST.LiquorTNT.Business.RoleGroups;
 using ST.LiquorTNT.Business.Tests.Fakes;
 using ST.LiquorTNT.Business.Users;
 using ST.LiquorTNT.Contracts.Users;
@@ -60,7 +61,8 @@ public sealed class UserAccessServiceTests
         var current = new CurrentAccess(_access, new FakeCurrentUser(callerId), _tenant);
         return new UserAccessService(_userAccess, new UserAccessRules(_users, _userAccess, current),
             new PasswordRules(_policies, _users, new PasswordPolicyValidator(new FakePasswordHasher()), _clock),
-            current, _clock, _log, new UpdateUserRolesRequestValidator(), new UpdateUserRightsRequestValidator());
+            current, _clock, _log, new UpdateUserRolesRequestValidator(), new UpdateUserRoleGroupsRequestValidator(),
+            new UpdateUserRightsRequestValidator());
     }
 
     private void AddUser(int id, int role)
@@ -135,6 +137,79 @@ public sealed class UserAccessServiceTests
     {
         await Service().Invoking(s => s.UpdateRolesAsync(5, Roles(OtherCompanyOperator), CancellationToken.None))
             .Should().ThrowAsync<NotFoundException>();
+    }
+
+    // ---------- role groups ----------
+
+    private const int OperatorsGroup = 50;      // "All Operators" = Operator of OwnSupplierCode
+    private const int AdminsGroup = 51;         // holds Plant Admin
+    private const int ForeignGroup = 52;        // another company's
+
+    private void AddGroups()
+    {
+        _userAccess.Groups.Add(new RoleGroupInfo(OperatorsGroup, Company, "All Operators", true, new[] { OperatorRole }, false));
+        _userAccess.Groups.Add(new RoleGroupInfo(AdminsGroup, Company, "Admins", true, new[] { PlantAdminRole }, true));
+        _userAccess.Groups.Add(new RoleGroupInfo(ForeignGroup, 2, "Other", true, new[] { OtherCompanyOperator }, false));
+    }
+
+    private static UpdateUserRoleGroupsRequest Groups(params int[] ids) => new() { RoleGroupIds = ids.ToList() };
+
+    [Fact]
+    public async Task UpdateRoleGroups_GivesTheGroup_Audited()
+    {
+        AddGroups();
+
+        await Service().UpdateRoleGroupsAsync(5, Groups(OperatorsGroup), CancellationToken.None);
+
+        _userAccess.UserGroups[5].Should().Equal(OperatorsGroup);
+        _log.Has(UserLogActions.UserRoleGroupsChanged).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task UpdateRoleGroups_GroupOfAnotherCompany_Returns404()
+    {
+        AddGroups();
+
+        await Service().Invoking(s => s.UpdateRoleGroupsAsync(5, Groups(ForeignGroup), CancellationToken.None))
+            .Should().ThrowAsync<NotFoundException>();
+    }
+
+    [Fact]
+    public async Task UpdateRoleGroups_GroupWithAdminRole_WithoutManageAdmin_Returns403()
+    {
+        AddGroups();
+
+        var ex = await Service().Invoking(s => s.UpdateRoleGroupsAsync(5, Groups(AdminsGroup), CancellationToken.None))
+            .Should().ThrowAsync<ForbiddenException>();
+
+        ex.Which.ErrorCode.Should().Be(ErrorCodes.AdminUserProtected);
+    }
+
+    [Fact]
+    public async Task UpdateRoleGroups_Own_Returns409()
+    {
+        AddGroups();
+
+        var ex = await Service().Invoking(s => s.UpdateRoleGroupsAsync(AgentManager, Groups(OperatorsGroup), CancellationToken.None))
+            .Should().ThrowAsync<BusinessException>();
+
+        ex.Which.ErrorCode.Should().Be(ErrorCodes.CannotChangeOwnAccess);
+    }
+
+    [Fact]
+    public async Task Roles_MayBeEmpty_WhileTheUserHoldsAGroup_ButNotBothEmpty()
+    {
+        AddGroups();
+        _userAccess.UserGroups[5] = new() { OperatorsGroup };
+
+        // no direct role, but the group: fine
+        await Service().UpdateRolesAsync(5, Roles(), CancellationToken.None);
+        _userAccess.UserRoles[5].Should().BeEmpty();
+
+        // and now no group either: refused
+        var ex = await Service().Invoking(s => s.UpdateRoleGroupsAsync(5, Groups(), CancellationToken.None))
+            .Should().ThrowAsync<ValidationException>();
+        ex.Which.Errors.Should().ContainKey("roles");
     }
 
     // ---------- custom rights ----------

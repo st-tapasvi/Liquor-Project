@@ -27,6 +27,9 @@ public sealed class AppDbContext : DbContext
     public DbSet<PAGE_ACTIONS> PAGE_ACTIONS => Set<PAGE_ACTIONS>();
     public DbSet<ROLE_RIGHTS> ROLE_RIGHTS => Set<ROLE_RIGHTS>();
     public DbSet<USER_ROLES> USER_ROLES => Set<USER_ROLES>();
+    public DbSet<ROLE_GROUP> ROLE_GROUP => Set<ROLE_GROUP>();
+    public DbSet<ROLE_GROUP_ROLES> ROLE_GROUP_ROLES => Set<ROLE_GROUP_ROLES>();
+    public DbSet<USER_ROLE_GROUPS> USER_ROLE_GROUPS => Set<USER_ROLE_GROUPS>();
     public DbSet<USER_RIGHTS> USER_RIGHTS => Set<USER_RIGHTS>();
 
     // masters

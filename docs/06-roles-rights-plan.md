@@ -20,6 +20,7 @@
 | Default roles | Templates. Plant Admin, Agent Manager are copied once per company (with its first supplier code); Plant Manager, Supervisor, Operator, Viewer (`PER_SUPPLIER_CODE`) are copied for **every new supplier code**. The company may edit or delete its copies |
 | Agent Manager | Creates users, roles and rights for everyone **except admin users** |
 | Self-change | Nobody except Admin changes their **own** roles or rights |
+| Role groups | A **role group** bundles master roles of one company; a user gets roles directly, through groups, or both (owner, 2026-10-08, script 016). A new supplier code's roles are ticked into groups by hand (not automatic); a group in use cannot be deleted; groups may hold admin roles under the `user.manageadmin` rule |
 | Password policy | With several roles, the **strictest** value of each rule applies |
 | Plant | No plant entity. Hierarchy **Company → Excise → Supplier Code**. "Plant Admin" / "Plant Manager" are role names only |
 | Masters | `COMPANY`, `SUPPLIER_CODE` and `LIQUOR_CATEGORY` are maintained by Admin (they come from the CRM) |
@@ -55,6 +56,9 @@ Admin (the `admin` user, no company)
 | `ROLES` | + `COMPANY_ID`, `SUPPLIER_CODE_ID` (012; null = company-level), `IS_SYSTEM` (Admin), `IS_TEMPLATE` (default role), `PER_SUPPLIER_CODE` (012; templates copied per supplier code), `IS_ADMIN_ROLE` (Plant Admin, always company-level). Name is unique per company + supplier code |
 | `ROLE_RIGHTS` | Rebuilt: one row = role has one page action |
 | `USER_ROLES` | User → role. Since 012 the supplier code comes from the role (column removed); unique (user, role) |
+| `ROLE_GROUP` | (016) A named bundle of roles of one company: `COMPANY_ID`, `GROUP_NAME` (unique per company), `DESCRIPTION`, `IS_ACTIVE` |
+| `ROLE_GROUP_ROLES` | (016) Group → role. A role inside a group cannot be deleted (FK) |
+| `USER_ROLE_GROUPS` | (016) User → group. A user holds every role of their active groups |
 | `USER_RIGHTS` | Custom rights: user → page action → supplier code (null = all supplier codes) |
 | `USER_SESSION` | + `ACTIVE_SUPPLIER_CODE_ID` |
 | `USERS` | `ROLE_ID` removed (moved to `USER_ROLES`) |
@@ -75,7 +79,7 @@ business category that grows as data (`LIQUOR_CATEGORY`) gets its own table with
    active supplier code
 ```
 
-- Effective keys = rights of the user's roles of the active supplier code and company-level roles ∪ custom rights for it (or all supplier codes).
+- Effective keys = rights of the user's roles (given directly **or through a role group**) of the active supplier code and company-level roles ∪ custom rights for it (or all supplier codes). One query defines the held roles (`Infrastructure/.../UserRoleQuery`), used for rights, the picker, the password policy and the admin-user check.
   A company-level role or "all supplier codes" right only applies to supplier codes of the user's **own** company; the query checks this again.
 - Rights are read **per request** (one query, kept by the scoped `CurrentAccess`). They are not in the JWT, so a change applies on the
   next call without a new login.
@@ -96,7 +100,10 @@ business category that grows as data (`LIQUOR_CATEGORY`) gets its own table with
 | A role's supplier code is set on create and never changes; an admin role has none | `400` |
 | A role of a deactivated supplier code cannot be given | `404` |
 | Admin role cannot change; templates are changed by Admin only | `409 ROLE_NOT_EDITABLE` |
-| A role still assigned to users cannot be deleted | `409 ROLE_IN_USE` |
+| A role still assigned to users, or inside a role group, cannot be deleted | `409 ROLE_IN_USE` |
+| A role group given to any user cannot be deleted | `409 ROLE_GROUP_IN_USE` |
+| A group with an admin role, or held by an admin user, is changed / given only with `user.manageadmin`; nobody but Admin changes a group they hold | `403 ADMIN_USER_PROTECTED` / `409 CANNOT_CHANGE_OWN_ACCESS` |
+| A user keeps at least one role or one role group | `400` |
 | Every role of a user needs a password policy | `409 PASSWORD_POLICY_NOT_CONFIGURED` |
 
 Only the **changes** in a rights list are checked for grant scope, so saving an unchanged grid never fails on rights the editor could
@@ -138,7 +145,9 @@ All responses have a body; errors are ProblemDetails with `errorCode` (see `05-u
 | `GET /api/pages` | `role.view` | Every page with its actions and `applicationType` (empty grid); `?applicationType=WEB` or `LINE` |
 | `POST /api/users` | `user.add` | Takes `roles: [{ roleId }]` (at least one; the supplier code comes with the role); `companyId` is used only for Admin |
 | `GET /api/users/{id}/access` | `user.view` | The user's roles and custom rights, with supplier code names |
-| `PUT /api/users/{id}/roles` `{ roles: [] }` | `user.access` | The **full** list of roles |
+| `PUT /api/users/{id}/roles` `{ roles: [] }` | `user.access` | The **full** list of direct roles (may be empty while the user holds a group) |
+| `PUT /api/users/{id}/rolegroups` `{ roleGroupIds: [] }` | `user.access` | The **full** list of role groups |
+| `GET` · `POST` · `PUT` · `DELETE` `/api/rolegroups[/{id}]`, `PUT /api/rolegroups/{id}/roles` `{ roleIds: [] }` | `role.view` / `add` / `edit` / `delete` | Role groups of the company and the roles inside each |
 | `PUT /api/users/{id}/rights` `{ rights: [{ pageActionId, supplierCodeId }] }` | `user.access` | The **full** list of custom rights |
 | `GET /api/suppliercodes` · `GET /api/suppliercodes/{id}` | `suppliercode.view` | Supplier codes of the company (Admin: all) |
 | `POST /api/suppliercodes` · `PUT /api/suppliercodes/{id}` · `POST …/activate` · `POST …/deactivate` | `suppliercode.add` / `edit` (Admin) | A new supplier code gets its default roles (Plant Manager / Supervisor / Operator / Viewer of that code); the first one of a company also the company-level ones |

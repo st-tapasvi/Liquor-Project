@@ -1,3 +1,4 @@
+using ST.LiquorTNT.Business.RoleGroups;
 using ST.LiquorTNT.Contracts.Users;
 using ST.LiquorTNT.Domain.Entities;
 
@@ -30,6 +31,15 @@ public interface IUserAccessRepository
 
     /// <summary>Makes the user's roles exactly <paramref name="roles"/> (adds what is missing, removes the rest).</summary>
     Task ReplaceRolesAsync(int userId, IReadOnlyCollection<UserRoleAssignment> roles, DateTime now, int? changedBy, CancellationToken ct);
+
+    /// <summary>The ids of the role groups the user holds.</summary>
+    Task<IReadOnlyList<int>> GetRoleGroupIdsAsync(int userId, CancellationToken ct);
+
+    /// <summary>The role groups with these ids, with their role ids (unknown ids are missing from the result).</summary>
+    Task<IReadOnlyList<RoleGroupInfo>> GetRoleGroupsAsync(IReadOnlyCollection<int> roleGroupIds, CancellationToken ct);
+
+    /// <summary>Makes the user's role groups exactly <paramref name="roleGroupIds"/>.</summary>
+    Task ReplaceRoleGroupsAsync(int userId, IReadOnlyCollection<int> roleGroupIds, DateTime now, int? changedBy, CancellationToken ct);
 
     /// <summary>Makes the user's custom rights exactly <paramref name="rights"/>.</summary>
     Task ReplaceRightsAsync(int userId, IReadOnlyCollection<UserRightAssignment> rights, DateTime now, int? changedBy, CancellationToken ct);

@@ -62,6 +62,9 @@ public sealed class RoleRepository : IRoleRepository
     public Task<bool> IsAssignedAsync(int roleId, CancellationToken ct) =>
         _db.USER_ROLES.AnyAsync(r => r.RoleId == roleId, ct);
 
+    public Task<bool> IsInRoleGroupAsync(int roleId, CancellationToken ct) =>
+        _db.ROLE_GROUP_ROLES.AnyAsync(r => r.RoleId == roleId, ct);
+
     public async Task<IReadOnlyList<int>> GetRightIdsAsync(int roleId, CancellationToken ct) =>
         await _db.ROLE_RIGHTS.AsNoTracking().Where(r => r.RoleId == roleId).Select(r => r.PageActionId).ToListAsync(ct);
 
