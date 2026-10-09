@@ -72,6 +72,7 @@ db/mysql/012_supplier_code_roles.sql      master roles per supplier code (ROLES.
 db/mysql/013_page_application_type.sql    PAGES.APPLICATION_TYPE (WEB / LINE application)
 db/mysql/014_security_questions.sql       10 security questions; a question in use can never change its text
 db/mysql/015_admin_role_name.sql          the admin user's system role is named "Admin"
+db/mysql/016_role_groups.sql              role groups: ROLE_GROUP, ROLE_GROUP_ROLES, USER_ROLE_GROUPS
 db/mysql/new_install_admin.sql            NEW installations only: admin must change Admin@123 and set a question
 db/mysql/demo_globus_spirits.sql          DEV only: demo company, supplier codes, roles and users
 ```

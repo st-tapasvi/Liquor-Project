@@ -16,9 +16,18 @@ public sealed class UpdateUserRolesRequestValidator : AbstractValidator<UpdateUs
 {
     public UpdateUserRolesRequestValidator()
     {
-        // A user without any role could not do anything, and would have no password policy.
-        RuleFor(x => x.Roles).NotEmpty().WithMessage("Give the user at least one role.");
+        // May be empty while the user holds a role group; "at least one role or group" is checked by the service.
+        RuleFor(x => x.Roles).NotNull();
         RuleForEach(x => x.Roles).SetValidator(new UserRoleAssignmentValidator());
+    }
+}
+
+public sealed class UpdateUserRoleGroupsRequestValidator : AbstractValidator<UpdateUserRoleGroupsRequest>
+{
+    public UpdateUserRoleGroupsRequestValidator()
+    {
+        RuleFor(x => x.RoleGroupIds).NotNull();
+        RuleForEach(x => x.RoleGroupIds).GreaterThan(0);
     }
 }
 

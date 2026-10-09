@@ -257,6 +257,17 @@ public sealed class RoleServiceTests
     }
 
     [Fact]
+    public async Task Delete_RoleInsideARoleGroup_Returns409()
+    {
+        _roles.RolesInGroups.Add(10);
+
+        var ex = await _service.Invoking(s => s.DeleteAsync(10, CancellationToken.None)).Should().ThrowAsync<BusinessException>();
+
+        ex.Which.ErrorCode.Should().Be(ErrorCodes.RoleInUse);
+        ex.Which.Detail.Should().Contain("role group");
+    }
+
+    [Fact]
     public async Task Delete_UnusedRole_RemovesIt()
     {
         var response = await _service.DeleteAsync(10, CancellationToken.None);

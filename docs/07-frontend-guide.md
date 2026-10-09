@@ -26,6 +26,7 @@ every API with request, response and errors; give it to the AI assistant as the 
 | **Session supplier code** | After **every** login, **every** user (also with only one supplier code) goes to the supplier code screen and picks one; then the dashboard opens. The user works inside that one supplier code (switchable from the header). Rights and data follow it. |
 | **Master role** | A named set of rights. **Each supplier code has its own roles** ("Operator RJ CL 772", "Operator RJ IMFL 1028"), so each can get different rights. **Company-level roles** (Plant Admin, Agent Manager) cover every supplier code of the company. A user can hold several roles. |
 | **Right (permission key)** | One thing a user may do on one page, written `page.action`: `user.add`, `role.edit`. Pages and their actions are fixed by us (seeded in the database). |
+| **Role group** | A named bundle of master roles, given to users as one piece ("All Operators" = Operator RJ CL 772 + Operator RJ IMFL 1028). Change the group once and every user of it changes. Optional: roles can still be given directly. |
 | **Custom right** | A right given straight to one user, on top of the roles (for one supplier code or all). It only adds; it never takes a role's right away. |
 | **Admin** | The `admin` user of this installation (system role "Admin"): every right in every company. Not linked to a company. Not the same as a company's **Plant Admin** role. |
 
@@ -41,27 +42,29 @@ NEW INSTALLATION
     -> the company of that supplier code is now the company for the screens below
  6. Dashboard; menu from the permissions in that response
 
-SUPER ADMIN SETS UP THE COMPANY
+ADMIN SETS UP THE COMPANY
  7. Roles screen: the company already has its default roles (created with each supplier code):
        Plant Admin, Agent Manager                  (company-level)
        Plant Manager / Supervisor / Operator / Viewer  RJ CL 772
        Plant Manager / Supervisor / Operator / Viewer  RJ IMFL 1028   ...
     Admin may edit their rights (rights grid), create new roles ("Packer RJ CL 772"), delete unused ones.
- 8. Users screen: creates a user with a TEMPORARY password and one or more roles.
- 9. User access screen: changes roles, adds custom rights.
-10. Settings screen: security settings (lockout, sessions, security question, reset, log mode).
+ 8. Role groups screen (optional): e.g. "All Operators" = Operator RJ CL 772 + Operator RJ IMFL 1028.
+ 9. Users screen: creates a user with a TEMPORARY password and a role group and/or roles.
+10. User access screen: changes groups and roles, adds custom rights.
+11. Settings screen: security settings (lockout, sessions, security question, reset, log mode).
 
 THE NEW USER
-11. Logs in with the temporary password ................. 403 PASSWORD_CHANGE_REQUIRED
-12. Sets an own password, logs in again, sets the security question (same as steps 2-4)
-13. Supplier code screen: the list of HIS supplier codes (even if only one) -> picks one -> dashboard
-14. Menu shows only what the roles allow
+12. Logs in with the temporary password ................. 403 PASSWORD_CHANGE_REQUIRED
+13. Sets an own password, logs in again, sets the security question (same as steps 2-4)
+14. Supplier code screen: the list of the user's own supplier codes (even if only one) -> picks one -> dashboard
+15. Menu shows only what the roles (direct and through groups) allow
 
 EVERY LATER LOGIN (every user)
-15. Login -> supplier code screen -> picks one -> dashboard
+16. Login -> supplier code screen -> picks one -> dashboard
 
 LATER
-16. Forgot password on the login page -> answers the security question -> new password
+17. New supplier code: tick its roles once in the role group -> every user of the group gets them
+18. Forgot password on the login page -> answers the security question -> new password
 ```
 
 ## A3. Screens to build
@@ -75,8 +78,9 @@ LATER
 | 5 | Supplier code screen (after every login, all users) + header switcher | after login | `GET /api/auth/mysuppliercodes`, `POST /api/auth/selectsuppliercode` |
 | 6 | Menu / buttons | always | `GET /api/auth/mypermissions` |
 | 7 | Users list | `user.view` | `GET /api/users` |
-| 8 | User create / edit | `user.add` / `user.edit` | `POST /api/users`, `PUT /api/users/{id}`, `GET /api/roles` |
-| 9 | User access (roles + custom rights) | `user.view`, save needs `user.access` | `GET /api/users/{id}/access`, `PUT …/roles`, `PUT …/rights`, `GET /api/pages` |
+| 8 | User create / edit | `user.add` / `user.edit` | `POST /api/users`, `PUT /api/users/{id}`, `GET /api/roles`, `GET /api/rolegroups` |
+| 9 | User access (role groups + roles + custom rights) | `user.view`, save needs `user.access` | `GET /api/users/{id}/access`, `PUT …/rolegroups`, `PUT …/roles`, `PUT …/rights`, `GET /api/pages` |
+| 9a | Role groups: list, create / rename, roles of a group, delete | `role.view` / `role.add` / `role.edit` / `role.delete` | `/api/rolegroups…` (B8a) |
 | 10 | Roles list | `role.view` | `GET /api/roles` |
 | 11 | Role form | `role.add` / `role.edit` | `POST /api/roles`, `PUT /api/roles/{id}`, `GET /api/suppliercodes`, `GET /api/passwordpolicies` |
 | 12 | Role rights grid | `role.view`, save needs `role.edit` | `GET /api/roles/{id}/rights`, `PUT /api/roles/{id}/rights` |
@@ -388,8 +392,9 @@ when `forcePasswordChange` is true. `GET /api/users/{id}` returns one `UserRespo
 ### Create · `POST /api/users` — `user.add`
 
 Form: user name, temporary password, full name, email, phone, employee code, "must change password at first login"
-(default on), and **roles**. Roles come from `GET /api/roles` (B8) shown by `displayName`. Easiest UI: pick a supplier code,
-then tick its roles from `GET /api/roles?supplierCodeId=…`; repeat for another supplier code. Company-level roles are in every list.
+(default on), **role groups** and/or **roles** (at least one of the two). Role groups come from `GET /api/rolegroups` (B8a) —
+for most users one group is enough ("All Operators"). Roles come from `GET /api/roles` (B8) shown by `displayName`; easiest UI:
+pick a supplier code, then tick its roles from `GET /api/roles?supplierCodeId=…`. Company-level roles are in every list.
 
 ```json
 // request
@@ -398,12 +403,14 @@ then tick its roles from `GET /api/roles?supplierCodeId=…`; repeat for another
   "password": "Temp@12345",
   "companyId": 20,
   "roles": [ { "roleId": 98 } ],
+  "roleGroupIds": [],
   "fullName": "Ravi Kumar",
   "email": "ravi.kumar@globus-spirits.example",
   "phone": "9000000201",
   "employeeCode": "GSL-201",
   "forcePasswordChange": true
 }
+// or with a role group only:  "roles": [], "roleGroupIds": [2]
 // 201 (UserResponse)
 { "id": 286, "userName": "ravi.kumar", "fullName": "Ravi Kumar", "email": "ravi.kumar@globus-spirits.example",
   "phone": "9000000201", "employeeCode": "GSL-201", "companyId": 20, "isActive": true, "isBlocked": false,
@@ -411,7 +418,8 @@ then tick its roles from `GET /api/roles?supplierCodeId=…`; repeat for another
   "lastLoginAt": null, "createdAt": "2026-10-08T13:19:56.2769256" }
 ```
 
-- `roles`: at least one; send only `roleId` (the supplier code comes with the role). Role 98 = "Operator RJ CL 772".
+- `roles` / `roleGroupIds`: at least one role **or** one group. For a role send only `roleId` (the supplier code comes with the
+  role; 98 = "Operator RJ CL 772"). The password policy is the strictest of all roles, direct and inside the groups.
 - `companyId`: **only Admin** sends it; when left out it is the company of the picked supplier code. Everyone else's
   users always join their own company.
 - `userName`: letters, digits and `. _ @ -`, max 50, cannot be changed later.
@@ -437,28 +445,48 @@ Profile fields only (send all four; roles and status have their own APIs):
 |---|---|---|
 | `USERNAME_TAKEN` | 409 | user name exists |
 | `PASSWORD_POLICY_NOT_CONFIGURED` | 409 | a chosen role has no password policy |
-| `VALIDATION_FAILED` | 400 | `errors.password` (policy rules), `errors.roles` (none chosen), other fields |
-| `ADMIN_USER_PROTECTED` | 403 | target is an admin user (Plant Admin / Admin), or an admin role is chosen, and the caller lacks `user.manageadmin` |
+| `VALIDATION_FAILED` | 400 | `errors.password` (policy rules), `errors.roles` (no role and no group), other fields |
+| `ADMIN_USER_PROTECTED` | 403 | target is an admin user (Plant Admin / Admin), or an admin role / a group with an admin role is chosen, and the caller lacks `user.manageadmin` |
 | `CANNOT_DEACTIVATE_SELF` | 409 | deactivating yourself |
-| `NOT_FOUND` | 404 | user / role of another company, role of a deactivated supplier code, unknown company |
+| `NOT_FOUND` | 404 | user / role / role group of another company, role of a deactivated supplier code, unknown company |
 
 ---
 
-## B7. User access: roles and custom rights
+## B7. User access: role groups, roles and custom rights
+
+A user's rights = rights of the **roles given directly** + rights of the **roles inside the user's role groups** + **custom
+rights**. Groups are optional; a user needs at least one role or one group.
 
 ### Load · `GET /api/users/{id}/access` — `user.view`
 ```json
 {
-  "userId": 286, "userName": "ravi.kumar",
-  "roles": [
-    { "roleId": 98, "roleName": "Operator", "displayName": "Operator RJ CL 772", "supplierCodeId": 30, "supplierCodeName": "RJ CL 772" }
+  "userId": 392, "userName": "zz.group.demo",
+  "roles": [],
+  "roleGroups": [
+    { "roleGroupId": 2, "groupName": "All Operators",
+      "roles": [
+        { "roleId": 98, "roleName": "Operator", "displayName": "Operator RJ CL 772",   "supplierCodeId": 30, "supplierCodeName": "RJ CL 772" },
+        { "roleId": 97, "roleName": "Operator", "displayName": "Operator RJ IMFL 1028", "supplierCodeId": 31, "supplierCodeName": "RJ IMFL 1028" }
+      ] }
   ],
   "rights": []
 }
 ```
-`supplierCodeName` is `"All supplier codes"` for a company-level role or an all-supplier-codes right.
+`roles` holds only the directly given roles; the group's roles are listed inside `roleGroups`. `supplierCodeName` is
+`"All supplier codes"` for a company-level role or an all-supplier-codes right.
 
-### Save roles · `PUT /api/users/{id}/roles` — `user.access` (the FULL list, at least one)
+### Save role groups · `PUT /api/users/{id}/rolegroups` — `user.access` (the FULL list)
+```json
+// request
+{ "roleGroupIds": [2] }
+// 200 → UserAccessResponse (as above)
+```
+```json
+// removing the last group of a user who has no direct role → 400
+{ "errorCode": "VALIDATION_FAILED", "errors": { "roles": ["Give the user at least one role or one role group."] } }
+```
+
+### Save roles · `PUT /api/users/{id}/roles` — `user.access` (the FULL list; may be empty while the user holds a group)
 ```json
 // request
 { "roles": [ { "roleId": 98 }, { "roleId": 133 } ] }
@@ -487,19 +515,20 @@ or `supplierCodeId: null` = all supplier codes. This list always holds the user'
 }
 ```
 
-**Screen:** two sections. "Roles": rows of `displayName` grouped by `supplierCodeName`, add / remove, Save. "Custom rights":
+**Screen:** three sections. "Role groups": the user's groups (chips; each expandable to show its roles), add / remove from
+`GET /api/rolegroups`, Save. "Roles (direct)": rows of `displayName` grouped by `supplierCodeName`, add / remove, Save. "Custom rights":
 rows *Right* (`pageName → actionName`) × *Supplier code* (or "All"), add / remove, Save. In the right picker disable
 `grantScope = "SYSTEM"` actions, and `"ADMIN"` actions unless the user has `user.manageadmin`. Hide both Save buttons when
 looking at yourself (unless Admin).
 
 | Error | Status | Meaning |
 |---|---|---|
-| `CANNOT_CHANGE_OWN_ACCESS` | 409 | editing your own roles / rights |
-| `ADMIN_USER_PROTECTED` | 403 | admin user / admin role / ADMIN right without `user.manageadmin` |
+| `CANNOT_CHANGE_OWN_ACCESS` | 409 | editing your own roles / groups / rights |
+| `ADMIN_USER_PROTECTED` | 403 | admin user / admin role / group with an admin role / ADMIN right without `user.manageadmin` |
 | `RIGHT_NOT_GRANTABLE` | 403 | a SYSTEM right in custom rights |
 | `PASSWORD_POLICY_NOT_CONFIGURED` | 409 | a role without password policy |
-| `VALIDATION_FAILED` | 400 | `errors.roles` (empty list), `errors.rights` (unknown action id) |
-| `NOT_FOUND` | 404 | user / role / supplier code not of this company |
+| `VALIDATION_FAILED` | 400 | `errors.roles` (no role and no group left), `errors.rights` (unknown action id) |
+| `NOT_FOUND` | 404 | user / role / role group / supplier code not of this company |
 
 ---
 
@@ -594,6 +623,74 @@ Refused with `409 ROLE_IN_USE` while any user holds the role — remove it from 
 | `ADMIN_USER_PROTECTED` | 403 | admin role or ADMIN right without `user.manageadmin` |
 | `VALIDATION_FAILED` | 400 | `errors.supplierCodeId` (changed), `errors.isAdminRole` (admin role with a supplier code), `errors.roleName` |
 | `NOT_FOUND` | 404 | role of another company, supplier code not of the company, unknown password policy |
+
+---
+
+## B8a. Role groups
+
+A **role group** is a named bundle of master roles of the company, given to users as one piece — e.g. "All Operators" =
+Operator RJ CL 772 + Operator RJ IMFL 1028. Why: when a new supplier code comes, its "Operator" role is ticked **once** in
+the group and all 50 operators get it, instead of giving the role to 50 users one by one. Groups are optional; roles can
+still be given directly, or both.
+
+Rules:
+- A group holds roles of its own company only (no rights, no other groups). Any role may go in, also company-level ones.
+- A new supplier code's roles are **not** added to groups automatically — the admin ticks them in the group.
+- Changing a group's roles changes the rights of every user of the group on their next call.
+- A group given to any user cannot be deleted (`409 ROLE_GROUP_IN_USE`); a role inside a group cannot be deleted (`409 ROLE_IN_USE`).
+- A group with an admin role (Plant Admin), or held by an admin user, is changed or given only with `user.manageadmin`.
+- Nobody (except Admin) changes a group they hold themselves.
+- Group screens use the role rights: `role.view` / `role.add` / `role.edit` / `role.delete`. Giving a group to a user: `user.access`.
+
+| Call | Right | Request → Response |
+|---|---|---|
+| `GET /api/rolegroups` | `role.view` | → `RoleGroupResponse[]` (the company's groups, by name) |
+| `GET /api/rolegroups/{id}` | `role.view` | → `RoleGroupResponse` |
+| `POST /api/rolegroups` | `role.add` | `{ groupName, description }` → `201 RoleGroupResponse` (no roles yet) |
+| `PUT /api/rolegroups/{id}` | `role.edit` | `{ groupName, description }` → `RoleGroupResponse` |
+| `PUT /api/rolegroups/{id}/roles` | `role.edit` | `{ roleIds: [] }` (the FULL list) → `RoleGroupResponse` |
+| `DELETE /api/rolegroups/{id}` | `role.delete` | → `MessageResponse` |
+
+```json
+// POST /api/rolegroups
+{ "groupName": "All Operators", "description": "Operators of every supplier code" }
+// 201
+{ "id": 2, "companyId": 20, "groupName": "All Operators", "description": "Operators of every supplier code",
+  "isActive": true, "hasAdminRole": false, "userCount": 0, "roles": [] }
+
+// PUT /api/rolegroups/2/roles
+{ "roleIds": [98, 97] }
+// 200
+{ "id": 2, "companyId": 20, "groupName": "All Operators", "description": "Operators of every supplier code",
+  "isActive": true, "hasAdminRole": false, "userCount": 0,
+  "roles": [
+    { "roleId": 98, "roleName": "Operator", "displayName": "Operator RJ CL 772",    "supplierCodeId": 30, "supplierCodeName": "RJ CL 772",    "isAdminRole": false },
+    { "roleId": 97, "roleName": "Operator", "displayName": "Operator RJ IMFL 1028", "supplierCodeId": 31, "supplierCodeName": "RJ IMFL 1028", "isAdminRole": false }
+  ] }
+
+// new supplier code JK 369: tick its Operator once → every user of the group gets it
+{ "roleIds": [98, 97, 96] }      // 200, "userCount": 1 — the response shows how many users are affected
+
+// DELETE /api/rolegroups/2 while a user holds it → 409
+{ "errorCode": "ROLE_GROUP_IN_USE", "title": "This role group is still given to users.",
+  "detail": "Remove 'All Operators' from every user (1) before deleting it." }
+// after removing it from the users → 200
+{ "message": "Role group 'All Operators' deleted." }
+```
+
+**Screens:** a "Role groups" list (name, description, number of roles, `userCount`, "Admin" badge when `hasAdminRole`),
+a create / rename form, and a "roles of the group" screen: the company's roles from `GET /api/roles` grouped by
+`supplierCodeName`, with checkboxes and one Save (show "Changes the access of N users" with `userCount` before saving).
+
+| Error | Status | Meaning |
+|---|---|---|
+| `ROLE_GROUP_NAME_TAKEN` | 409 | name already used in this company |
+| `ROLE_GROUP_IN_USE` | 409 | delete refused: users hold the group |
+| `CANNOT_CHANGE_OWN_ACCESS` | 409 | changing a group you hold yourself |
+| `ADMIN_USER_PROTECTED` | 403 | group with an admin role, or held by an admin user, without `user.manageadmin` |
+| `PASSWORD_POLICY_NOT_CONFIGURED` | 409 | a ticked role has no password policy |
+| `VALIDATION_FAILED` | 400 | empty name; creating a group before picking a supplier code (Admin) |
+| `NOT_FOUND` | 404 | group or role of another company, template / inactive role |
 
 ---
 
@@ -849,7 +946,8 @@ export interface UserRightAssignment { pageActionId: number; supplierCodeId: num
 export interface CreateUserRequest {
   userName: string; password: string;
   companyId?: number | null;           // Admin only
-  roles: UserRoleAssignment[];         // at least one
+  roles: UserRoleAssignment[];         // direct roles (may be empty when roleGroupIds is not)
+  roleGroupIds: number[];              // role groups; at least one role OR one group
   fullName?: string; email?: string; phone?: string; employeeCode?: string;
   forcePasswordChange: boolean;        // default true
 }
@@ -862,9 +960,22 @@ export interface UserResponse {
 }
 export interface UserRoleResponse { roleId: number; roleName: string; displayName: string; supplierCodeId: number | null; supplierCodeName: string; }
 export interface UserRightResponse { pageActionId: number; permissionKey: string; actionName: string; supplierCodeId: number | null; supplierCodeName: string; }
-export interface UserAccessResponse { userId: number; userName: string; roles: UserRoleResponse[]; rights: UserRightResponse[]; }
+export interface UserRoleGroupResponse { roleGroupId: number; groupName: string; roles: UserRoleResponse[]; }
+export interface UserAccessResponse { userId: number; userName: string; roles: UserRoleResponse[]; roleGroups: UserRoleGroupResponse[]; rights: UserRightResponse[]; }
 export interface UpdateUserRolesRequest { roles: UserRoleAssignment[]; }
+export interface UpdateUserRoleGroupsRequest { roleGroupIds: number[]; }
 export interface UpdateUserRightsRequest { rights: UserRightAssignment[]; }
+
+// ---------- role groups ----------
+export interface RoleGroupRoleResponse { roleId: number; roleName: string; displayName: string; supplierCodeId: number | null; supplierCodeName: string | null; isAdminRole: boolean; }
+export interface RoleGroupResponse {
+  id: number; companyId: number; groupName: string; description?: string | null; isActive: boolean;
+  hasAdminRole: boolean;   // only user.manageadmin may change or give it
+  userCount: number;       // users holding the group (in use → cannot be deleted)
+  roles: RoleGroupRoleResponse[];
+}
+export interface SaveRoleGroupRequest { groupName: string; description?: string | null; }
+export interface UpdateRoleGroupRolesRequest { roleIds: number[]; }   // the FULL list
 
 // ---------- roles / pages ----------
 export interface RoleResponse {

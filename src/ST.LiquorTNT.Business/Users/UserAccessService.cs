@@ -7,8 +7,8 @@ using ST.LiquorTNT.Contracts.Users;
 namespace ST.LiquorTNT.Business.Users;
 
 /// <summary>
-/// Assigning master roles and custom rights to a user. The request always carries the FULL list; the service
-/// works out what was added and removed. A change applies from the user's next API call (rights are read per
+/// Assigning master roles, role groups and custom rights to a user. The request always carries the FULL list; the
+/// service works out what was added and removed. A change applies from the user's next API call (rights are read per
 /// request), so nobody has to log in again. All the "who may give what" rules are in <see cref="UserAccessRules"/>.
 /// </summary>
 public sealed class UserAccessService : IUserAccessService
@@ -22,6 +22,7 @@ public sealed class UserAccessService : IUserAccessService
     private readonly IClock _clock;
     private readonly IUserLogWriter _log;
     private readonly IValidator<UpdateUserRolesRequest> _rolesValidator;
+    private readonly IValidator<UpdateUserRoleGroupsRequest> _roleGroupsValidator;
     private readonly IValidator<UpdateUserRightsRequest> _rightsValidator;
 
     public UserAccessService(
@@ -32,6 +33,7 @@ public sealed class UserAccessService : IUserAccessService
         IClock clock,
         IUserLogWriter log,
         IValidator<UpdateUserRolesRequest> rolesValidator,
+        IValidator<UpdateUserRoleGroupsRequest> roleGroupsValidator,
         IValidator<UpdateUserRightsRequest> rightsValidator)
     {
         _userAccess = userAccess;
@@ -41,6 +43,7 @@ public sealed class UserAccessService : IUserAccessService
         _clock = clock;
         _log = log;
         _rolesValidator = rolesValidator;
+        _roleGroupsValidator = roleGroupsValidator;
         _rightsValidator = rightsValidator;
     }
 
@@ -60,14 +63,45 @@ public sealed class UserAccessService : IUserAccessService
 
         var roles = await _rules.ValidateRolesAsync(user.CompanyId, request.Roles, ct);
 
-        // The user's password must stay governable: every new role needs a password policy.
-        await _passwordRules.RequirePolicyAsync(roles.Select(r => r.RoleId).ToList(), ct);
+        // No direct role is fine while the user holds a role group; the groups' roles count for the password policy.
+        var groups = await _userAccess.GetRoleGroupsAsync(await _userAccess.GetRoleGroupIdsAsync(user.Id, ct), ct);
+        UserAccessRules.EnsureSomeRoleOrGroup(roles.Count, groups.Count);
+
+        // The user's password must stay governable: every role (direct or through a group) needs a password policy.
+        await _passwordRules.RequirePolicyAsync(
+            roles.Select(r => r.RoleId).Concat(groups.SelectMany(g => g.RoleIds)).ToList(), ct);
 
         var before = await _userAccess.GetRoleAssignmentsAsync(user.Id, ct);
         await _userAccess.ReplaceRolesAsync(user.Id, roles, _clock.IndiaNow, _access.UserId, ct);
 
         await _log.WriteAsync(UserLogEntry.Success(UserLogActions.UserRolesChanged, UserLogModules.Users, EntityName,
             user.Id.ToString(), $"Roles of user '{user.UserName}' changed.", oldValue: before, newValue: roles), ct);
+        await _userAccess.SaveChangesAsync(ct);
+
+        return await _userAccess.GetAccessAsync(user, ct);
+    }
+
+    public async Task<UserAccessResponse> UpdateRoleGroupsAsync(int userId, UpdateUserRoleGroupsRequest request, CancellationToken ct)
+    {
+        (await _roleGroupsValidator.ValidateAsync(request, ct)).EnsureValid();
+
+        var user = await _rules.RequireUserAsync(userId, ct);
+        await _rules.EnsureNotSelfAsync(user, ct);
+        await _rules.EnsureCanManageUserAsync(user, ct);      // taking groups away from an admin user is protected too
+
+        var groups = await _rules.ValidateRoleGroupsAsync(user.CompanyId, request.RoleGroupIds, ct);
+        var directRoles = await _userAccess.GetRoleAssignmentsAsync(user.Id, ct);
+        UserAccessRules.EnsureSomeRoleOrGroup(directRoles.Count, groups.Count);
+
+        await _passwordRules.RequirePolicyAsync(
+            directRoles.Select(r => r.RoleId).Concat(groups.SelectMany(g => g.RoleIds)).ToList(), ct);
+
+        var before = await _userAccess.GetRoleGroupIdsAsync(user.Id, ct);
+        var wanted = groups.Select(g => g.Id).ToList();
+        await _userAccess.ReplaceRoleGroupsAsync(user.Id, wanted, _clock.IndiaNow, _access.UserId, ct);
+
+        await _log.WriteAsync(UserLogEntry.Success(UserLogActions.UserRoleGroupsChanged, UserLogModules.Users, EntityName,
+            user.Id.ToString(), $"Role groups of user '{user.UserName}' changed.", oldValue: before, newValue: wanted), ct);
         await _userAccess.SaveChangesAsync(ct);
 
         return await _userAccess.GetAccessAsync(user, ct);

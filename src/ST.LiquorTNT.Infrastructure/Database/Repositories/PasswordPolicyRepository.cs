@@ -22,8 +22,9 @@ public sealed class PasswordPolicyRepository : IPasswordPolicyRepository
         return rows.ToDictionary(r => r.RoleId, r => r.Policy);
     }
 
+    // direct roles and the roles of the user's role groups: the strictest policy of all of them applies
     public async Task<IReadOnlyList<int>> GetRoleIdsForUserAsync(int userId, CancellationToken ct) =>
-        await _db.USER_ROLES.AsNoTracking().Where(r => r.UserId == userId).Select(r => r.RoleId).Distinct().ToListAsync(ct);
+        await UserRoleQuery.RoleIds(_db, userId).ToListAsync(ct);
 
     public Task<PASSWORD_POLICY?> GetByIdAsync(int id, CancellationToken ct) =>
         _db.PASSWORD_POLICY.FirstOrDefaultAsync(p => p.Id == id, ct);

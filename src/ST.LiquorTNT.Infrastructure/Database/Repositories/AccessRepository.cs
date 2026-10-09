@@ -30,13 +30,13 @@ public sealed class AccessRepository : IAccessRepository
         var userCompany = await _db.USERS.Where(u => u.Id == userId).Select(u => u.CompanyId).FirstOrDefaultAsync(ct);
         var allSupplierCodesCount = supplierCodeCompany is not null && supplierCodeCompany == userCompany;
 
-        // rights through roles
+        // rights through roles (given directly or through a role group)
+        var heldRoles = UserRoleQuery.RoleIds(_db, userId);
         var fromRoles =
-            from ur in _db.USER_ROLES
-            join r in _db.ROLES on ur.RoleId equals r.Id
+            from r in _db.ROLES
             join rr in _db.ROLE_RIGHTS on r.Id equals rr.RoleId
             join pa in _db.PAGE_ACTIONS on rr.PageActionId equals pa.Id
-            where ur.UserId == userId
+            where heldRoles.Contains(r.Id)
                   && r.IsActive && pa.IsActive
                   && (r.SupplierCodeId == supplierCodeId || (allSupplierCodesCount && r.SupplierCodeId == null))
             select pa.PermissionKey;
@@ -60,20 +60,16 @@ public sealed class AccessRepository : IAccessRepository
     {
         var userCompany = await _db.USERS.Where(u => u.Id == userId).Select(u => u.CompanyId).FirstOrDefaultAsync(ct);
 
-        // Supplier codes of the user's roles and custom rights ...
-        var namedByRole =
-            from ur in _db.USER_ROLES
-            join r in _db.ROLES on ur.RoleId equals r.Id
-            where ur.UserId == userId && r.IsActive && r.SupplierCodeId != null
-            select r.SupplierCodeId!.Value;
+        // Supplier codes of the user's roles (direct or through role groups) and custom rights ...
+        var heldRoles = UserRoleQuery.RoleIds(_db, userId);
+        var namedByRole = _db.ROLES
+            .Where(r => heldRoles.Contains(r.Id) && r.IsActive && r.SupplierCodeId != null)
+            .Select(r => r.SupplierCodeId!.Value);
         var namedByRight = _db.USER_RIGHTS.Where(r => r.UserId == userId && r.SupplierCodeId != null).Select(r => r.SupplierCodeId!.Value);
 
         // ... plus every supplier code of the company when some role is company-level or some right is for "all supplier codes".
         var coversAll =
-            await (from ur in _db.USER_ROLES
-                   join r in _db.ROLES on ur.RoleId equals r.Id
-                   where ur.UserId == userId && r.SupplierCodeId == null && r.IsActive && !r.IsSystem
-                   select ur.Id).AnyAsync(ct)
+            await _db.ROLES.AnyAsync(r => heldRoles.Contains(r.Id) && r.SupplierCodeId == null && r.IsActive && !r.IsSystem, ct)
             || await _db.USER_RIGHTS.AnyAsync(r => r.UserId == userId && r.SupplierCodeId == null, ct);
 
         var supplierCodes = _db.SUPPLIER_CODE.Where(s =>

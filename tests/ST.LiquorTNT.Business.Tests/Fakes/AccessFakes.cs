@@ -1,5 +1,6 @@
 using ST.LiquorTNT.Business.Access;
 using ST.LiquorTNT.Business.Common;
+using ST.LiquorTNT.Business.RoleGroups;
 using ST.LiquorTNT.Business.Users;
 using ST.LiquorTNT.Contracts.Users;
 using ST.LiquorTNT.Contracts.SupplierCodes;
@@ -111,6 +112,24 @@ internal sealed class FakeUserAccessRepository : IUserAccessRepository
     public Task ReplaceRightsAsync(int userId, IReadOnlyCollection<UserRightAssignment> rights, DateTime now, int? changedBy, CancellationToken ct)
     {
         UserRights[userId] = rights.ToList();
+        return Task.CompletedTask;
+    }
+
+    /// <summary>Role groups known to the fake.</summary>
+    public List<RoleGroupInfo> Groups { get; } = new();
+
+    /// <summary>Role group ids per user.</summary>
+    public Dictionary<int, List<int>> UserGroups { get; } = new();
+
+    public Task<IReadOnlyList<int>> GetRoleGroupIdsAsync(int userId, CancellationToken ct) =>
+        Task.FromResult<IReadOnlyList<int>>(UserGroups.GetValueOrDefault(userId, new()));
+
+    public Task<IReadOnlyList<RoleGroupInfo>> GetRoleGroupsAsync(IReadOnlyCollection<int> roleGroupIds, CancellationToken ct) =>
+        Task.FromResult<IReadOnlyList<RoleGroupInfo>>(Groups.Where(g => roleGroupIds.Contains(g.Id)).ToList());
+
+    public Task ReplaceRoleGroupsAsync(int userId, IReadOnlyCollection<int> roleGroupIds, DateTime now, int? changedBy, CancellationToken ct)
+    {
+        UserGroups[userId] = roleGroupIds.ToList();
         return Task.CompletedTask;
     }
 

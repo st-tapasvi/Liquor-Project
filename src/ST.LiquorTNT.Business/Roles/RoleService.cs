@@ -166,6 +166,13 @@ public sealed class RoleService : IRoleService
                 $"Remove '{name}' from every user before deleting it.");
         }
 
+        // The same for a role inside a role group: its users hold it through the group.
+        if (await _roles.IsInRoleGroupAsync(role.Id, ct))
+        {
+            throw new BusinessException(ErrorCodes.RoleInUse, "This role is still inside a role group.",
+                $"Remove '{name}' from every role group before deleting it.");
+        }
+
         await _roles.RemoveAsync(role, ct);
         await _log.WriteAsync(UserLogEntry.Success(UserLogActions.RoleDeleted, UserLogModules.Roles, EntityName,
             role.Id.ToString(), $"Role '{name}' deleted."), ct);

@@ -84,8 +84,12 @@ public sealed class UserService : IUserService
         }
 
         var roles = await _rules.ValidateRolesAsync(companyId, request.Roles, ct);
+        var groups = await _rules.ValidateRoleGroupsAsync(companyId, request.RoleGroupIds, ct);
+        UserAccessRules.EnsureSomeRoleOrGroup(roles.Count, groups.Count);
 
-        var policy = await _passwordRules.RequirePolicyAsync(roles.Select(r => r.RoleId).ToList(), ct);
+        // the strictest policy of every role the user will hold, directly or through a group
+        var policy = await _passwordRules.RequirePolicyAsync(
+            roles.Select(r => r.RoleId).Concat(groups.SelectMany(g => g.RoleIds)).ToList(), ct);
         _passwordRules.EnsureAcceptable(request.Password, userName, policy, Array.Empty<string>());
 
         var now = _clock.IndiaNow;
@@ -107,11 +111,14 @@ public sealed class UserService : IUserService
         await _users.SaveChangesAsync(ct);
 
         await _userAccess.ReplaceRolesAsync(user.Id, roles, now, _access.UserId, ct);
+        var groupIds = groups.Select(g => g.Id).ToList();
+        await _userAccess.ReplaceRoleGroupsAsync(user.Id, groupIds, now, _access.UserId, ct);
 
         var response = UserProjections.Map(user);
         await _log.WriteAsync(UserLogEntry.Success(
             UserLogActions.UserCreated, UserLogModules.Users, EntityName, user.Id.ToString(),
-            $"User '{user.UserName}' created with {roles.Count} role(s).", newValue: new { user = response, roles }), ct);
+            $"User '{user.UserName}' created with {roles.Count} role(s) and {groupIds.Count} role group(s).",
+            newValue: new { user = response, roles, roleGroups = groupIds }), ct);
         await _users.SaveChangesAsync(ct);
 
         return response;
