@@ -6,6 +6,7 @@ import {
   type GridRowId,
   type GridValidRowModel,
 } from '@mui/x-data-grid';
+import { type RefObject, useLayoutEffect, useRef, useState } from 'react';
 
 import { tokens } from '@/core/theme';
 
@@ -30,9 +31,38 @@ interface AppDataGridProps<TRow extends GridValidRowModel> {
   error?: unknown;
   onRetry?: () => void;
   server?: ServerPaging;
+  fillViewport?: boolean;
 }
 
 const paginationModel = { page: 0, pageSize: DEFAULT_PAGE_SIZE };
+
+const DEFAULT_HEIGHT = 400;
+const BOTTOM_GAP = 24;
+
+function useViewportFillHeight(ref: RefObject<HTMLDivElement | null>, enabled: boolean): number {
+  const [height, setHeight] = useState(DEFAULT_HEIGHT);
+
+  useLayoutEffect(() => {
+    const element = ref.current;
+    if (!enabled || !element) return;
+
+    const update = () => {
+      const top = element.getBoundingClientRect().top + window.scrollY;
+      setHeight(Math.max(DEFAULT_HEIGHT, Math.floor(window.innerHeight - top - BOTTOM_GAP)));
+    };
+
+    update();
+    window.addEventListener('resize', update);
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(update);
+    if (element.parentElement) observer?.observe(element.parentElement);
+    return () => {
+      window.removeEventListener('resize', update);
+      observer?.disconnect();
+    };
+  }, [ref, enabled]);
+
+  return height;
+}
 
 const gridSx = {
   border: 0,
@@ -60,13 +90,17 @@ export function AppDataGrid<TRow extends GridValidRowModel>({
   error,
   onRetry,
   server,
+  fillViewport = false,
 }: AppDataGridProps<TRow>) {
+  const paperRef = useRef<HTMLDivElement>(null);
+  const height = useViewportFillHeight(paperRef, fillViewport && !error);
+
   if (error) {
     return <ErrorState error={error} {...(onRetry ? { onRetry } : {})} />;
   }
 
   return (
-    <Paper elevation={1} sx={{ height: 400, width: '100%' }}>
+    <Paper ref={paperRef} elevation={1} sx={{ height, width: '100%' }}>
       <DataGrid<TRow>
         aria-label={ariaLabel}
         rows={rows ?? []}

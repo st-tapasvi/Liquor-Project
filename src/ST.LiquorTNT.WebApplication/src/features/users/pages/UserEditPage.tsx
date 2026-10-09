@@ -1,5 +1,9 @@
-import { useNavigate, useParams } from 'react-router';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
+import Button from '@mui/material/Button';
+import { Link as RouterLink, useMatch, useNavigate, useParams } from 'react-router';
 
+import { Can, usePermission } from '@/core/auth';
 import { PATHS } from '@/core/router';
 
 import { ErrorState, LoadingOverlay } from '@/shared/components/feedback';
@@ -13,15 +17,17 @@ import { UserForm } from '../components/UserForm';
 import { UserRolesSection } from '../components/UserRolesSection';
 import { fromUser, toCreateRequest, toUpdateRequest } from '../users.schema';
 
-/** Serves both /users/new and /users/:id/edit. */
+/** Serves /users/new, /users/:id (read-only view) and /users/:id/edit. */
 export default function UserEditPage() {
   const { id } = useParams<{ id: string }>();
-  const userId = id === undefined ? undefined : Number.parseInt(id, 10);
+  const userId = id === undefined ? undefined : /^\d+$/.test(id) ? Number(id) : Number.NaN;
   const navigate = useNavigate();
+  const isEditRoute = useMatch(PATHS.users.edit()) !== null;
+  const canEdit = usePermission('user.edit');
 
   if (userId === undefined) return <CreateView onDone={() => navigate(PATHS.users.list)} />;
   if (!Number.isInteger(userId) || userId <= 0) return <ErrorState error={new Error('Invalid user id.')} />;
-  return <EditView userId={userId} onDone={() => navigate(PATHS.users.list)} />;
+  return <EditView userId={userId} readOnly={!isEditRoute || !canEdit} onDone={() => navigate(PATHS.users.list)} />;
 }
 
 function CreateView({ onDone }: { onDone: () => void }) {
@@ -44,7 +50,7 @@ function CreateView({ onDone }: { onDone: () => void }) {
   );
 }
 
-function EditView({ userId, onDone }: { userId: number; onDone: () => void }) {
+function EditView({ userId, readOnly, onDone }: { userId: number; readOnly: boolean; onDone: () => void }) {
   const user = useUser(userId);
   const update = useUpdateUser(userId);
 
@@ -58,12 +64,34 @@ function EditView({ userId, onDone }: { userId: number; onDone: () => void }) {
       <PageHeader
         title={user.data.userName}
         subtitle={user.data.fullName ?? undefined}
-        actions={<StatusChip label={status.label} tone={status.tone} />}
+        actions={
+          <>
+            <StatusChip label={status.label} tone={status.tone} />
+            {readOnly && (
+              <>
+                <Button component={RouterLink} to={PATHS.users.list} startIcon={<ArrowBackIcon />}>
+                  Back
+                </Button>
+                <Can right="user.edit">
+                  <Button
+                    component={RouterLink}
+                    to={PATHS.users.edit(userId)}
+                    variant="contained"
+                    startIcon={<EditOutlinedIcon />}
+                  >
+                    Edit
+                  </Button>
+                </Can>
+              </>
+            )}
+          </>
+        }
       />
       <Section>
         <UserForm
           mode="edit"
           key={user.data.id}
+          readOnly={readOnly}
           defaultValues={fromUser(user.data)}
           busy={update.isPending}
           onCancel={onDone}

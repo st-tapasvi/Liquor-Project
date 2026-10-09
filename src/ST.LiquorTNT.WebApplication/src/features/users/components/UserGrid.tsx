@@ -1,11 +1,12 @@
+import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined';
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import LockOpenIcon from '@mui/icons-material/LockOpen';
-import PersonIcon from '@mui/icons-material/Person';
-import PersonOffIcon from '@mui/icons-material/PersonOff';
+import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import IconButton from '@mui/material/IconButton';
 import Link from '@mui/material/Link';
 import Stack from '@mui/material/Stack';
 import Tooltip from '@mui/material/Tooltip';
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Link as RouterLink } from 'react-router';
 
 import type { UserResponse } from '@/core/api';
@@ -17,7 +18,7 @@ import { StatusChip } from '@/shared/components/ui';
 import { useConfirm } from '@/shared/hooks';
 import { formatDateTime } from '@/shared/utils';
 
-import { useActivateUser, useDeactivateUser, useUnlockUser } from '../api/users.mutations';
+import { useDeleteUser, useUnlockUser } from '../api/users.mutations';
 import { useUsers } from '../api/users.queries';
 
 import { userStatus } from './user-status';
@@ -34,9 +35,15 @@ export function UserGrid({ grid }: { grid: ReturnType<typeof useServerGrid> }) {
   const users = useUsers(params);
   const me = useCurrentUser();
   const confirm = useConfirm();
-  const activate = useActivateUser();
-  const deactivate = useDeactivateUser();
+  const remove = useDeleteUser();
   const unlock = useUnlockUser();
+
+  useEffect(() => {
+    const data = users.data;
+    if (!data || users.isPlaceholderData || data.items.length > 0) return;
+    const lastPage = Math.max(1, Math.ceil(data.totalCount / grid.state.pageSize));
+    if (grid.state.page > lastPage) grid.setPage(lastPage);
+  }, [users.data, users.isPlaceholderData, grid]);
 
   const columns = useMemo<AppGridColumn<UserResponse>[]>(
     () => [
@@ -47,7 +54,7 @@ export function UserGrid({ grid }: { grid: ReturnType<typeof useServerGrid> }) {
         flex: 1,
         minWidth: 140,
         renderCell: ({ row }) => (
-          <Link component={RouterLink} to={PATHS.users.edit(row.id)} underline="hover">
+          <Link component={RouterLink} to={PATHS.users.view(row.id)} underline="hover">
             {row.userName}
           </Link>
         ),
@@ -80,12 +87,59 @@ export function UserGrid({ grid }: { grid: ReturnType<typeof useServerGrid> }) {
       {
         field: 'actions',
         disableColumnMenu: true,
-        headerName: '',
-        width: 110,
+        headerName: 'Action',
+        width: 160,
         sortable: false,
-        align: 'right',
+        align: 'center',
+        headerAlign: 'center',
         renderCell: ({ row }) => (
-          <Stack direction="row" spacing={0.5} sx={{ height: '100%', alignItems: 'center' }}>
+          <Stack direction="row" spacing={0.5} sx={{ height: '100%', alignItems: 'center', justifyContent: 'center' }}>
+            <Tooltip title="View">
+              <IconButton
+                size="small"
+                component={RouterLink}
+                to={PATHS.users.view(row.id)}
+                aria-label={`View ${row.userName}`}
+              >
+                <VisibilityOutlinedIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            <Can right="user.edit">
+              <Tooltip title="Edit">
+                <IconButton
+                  size="small"
+                  component={RouterLink}
+                  to={PATHS.users.edit(row.id)}
+                  aria-label={`Edit ${row.userName}`}
+                >
+                  <EditOutlinedIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            </Can>
+            <Can right="user.delete">
+              <Tooltip title={row.id === me.userId ? 'You cannot delete your own account' : 'Delete'}>
+                <span>
+                  <IconButton
+                    size="small"
+                    color="error"
+                    aria-label={`Delete ${row.userName}`}
+                    disabled={row.id === me.userId || remove.isPending}
+                    onClick={() => {
+                      void confirm({
+                        title: 'Delete user?',
+                        message: `${row.userName} will be permanently deleted. This cannot be undone.`,
+                        confirmLabel: 'Delete',
+                        destructive: true,
+                      }).then((ok) => {
+                        if (ok) remove.mutate(row);
+                      });
+                    }}
+                  >
+                    <DeleteOutlinedIcon fontSize="small" />
+                  </IconButton>
+                </span>
+              </Tooltip>
+            </Can>
             <Can right="user.unlock">
               {(row.lockedUntil !== null || row.isBlocked) && (
                 <Tooltip title="Unlock">
@@ -95,46 +149,11 @@ export function UserGrid({ grid }: { grid: ReturnType<typeof useServerGrid> }) {
                 </Tooltip>
               )}
             </Can>
-            <Can right="user.status">
-              {row.isActive ? (
-                <Tooltip title="Deactivate">
-                  <span>
-                    <IconButton
-                      size="small"
-                      aria-label={`Deactivate ${row.userName}`}
-                      disabled={row.id === me.userId}
-                      onClick={() => {
-                        void confirm({
-                          title: 'Deactivate user?',
-                          message: `${row.userName} will be logged out everywhere and cannot sign in until reactivated.`,
-                          confirmLabel: 'Deactivate',
-                          destructive: true,
-                        }).then((ok) => {
-                          if (ok) deactivate.mutate(row.id);
-                        });
-                      }}
-                    >
-                      <PersonOffIcon fontSize="small" />
-                    </IconButton>
-                  </span>
-                </Tooltip>
-              ) : (
-                <Tooltip title="Activate">
-                  <IconButton
-                    size="small"
-                    aria-label={`Activate ${row.userName}`}
-                    onClick={() => activate.mutate(row.id)}
-                  >
-                    <PersonIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-              )}
-            </Can>
           </Stack>
         ),
       },
     ],
-    [activate, deactivate, unlock, confirm, me.userId],
+    [remove, unlock, confirm, me.userId],
   );
 
   return (
@@ -147,6 +166,7 @@ export function UserGrid({ grid }: { grid: ReturnType<typeof useServerGrid> }) {
       error={users.error}
       onRetry={() => void users.refetch()}
       server={grid.paging(users.data?.totalCount ?? 0)}
+      fillViewport
     />
   );
 }

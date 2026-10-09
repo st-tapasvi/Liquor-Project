@@ -9,6 +9,7 @@ export const PATHS = {
   users: {
     list: '/users',
     new: '/users/new',
+    view: (id: string | number = ':id') => `/users/${id}`,
     edit: (id: string | number = ':id') => `/users/${id}/edit`,
     roles: '/roles',
   },

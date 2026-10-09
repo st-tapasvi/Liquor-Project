@@ -2,6 +2,7 @@ export const API_PERMISSION_KEYS = [
   'user.view',
   'user.add',
   'user.edit',
+  'user.delete',
   'user.status',
   'user.unlock',
   'user.access',

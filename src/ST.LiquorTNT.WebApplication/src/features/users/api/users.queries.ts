@@ -28,7 +28,7 @@ export function useUser(id: number | undefined) {
 
 export function useUserAccess(id: number) {
   const scope = useCompanyScope();
-  return useQuery({ queryKey: userKeys.access(scope, id), queryFn: () => usersApi.access(id) });
+  return useQuery({ queryKey: userKeys.access(scope, id), queryFn: () => usersApi.access(id), throwOnError: false });
 }
 
 export function useRoles(enabled = true) {

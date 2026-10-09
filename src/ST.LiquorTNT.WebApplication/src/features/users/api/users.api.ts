@@ -37,6 +37,9 @@ export const usersApi = {
     const { data } = await http.post<UserResponse>(`/users/${encodeURIComponent(id)}/deactivate`);
     return data;
   },
+  remove: async (id: number): Promise<void> => {
+    await http.delete(`/users/${encodeURIComponent(id)}`);
+  },
   unlock: async (id: number): Promise<UserResponse> => {
     const { data } = await http.post<UserResponse>(`/users/${encodeURIComponent(id)}/unlock`);
     return data;

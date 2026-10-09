@@ -27,6 +27,7 @@ interface CreateProps {
 interface EditProps {
   mode: 'edit';
   defaultValues: UpdateUserFormValues;
+  readOnly?: boolean;
   onSubmit: (values: UpdateUserFormValues) => Promise<void>;
   onCancel: () => void;
   busy: boolean;
@@ -164,10 +165,11 @@ function CreateForm({ onSubmit, onCancel, busy }: CreateProps) {
   );
 }
 
-function EditForm({ defaultValues, onSubmit, onCancel, busy }: EditProps) {
+function EditForm({ defaultValues, readOnly = false, onSubmit, onCancel, busy }: EditProps) {
   const form = useForm<UpdateUserFormValues>({ resolver: zodResolver(updateUserSchema), defaultValues });
 
   const submit = form.handleSubmit(async (values) => {
+    if (readOnly) return;
     try {
       await onSubmit(values);
     } catch (error) {
@@ -178,12 +180,14 @@ function EditForm({ defaultValues, onSubmit, onCancel, busy }: EditProps) {
 
   return (
     <FormProvider {...form}>
-      <form onSubmit={submit} noValidate>
+      <form onSubmit={submit} noValidate aria-readonly={readOnly || undefined}>
         <FormRootError />
-        <Grid container spacing={2}>
-          <ProfileFields />
-        </Grid>
-        <FormActions submitLabel="Save changes" onCancel={onCancel} busy={busy} />
+        <fieldset disabled={readOnly} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
+          <Grid container spacing={2}>
+            <ProfileFields />
+          </Grid>
+        </fieldset>
+        {!readOnly && <FormActions submitLabel="Save changes" onCancel={onCancel} busy={busy} />}
       </form>
     </FormProvider>
   );

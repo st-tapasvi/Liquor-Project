@@ -51,6 +51,22 @@ export function useUpdateUser(id: number) {
   );
 }
 
+export function useDeleteUser() {
+  const qc = useQueryClient();
+  const snackbar = useSnackbar();
+  const scope = useCompanyScope();
+  return useMutation({
+    mutationKey: ['users', 'delete'],
+    mutationFn: (user: Pick<UserResponse, 'id' | 'userName'>) => usersApi.remove(user.id),
+    onSuccess: async (_data, user) => {
+      qc.removeQueries({ queryKey: userKeys.detail(scope, user.id) });
+      qc.removeQueries({ queryKey: userKeys.access(scope, user.id) });
+      await qc.invalidateQueries({ queryKey: userKeys.lists(scope) });
+      snackbar.success(`User ${user.userName} deleted.`);
+    },
+  });
+}
+
 export function useActivateUser() {
   return useUserMutation(
     'activate',

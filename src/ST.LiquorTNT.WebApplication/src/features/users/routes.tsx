@@ -14,9 +14,14 @@ export const userRoutes: RouteObject[] = [
     permission: 'user.add',
   }),
   createProtectedRoute({
-    path: PATHS.users.edit(),
+    path: PATHS.users.view(),
     page: () => import('./pages/UserEditPage'),
     permission: 'user.view',
+  }),
+  createProtectedRoute({
+    path: PATHS.users.edit(),
+    page: () => import('./pages/UserEditPage'),
+    permission: 'user.edit',
   }),
   createProtectedRoute({
     path: PATHS.users.roles,
