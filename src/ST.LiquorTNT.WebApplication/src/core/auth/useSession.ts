@@ -23,11 +23,11 @@ export function useCurrentUser(): SessionUser {
 }
 
 export function usePermission(key: PermissionKey): boolean {
-  return useSessionStore((s) => (s.user ? hasPermission(s.user.permissions, key) : false));
+  return useSessionStore((s) => (s.user ? s.user.isSuperAdmin || hasPermission(s.user.permissions, key) : false));
 }
 
 export function useAnyPermission(keys: readonly PermissionKey[]): boolean {
-  return useSessionStore((s) => (s.user ? hasAnyPermission(s.user.permissions, keys) : false));
+  return useSessionStore((s) => (s.user ? s.user.isSuperAdmin || hasAnyPermission(s.user.permissions, keys) : false));
 }
 
 export function useCompanyScope(): number {

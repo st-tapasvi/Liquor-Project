@@ -53,7 +53,7 @@ const hiddenWhenMini = (mini: boolean): { opacity: number; transition: string } 
 });
 
 function canSee(link: MenuLink, user: SessionUser): boolean {
-  return !link.permission || link.permission.some((p) => user.permissions.has(p));
+  return user.isSuperAdmin || !link.permission || link.permission.some((p) => user.permissions.has(p));
 }
 
 function RailTooltip({ title, mini, children }: { title: string; mini: boolean; children: ReactElement }) {

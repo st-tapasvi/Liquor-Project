@@ -63,7 +63,7 @@ export function toSessionUser(dto: CurrentUserResponse, access: SessionAccess = 
     isSuperAdmin: access.isSuperAdmin,
     activeSupplierCode: access.activeSupplierCode,
     supplierCodes: access.supplierCodes,
-    permissions: effectivePermissions(access.granted),
+    permissions: effectivePermissions(access.granted, access.isSuperAdmin),
   };
 }
 
@@ -102,7 +102,7 @@ export const useSessionStore = create<SessionState>()((set) => ({
           isSuperAdmin: next.isSuperAdmin,
           activeSupplierCode: next.activeSupplierCode,
           supplierCodes: next.supplierCodes,
-          permissions: effectivePermissions(next.granted),
+          permissions: effectivePermissions(next.granted, next.isSuperAdmin),
         },
       };
     }),

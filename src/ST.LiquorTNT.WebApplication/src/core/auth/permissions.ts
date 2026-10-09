@@ -39,8 +39,8 @@ export function toPermissionSet(values: readonly string[] | undefined): Readonly
   return set;
 }
 
-export function effectivePermissions(granted: readonly string[]): ReadonlySet<PermissionKey> {
-  return toPermissionSet([...EVERYONE_PERMISSIONS, ...granted]);
+export function effectivePermissions(granted: readonly string[], isSuperAdmin = false): ReadonlySet<PermissionKey> {
+  return toPermissionSet(isSuperAdmin ? PERMISSION_KEYS : [...EVERYONE_PERMISSIONS, ...granted]);
 }
 
 export function hasPermission(rights: ReadonlySet<PermissionKey>, key: PermissionKey): boolean {
