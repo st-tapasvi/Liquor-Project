@@ -112,7 +112,7 @@ export interface PageActionResponse {
   permissionKey: string;
   actionName: string;
   grantScope: GrantScope;
-  exciseCodes?: number[] | null;
+  exciseCodes?: string[] | null;
   granted: boolean;
 }
 
@@ -123,7 +123,7 @@ export interface PageResponse {
   pageName: string;
   moduleName: string | null;
   applicationType: ApplicationType;
-  exciseCodes?: number[] | null;
+  exciseCodes?: string[] | null;
   actions: PageActionResponse[];
 }
 

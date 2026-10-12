@@ -11,15 +11,17 @@ export function isGrantable(action: PageActionResponse, canManageAdmins: boolean
   return true;
 }
 
-function appliesToExcise(exciseCodes: readonly number[] | null | undefined, exciseId: number): boolean {
-  return !exciseCodes || exciseCodes.length === 0 || exciseCodes.includes(exciseId);
+function appliesToExcise(exciseCodes: readonly string[] | null | undefined, exciseCode: string): boolean {
+  return (
+    !exciseCodes || exciseCodes.length === 0 || exciseCodes.some((c) => c.toUpperCase() === exciseCode.toUpperCase())
+  );
 }
 
-export function pagesForExcise(pages: readonly PageResponse[], exciseId: number | null): PageResponse[] {
-  if (exciseId === null) return [];
+export function pagesForExcise(pages: readonly PageResponse[], exciseCode: string | null): PageResponse[] {
+  if (exciseCode === null) return [];
   return pages
-    .filter((p) => appliesToExcise(p.exciseCodes, exciseId))
-    .map((p) => ({ ...p, actions: p.actions.filter((a) => appliesToExcise(a.exciseCodes, exciseId)) }))
+    .filter((p) => appliesToExcise(p.exciseCodes, exciseCode))
+    .map((p) => ({ ...p, actions: p.actions.filter((a) => appliesToExcise(a.exciseCodes, exciseCode)) }))
     .filter((p) => p.actions.length > 0);
 }
 

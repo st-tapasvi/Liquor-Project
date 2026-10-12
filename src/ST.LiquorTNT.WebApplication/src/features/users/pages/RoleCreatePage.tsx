@@ -135,7 +135,8 @@ export default function RoleCreatePage() {
   useSyncSelect(form, 'supplierCode', supplierCode, supplierOptions, codesOfExcise.length === 1);
   useSyncSelect(form, 'passwordPolicyId', passwordPolicyId, policyOptions);
 
-  const visiblePages = pagesForExcise(pages.data ?? [], exciseId);
+  const exciseCode = codesOfCompany.find((s) => s.exciseId === exciseId)?.exciseCode ?? null;
+  const visiblePages = pagesForExcise(pages.data ?? [], exciseCode);
   const targets =
     supplierCode === ALL_SUPPLIER_CODES ? codesOfExcise : codesOfExcise.filter((s) => s.id === supplierCode);
   const trimmedName = roleName.trim();

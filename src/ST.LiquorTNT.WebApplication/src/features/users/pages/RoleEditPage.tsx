@@ -91,8 +91,8 @@ function RoleEditor({
   const supplierCode = (canViewSupplierCodes ? supplierCodes.data : me.supplierCodes)?.find(
     (s) => s.id === role.supplierCodeId,
   );
-  const exciseId = supplierCode?.exciseId ?? null;
-  const pages = exciseId === null ? rights.pages : pagesForExcise(rights.pages, exciseId);
+  const exciseCode = supplierCode?.exciseCode ?? null;
+  const pages = exciseCode === null ? rights.pages : pagesForExcise(rights.pages, exciseCode);
 
   const policyOptions: Option<number>[] = (policies.data ?? []).map((p) => ({
     value: p.id,
