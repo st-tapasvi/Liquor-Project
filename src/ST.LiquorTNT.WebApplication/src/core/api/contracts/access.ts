@@ -84,6 +84,7 @@ export interface RoleResponse {
   description: string | null;
   isSystem: boolean;
   isTemplate: boolean;
+  perSupplierCode: boolean;
   isAdminRole: boolean;
   isActive: boolean;
   passwordPolicyId: number | null;
@@ -93,9 +94,14 @@ export interface RoleResponse {
 export interface SaveRoleRequest {
   roleName: string;
   description: string | null;
+  companyId?: number | null;
+  supplierCodeId: number | null;
   isAdminRole: boolean;
+  perSupplierCode: boolean;
   passwordPolicyId: number;
 }
+
+export type ApplicationType = 'WEB' | 'LINE';
 
 /** ANY, ADMIN (needs user.manageadmin to grant) or SYSTEM (never grantable; Super Admin only). */
 export type GrantScope = 'ANY' | 'ADMIN' | 'SYSTEM';
@@ -106,6 +112,7 @@ export interface PageActionResponse {
   permissionKey: string;
   actionName: string;
   grantScope: GrantScope;
+  exciseCodes?: number[] | null;
   granted: boolean;
 }
 
@@ -115,6 +122,8 @@ export interface PageResponse {
   pageKey: string;
   pageName: string;
   moduleName: string | null;
+  applicationType: ApplicationType;
+  exciseCodes?: number[] | null;
   actions: PageActionResponse[];
 }
 
@@ -122,10 +131,12 @@ export interface PageResponse {
 export interface RoleRightsResponse {
   roleId: number;
   roleName: string;
+  displayName: string;
   pages: PageResponse[];
 }
 
 /** PUT /api/roles/{id}/rights – the FULL list of ticked actions. */
 export interface UpdateRoleRightsRequest {
   pageActionIds: number[];
+  applicationType?: ApplicationType | null;
 }

@@ -1,11 +1,16 @@
 import {
   type CreateUserRequest,
+  type ExciseResponse,
   http,
   type PagedResult,
+  type PageResponse,
+  type PasswordPolicyResponse,
   type RoleResponse,
   type CompanyResponse,
+  type SaveRoleRequest,
   type SupplierCodeResponse,
   type UpdateUserRequest,
+  type UpdateRoleRightsRequest,
   type UpdateUserRolesRequest,
   type UserAccessResponse,
   type UserListParams,
@@ -59,6 +64,17 @@ export const rolesApi = {
     const { data } = await http.get<RoleResponse[]>('/roles');
     return data;
   },
+  create: async (request: SaveRoleRequest): Promise<RoleResponse> => {
+    const { data } = await http.post<RoleResponse>('/roles', request);
+    return data;
+  },
+  updateRights: async (id: number, request: UpdateRoleRightsRequest): Promise<void> => {
+    await http.put(`/roles/${encodeURIComponent(id)}/rights`, request);
+  },
+  pages: async (): Promise<PageResponse[]> => {
+    const { data } = await http.get<PageResponse[]>('/pages');
+    return data;
+  },
 };
 
 export const userLookupsApi = {
@@ -71,5 +87,13 @@ export const userLookupsApi = {
       params: { page: 1, pageSize: 200 },
     });
     return data.items;
+  },
+  excises: async (): Promise<ExciseResponse[]> => {
+    const { data } = await http.get<ExciseResponse[]>('/excises');
+    return data;
+  },
+  passwordPolicies: async (): Promise<PasswordPolicyResponse[]> => {
+    const { data } = await http.get<PasswordPolicyResponse[]>('/passwordpolicies');
+    return data;
   },
 };

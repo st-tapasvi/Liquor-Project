@@ -18,6 +18,7 @@ export interface UpdateSecurityConfigRequest {
 export interface PasswordPolicyResponse {
   id: number;
   name: string;
+  policyName?: string;
   minLength: number;
   maxLength: number;
   requireUppercase: boolean;

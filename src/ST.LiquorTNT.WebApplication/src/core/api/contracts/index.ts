@@ -39,6 +39,7 @@ export type {
   SaveLiquorCategoryRequest,
   RoleResponse,
   SaveRoleRequest,
+  ApplicationType,
   GrantScope,
   PageActionResponse,
   PageResponse,

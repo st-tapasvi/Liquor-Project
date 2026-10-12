@@ -41,6 +41,24 @@ export function useCompanyOptions(enabled: boolean) {
   return useQuery({ queryKey: ['users', scope, 'lookup', 'companies'], queryFn: userLookupsApi.companies, enabled });
 }
 
+export function usePages(enabled = true) {
+  return useQuery({ queryKey: userKeys.pages(), queryFn: rolesApi.pages, enabled, staleTime: 5 * 60_000 });
+}
+
+export function useExciseOptions(enabled: boolean) {
+  const scope = useCompanyScope();
+  return useQuery({ queryKey: ['users', scope, 'lookup', 'excises'], queryFn: userLookupsApi.excises, enabled });
+}
+
+export function usePasswordPolicyOptions(enabled: boolean) {
+  const scope = useCompanyScope();
+  return useQuery({
+    queryKey: ['users', scope, 'lookup', 'password-policies'],
+    queryFn: userLookupsApi.passwordPolicies,
+    enabled,
+  });
+}
+
 export function useSupplierCodeOptions(enabled: boolean) {
   const scope = useCompanyScope();
   return useQuery({

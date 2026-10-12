@@ -12,6 +12,7 @@ export const PATHS = {
     view: (id: string | number = ':id') => `/users/${id}`,
     edit: (id: string | number = ':id') => `/users/${id}/edit`,
     roles: '/roles',
+    roleNew: '/roles/new',
   },
 
   company: {

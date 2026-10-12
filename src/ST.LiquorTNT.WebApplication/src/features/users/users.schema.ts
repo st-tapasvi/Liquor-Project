@@ -62,3 +62,26 @@ export function fromUser(user: UserResponse): UpdateUserFormValues {
     employeeCode: nullToEmpty(user.employeeCode),
   };
 }
+
+const requiredId = (message: string) =>
+  z
+    .number()
+    .int()
+    .positive()
+    .nullable()
+    .refine((v) => v !== null, message);
+
+export const ALL_SUPPLIER_CODES = 'all';
+
+export const createRoleSchema = z.object({
+  roleName: z.string().trim().min(1, 'Role name is required.').max(100, 'At most 100 characters.'),
+  companyId: requiredId('Company is required.'),
+  exciseId: requiredId('Excise is required.'),
+  supplierCode: z
+    .union([z.number().int().positive(), z.literal(ALL_SUPPLIER_CODES)])
+    .nullable()
+    .refine((v) => v !== null, 'Supplier code is required.'),
+  passwordPolicyId: requiredId('Password policy is required.'),
+});
+export type CreateRoleFormInput = z.input<typeof createRoleSchema>;
+export type CreateRoleFormValues = z.output<typeof createRoleSchema>;

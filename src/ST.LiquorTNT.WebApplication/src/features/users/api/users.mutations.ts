@@ -1,11 +1,19 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
-import type { CreateUserRequest, UpdateUserRequest, UpdateUserRolesRequest, UserResponse } from '@/core/api';
+import type {
+  CreateUserRequest,
+  RoleResponse,
+  SaveRoleRequest,
+  SupplierCodeResponse,
+  UpdateUserRequest,
+  UpdateUserRolesRequest,
+  UserResponse,
+} from '@/core/api';
 import { useCompanyScope } from '@/core/auth';
 
 import { useSnackbar } from '@/shared/hooks';
 
-import { usersApi } from './users.api';
+import { rolesApi, usersApi } from './users.api';
 import { userKeys } from './users.keys';
 
 function useUserMutation<TVariables>(
@@ -61,6 +69,46 @@ export function useUpdateUserRoles(id: number) {
     onSuccess: (access) => {
       qc.setQueryData(userKeys.access(scope, id), access);
       snackbar.success(`Roles of ${access.userName} saved.`);
+    },
+  });
+}
+
+export interface CreateRolesInput {
+  request: Omit<SaveRoleRequest, 'supplierCodeId'>;
+  supplierCodes: readonly SupplierCodeResponse[];
+  pageActionIds: readonly number[];
+}
+
+export interface CreateRoleOutcome {
+  supplierCode: SupplierCodeResponse;
+  role: RoleResponse | null;
+  error: unknown;
+}
+
+export function useCreateRoles() {
+  const qc = useQueryClient();
+  const scope = useCompanyScope();
+  return useMutation({
+    mutationKey: ['roles', 'create'],
+    meta: { silent: true },
+    mutationFn: async ({ request, supplierCodes, pageActionIds }: CreateRolesInput) => {
+      const outcomes: CreateRoleOutcome[] = [];
+      for (const supplierCode of supplierCodes) {
+        let role: RoleResponse | null = null;
+        try {
+          role = await rolesApi.create({ ...request, supplierCodeId: supplierCode.id });
+          if (pageActionIds.length > 0) {
+            await rolesApi.updateRights(role.id, { pageActionIds: [...pageActionIds] });
+          }
+          outcomes.push({ supplierCode, role, error: null });
+        } catch (error) {
+          outcomes.push({ supplierCode, role, error });
+        }
+      }
+      return outcomes;
+    },
+    onSettled: async () => {
+      await qc.invalidateQueries({ queryKey: userKeys.roles(scope) });
     },
   });
 }

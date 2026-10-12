@@ -28,4 +28,9 @@ export const userRoutes: RouteObject[] = [
     page: () => import('./pages/RoleListPage'),
     permission: 'role.view',
   }),
+  createProtectedRoute({
+    path: PATHS.users.roleNew,
+    page: () => import('./pages/RoleCreatePage'),
+    permission: 'role.add',
+  }),
 ];
