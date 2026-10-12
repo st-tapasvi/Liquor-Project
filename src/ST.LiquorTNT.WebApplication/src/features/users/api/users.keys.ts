@@ -7,5 +7,7 @@ export const userKeys = {
   detail: (scope: number, id: number) => [...userKeys.all(scope), 'detail', id] as const,
   access: (scope: number, id: number) => [...userKeys.all(scope), 'access', id] as const,
   roles: (scope: number) => ['roles', scope] as const,
+  role: (scope: number, id: number) => [...userKeys.roles(scope), 'detail', id] as const,
+  roleRights: (scope: number, id: number) => [...userKeys.roles(scope), 'rights', id] as const,
   pages: () => ['pages'] as const,
 };

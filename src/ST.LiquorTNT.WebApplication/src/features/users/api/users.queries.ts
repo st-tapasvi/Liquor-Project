@@ -41,6 +41,24 @@ export function useCompanyOptions(enabled: boolean) {
   return useQuery({ queryKey: ['users', scope, 'lookup', 'companies'], queryFn: userLookupsApi.companies, enabled });
 }
 
+export function useRole(id: number | undefined) {
+  const scope = useCompanyScope();
+  return useQuery({
+    queryKey: userKeys.role(scope, id ?? -1),
+    queryFn: () => rolesApi.get(id ?? -1),
+    enabled: id !== undefined,
+  });
+}
+
+export function useRoleRights(id: number | undefined) {
+  const scope = useCompanyScope();
+  return useQuery({
+    queryKey: userKeys.roleRights(scope, id ?? -1),
+    queryFn: () => rolesApi.rights(id ?? -1),
+    enabled: id !== undefined,
+  });
+}
+
 export function usePages(enabled = true) {
   return useQuery({ queryKey: userKeys.pages(), queryFn: rolesApi.pages, enabled, staleTime: 5 * 60_000 });
 }

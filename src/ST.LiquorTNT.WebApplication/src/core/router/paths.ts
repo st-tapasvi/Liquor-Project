@@ -13,6 +13,8 @@ export const PATHS = {
     edit: (id: string | number = ':id') => `/users/${id}/edit`,
     roles: '/roles',
     roleNew: '/roles/new',
+    roleView: (id: string | number = ':id') => `/roles/${id}`,
+    roleEdit: (id: string | number = ':id') => `/roles/${id}/edit`,
   },
 
   company: {

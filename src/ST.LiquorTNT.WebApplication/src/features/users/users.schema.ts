@@ -85,3 +85,10 @@ export const createRoleSchema = z.object({
 });
 export type CreateRoleFormInput = z.input<typeof createRoleSchema>;
 export type CreateRoleFormValues = z.output<typeof createRoleSchema>;
+
+export const editRoleSchema = z.object({
+  roleName: z.string().trim().min(1, 'Role name is required.').max(100, 'At most 100 characters.'),
+  passwordPolicyId: requiredId('Password policy is required.'),
+});
+export type EditRoleFormInput = z.input<typeof editRoleSchema>;
+export type EditRoleFormValues = z.output<typeof editRoleSchema>;

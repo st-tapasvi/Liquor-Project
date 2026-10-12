@@ -6,6 +6,7 @@ import {
   type PageResponse,
   type PasswordPolicyResponse,
   type RoleResponse,
+  type RoleRightsResponse,
   type CompanyResponse,
   type SaveRoleRequest,
   type SupplierCodeResponse,
@@ -64,8 +65,23 @@ export const rolesApi = {
     const { data } = await http.get<RoleResponse[]>('/roles');
     return data;
   },
+  get: async (id: number): Promise<RoleResponse> => {
+    const { data } = await http.get<RoleResponse>(`/roles/${encodeURIComponent(id)}`);
+    return data;
+  },
   create: async (request: SaveRoleRequest): Promise<RoleResponse> => {
     const { data } = await http.post<RoleResponse>('/roles', request);
+    return data;
+  },
+  update: async (id: number, request: SaveRoleRequest): Promise<RoleResponse> => {
+    const { data } = await http.put<RoleResponse>(`/roles/${encodeURIComponent(id)}`, request);
+    return data;
+  },
+  remove: async (id: number): Promise<void> => {
+    await http.delete(`/roles/${encodeURIComponent(id)}`);
+  },
+  rights: async (id: number): Promise<RoleRightsResponse> => {
+    const { data } = await http.get<RoleRightsResponse>(`/roles/${encodeURIComponent(id)}/rights`);
     return data;
   },
   updateRights: async (id: number, request: UpdateRoleRightsRequest): Promise<void> => {

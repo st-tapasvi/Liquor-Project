@@ -113,6 +113,47 @@ export function useCreateRoles() {
   });
 }
 
+export interface SaveRoleInput {
+  request: SaveRoleRequest | null;
+  pageActionIds: readonly number[] | null;
+}
+
+export function useSaveRole(id: number) {
+  const qc = useQueryClient();
+  const snackbar = useSnackbar();
+  const scope = useCompanyScope();
+  return useMutation({
+    mutationKey: ['roles', 'update'],
+    meta: { silent: true },
+    mutationFn: async ({ request, pageActionIds }: SaveRoleInput) => {
+      if (request) await rolesApi.update(id, request);
+      if (pageActionIds) await rolesApi.updateRights(id, { pageActionIds: [...pageActionIds] });
+    },
+    onSettled: async () => {
+      await qc.invalidateQueries({ queryKey: userKeys.roles(scope) });
+    },
+    onSuccess: () => {
+      snackbar.success('Role saved.');
+    },
+  });
+}
+
+export function useDeleteRole() {
+  const qc = useQueryClient();
+  const snackbar = useSnackbar();
+  const scope = useCompanyScope();
+  return useMutation({
+    mutationKey: ['roles', 'delete'],
+    mutationFn: (role: Pick<RoleResponse, 'id' | 'displayName'>) => rolesApi.remove(role.id),
+    onSuccess: async (_data, role) => {
+      qc.removeQueries({ queryKey: userKeys.role(scope, role.id) });
+      qc.removeQueries({ queryKey: userKeys.roleRights(scope, role.id) });
+      await qc.invalidateQueries({ queryKey: userKeys.roles(scope) });
+      snackbar.success(`Role ${role.displayName} deleted.`);
+    },
+  });
+}
+
 export function useDeleteUser() {
   const qc = useQueryClient();
   const snackbar = useSnackbar();
