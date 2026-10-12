@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import type {
   CreateUserRequest,
+  ResetUserPasswordRequest,
   RoleResponse,
   SaveRoleRequest,
   SupplierCodeResponse,
@@ -183,6 +184,15 @@ export function useDeactivateUser() {
     'deactivate',
     (id: number) => usersApi.deactivate(id),
     (u) => `User ${u.userName} deactivated.`,
+  );
+}
+
+export function useResetUserPassword(id: number) {
+  return useUserMutation(
+    'resetPassword',
+    (request: ResetUserPasswordRequest) => usersApi.resetPassword(id, request),
+    (u) => `Temporary password set for ${u.userName}.`,
+    { silent: true },
   );
 }
 

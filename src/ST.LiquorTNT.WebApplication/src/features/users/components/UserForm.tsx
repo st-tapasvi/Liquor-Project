@@ -1,7 +1,8 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import Grid from '@mui/material/Grid';
+import TextField from '@mui/material/TextField';
 import { useEffect, useState } from 'react';
-import { Controller, FormProvider, useForm, useWatch } from 'react-hook-form';
+import { Controller, FormProvider, useForm, useFormContext, useWatch } from 'react-hook-form';
 
 import { useCurrentUser } from '@/core/auth';
 import { applyServerErrors, describeError } from '@/core/errors';
@@ -50,7 +51,7 @@ function CreateForm({ onSubmit, onCancel, busy }: CreateProps) {
     defaultValues: {
       userName: '',
       password: '',
-      companyId: me.isSuperAdmin ? null : (me.activeSupplierCode?.companyId ?? me.companyId),
+      companyId: me.activeSupplierCode?.companyId ?? me.companyId,
       roleIds: [],
       fullName: '',
       email: '',
@@ -69,6 +70,13 @@ function CreateForm({ onSubmit, onCancel, busy }: CreateProps) {
     value: c.id,
     label: c.companyName ?? `Company ${c.id}`,
   }));
+  const onlyCompanyId = companyOptions.length === 1 ? companyOptions[0]?.value : undefined;
+
+  useEffect(() => {
+    if (onlyCompanyId !== undefined && form.getValues('companyId') !== onlyCompanyId) {
+      form.setValue('companyId', onlyCompanyId, { shouldValidate: true });
+    }
+  }, [onlyCompanyId, form]);
 
   const roleOptions = assignableRoles(roles.data ?? [], me.isSuperAdmin ? companyId : undefined).map((r) => ({
     id: r.id,
@@ -208,11 +216,35 @@ function ProfileFields() {
         <FormTextField<UpdateUserFormValues> name="email" label="E-mail" type="email" autoComplete="off" />
       </Grid>
       <Grid size={{ xs: 12, md: 6 }}>
-        <FormTextField<UpdateUserFormValues> name="phone" label="Phone" autoComplete="off" />
+        <PhoneField />
       </Grid>
       <Grid size={{ xs: 12, md: 6 }}>
         <FormTextField<UpdateUserFormValues> name="employeeCode" label="Employee code" autoComplete="off" />
       </Grid>
     </>
+  );
+}
+
+function PhoneField() {
+  const { control } = useFormContext<UpdateUserFormValues>();
+  return (
+    <Controller
+      name="phone"
+      control={control}
+      render={({ field, fieldState }) => (
+        <TextField
+          name={field.name}
+          inputRef={field.ref}
+          value={field.value}
+          onBlur={field.onBlur}
+          onChange={(e) => field.onChange(e.target.value.replace(/\D/g, '').slice(0, 10))}
+          label="Phone"
+          autoComplete="off"
+          error={fieldState.invalid}
+          helperText={fieldState.error?.message ?? '10-digit mobile number'}
+          slotProps={{ htmlInput: { inputMode: 'numeric', maxLength: 10, 'aria-invalid': fieldState.invalid } }}
+        />
+      )}
+    />
   );
 }

@@ -13,6 +13,7 @@ export interface UserResponse {
   isBlocked: boolean;
   failedLoginAttempts: number;
   lockedUntil: IstDateTime | null;
+  lastFailedLoginAt?: IstDateTime | null;
   forcePasswordChange: boolean;
   passwordExpiresAt: IstDateTime | null;
   lastLoginAt: IstDateTime | null;
@@ -56,6 +57,11 @@ export interface UpdateUserRequest {
   email: string | null;
   phone: string | null;
   employeeCode: string | null;
+}
+
+/** POST /api/users/{id}/resetpassword – admin sets a temporary password; the user must change it at next login. */
+export interface ResetUserPasswordRequest {
+  newPassword: string;
 }
 
 export interface UserRoleResponse {

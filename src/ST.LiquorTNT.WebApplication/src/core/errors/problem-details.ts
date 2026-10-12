@@ -13,6 +13,7 @@ export interface ProblemDetails {
   errors?: Record<string, string[]>;
   sessions?: ActiveSessionSummary[];
   canEndOtherSession?: boolean;
+  attemptsLeft?: number;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -44,6 +45,7 @@ export function parseProblemDetails(body: unknown): ProblemDetails | undefined {
     ...(errors ? { errors } : {}),
     ...(sessions ? { sessions } : {}),
     ...(typeof body['canEndOtherSession'] === 'boolean' ? { canEndOtherSession: body['canEndOtherSession'] } : {}),
+    ...(typeof body['attemptsLeft'] === 'number' ? { attemptsLeft: body['attemptsLeft'] } : {}),
   };
 }
 
@@ -97,7 +99,7 @@ export function toApiError(status: number, body: unknown, fallbackCorrelationId?
     });
   }
 
-  return new ApiError({ status, code, title, detail, correlationId, cause });
+  return new ApiError({ status, code, title, detail, correlationId, cause, attemptsLeft: problem?.attemptsLeft });
 }
 
 function defaultTitle(status: number): string {

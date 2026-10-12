@@ -5,6 +5,7 @@ import {
   type PagedResult,
   type PageResponse,
   type PasswordPolicyResponse,
+  type ResetUserPasswordRequest,
   type RoleResponse,
   type RoleRightsResponse,
   type CompanyResponse,
@@ -48,6 +49,10 @@ export const usersApi = {
   },
   unlock: async (id: number): Promise<UserResponse> => {
     const { data } = await http.post<UserResponse>(`/users/${encodeURIComponent(id)}/unlock`);
+    return data;
+  },
+  resetPassword: async (id: number, request: ResetUserPasswordRequest): Promise<UserResponse> => {
+    const { data } = await http.post<UserResponse>(`/users/${encodeURIComponent(id)}/resetpassword`, request);
     return data;
   },
   access: async (id: number): Promise<UserAccessResponse> => {

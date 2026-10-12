@@ -23,6 +23,7 @@ public static class UserProjections
         IsBlocked = u.IsBlocked,
         FailedLoginAttempts = u.FailedLoginAttempts,
         LockedUntil = u.LockedUntil,
+        LastFailedLoginAt = u.LastFailedLoginAt,
         ForcePasswordChange = u.ForcePasswordChange,
         PasswordExpiresAt = u.PasswordExpiresAt,
         LastLoginAt = u.LastLoginAt,

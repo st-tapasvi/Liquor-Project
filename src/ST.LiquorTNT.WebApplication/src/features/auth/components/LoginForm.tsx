@@ -12,6 +12,7 @@ import type { LoginRequest } from '@/core/api';
 import { authApi, loadAccess, NO_ACCESS, type SessionAccess, useSessionStore } from '@/core/auth';
 import {
   applyServerErrors,
+  describeError,
   isApiError,
   isNetworkError,
   isSessionLimitError,
@@ -108,6 +109,15 @@ export function LoginForm() {
       }
 
       form.resetField('password');
+      if (isApiError(error) && error.is('INVALID_CREDENTIALS') && error.attemptsLeft !== undefined) {
+        const left = error.attemptsLeft;
+        snackbar.error(
+          `${describeError(error)} ${left === 1 ? 'Last attempt' : `${left} attempts`} left before the account is locked.`,
+          undefined,
+          { id: LOGIN_TOAST_ID },
+        );
+        return;
+      }
       snackbar.errorFrom(error, { id: LOGIN_TOAST_ID });
     } finally {
       setEndingSessionId(null);

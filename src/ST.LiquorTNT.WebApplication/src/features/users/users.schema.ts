@@ -9,7 +9,10 @@ const optionalText = (max: number) => z.string().trim().max(max, `At most ${max}
 const profileFields = {
   fullName: optionalText(100),
   email: optionalText(100).refine((v) => v === '' || z.email().safeParse(v).success, 'Enter a valid e-mail address.'),
-  phone: optionalText(20),
+  phone: z
+    .string()
+    .trim()
+    .refine((v) => v === '' || /^\d{10}$/.test(v), 'Enter a 10-digit mobile number.'),
   employeeCode: optionalText(50),
 };
 
@@ -30,6 +33,17 @@ export type CreateUserFormValues = z.infer<typeof createUserSchema>;
 
 export const updateUserSchema = z.object(profileFields);
 export type UpdateUserFormValues = z.infer<typeof updateUserSchema>;
+
+export const resetPasswordSchema = z
+  .object({
+    newPassword: z.string().min(6, 'At least 6 characters.').max(128, 'At most 128 characters.'),
+    confirmPassword: z.string(),
+  })
+  .refine((v) => v.newPassword === v.confirmPassword, {
+    path: ['confirmPassword'],
+    message: 'Passwords do not match.',
+  });
+export type ResetPasswordFormValues = z.infer<typeof resetPasswordSchema>;
 
 export function toCreateRequest(values: CreateUserFormValues): CreateUserRequest {
   return {

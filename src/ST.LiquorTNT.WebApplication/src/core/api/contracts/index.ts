@@ -20,6 +20,7 @@ export type {
   UserListParams,
   CreateUserRequest,
   UpdateUserRequest,
+  ResetUserPasswordRequest,
   UserRoleAssignment,
   UserRightAssignment,
   UserAccessResponse,

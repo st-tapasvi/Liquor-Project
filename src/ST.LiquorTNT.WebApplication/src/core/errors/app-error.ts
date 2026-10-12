@@ -20,6 +20,7 @@ export class ApiError extends AppError {
   readonly code: ErrorCode | 'UNKNOWN';
   readonly title: string;
   readonly detail: string | undefined;
+  readonly attemptsLeft: number | undefined;
 
   constructor(args: {
     status: number;
@@ -28,6 +29,7 @@ export class ApiError extends AppError {
     detail?: string | undefined;
     correlationId?: string | undefined;
     cause?: unknown;
+    attemptsLeft?: number | undefined;
   }) {
     super(args.detail ?? args.title, { cause: args.cause, correlationId: args.correlationId });
     this.name = 'ApiError';
@@ -35,6 +37,7 @@ export class ApiError extends AppError {
     this.code = args.code;
     this.title = args.title;
     this.detail = args.detail;
+    this.attemptsLeft = args.attemptsLeft;
   }
 
   is(code: ErrorCode): boolean {

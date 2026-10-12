@@ -236,13 +236,20 @@ export default function RoleCreatePage() {
                 />
               </Grid>
             </Grid>
-            {trimmedName && targets.length > 0 && (
+            {targets.length > 0 && (
               <Stack direction="row" spacing={1} useFlexGap sx={{ mt: 2, alignItems: 'center', flexWrap: 'wrap' }}>
                 <Typography variant="body2" color="text.secondary">
                   {targets.length === 1 ? 'Role to be created:' : `${targets.length} roles to be created:`}
                 </Typography>
                 {targets.map((s) => (
-                  <Chip key={s.id} size="small" label={`${trimmedName} ${s.displayName}`} />
+                  <Chip
+                    key={s.id}
+                    size="small"
+                    variant="outlined"
+                    color="warning"
+                    sx={{ borderRadius: 1, borderStyle: trimmedName ? 'solid' : 'dashed' }}
+                    label={`${trimmedName || 'Role name'} ${s.displayName}`}
+                  />
                 ))}
               </Stack>
             )}

@@ -12,8 +12,10 @@ import { PageHeader, StatusChip } from '@/shared/components/ui';
 
 import { useCreateUser, useUpdateUser } from '../api/users.mutations';
 import { useUser } from '../api/users.queries';
+import { ResetPasswordSection } from '../components/ResetPasswordSection';
 import { userStatus } from '../components/user-status';
 import { UserForm } from '../components/UserForm';
+import { UserLockNotice } from '../components/UserLockNotice';
 import { UserRolesSection } from '../components/UserRolesSection';
 import { type UserTab, UserTabPanel, UserTabs } from '../components/UserTabs';
 import { fromUser, toCreateRequest, toUpdateRequest } from '../users.schema';
@@ -84,6 +86,7 @@ function EditView({ userId, readOnly, onDone }: { userId: number; readOnly: bool
           )
         }
       />
+      <UserLockNotice user={user.data} />
       <UserTabs value={tab} onChange={setTab} />
       <UserTabPanel tab="details" value={tab}>
         <Section>
@@ -100,6 +103,11 @@ function EditView({ userId, readOnly, onDone }: { userId: number; readOnly: bool
             }}
           />
         </Section>
+        {!readOnly && userId !== me.userId && (
+          <Can right="user.unlock">
+            <ResetPasswordSection user={user.data} />
+          </Can>
+        )}
       </UserTabPanel>
       <UserTabPanel tab="roles" value={tab}>
         <UserRolesSection

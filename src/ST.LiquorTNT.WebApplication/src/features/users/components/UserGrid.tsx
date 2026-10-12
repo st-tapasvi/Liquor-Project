@@ -21,7 +21,7 @@ import { formatDateTime } from '@/shared/utils';
 import { useDeleteUser, useUnlockUser } from '../api/users.mutations';
 import { useUsers } from '../api/users.queries';
 
-import { userStatus } from './user-status';
+import { isUserLocked, userStatus } from './user-status';
 
 export function UserGrid({ grid }: { grid: ReturnType<typeof useServerGrid> }) {
   const params = useMemo(
@@ -75,7 +75,14 @@ export function UserGrid({ grid }: { grid: ReturnType<typeof useServerGrid> }) {
         sortable: false,
         renderCell: ({ row }) => {
           const s = userStatus(row);
-          return <StatusChip label={s.label} tone={s.tone} />;
+          const chip = <StatusChip label={s.label} tone={s.tone} />;
+          return isUserLocked(row) ? (
+            <Tooltip title={`Locked until ${formatDateTime(row.lockedUntil)}`}>
+              <span>{chip}</span>
+            </Tooltip>
+          ) : (
+            chip
+          );
         },
       },
       {
@@ -141,7 +148,7 @@ export function UserGrid({ grid }: { grid: ReturnType<typeof useServerGrid> }) {
               </Tooltip>
             </Can>
             <Can right="user.unlock">
-              {(row.lockedUntil !== null || row.isBlocked) && (
+              {(isUserLocked(row) || row.isBlocked) && (
                 <Tooltip title="Unlock">
                   <IconButton size="small" aria-label={`Unlock ${row.userName}`} onClick={() => unlock.mutate(row.id)}>
                     <LockOpenIcon fontSize="small" />

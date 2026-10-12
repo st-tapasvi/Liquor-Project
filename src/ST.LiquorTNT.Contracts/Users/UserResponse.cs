@@ -14,6 +14,8 @@ public sealed class UserResponse
     /// <summary>Wrong passwords counted today; 0 after a successful login or an unlock.</summary>
     public int FailedLoginAttempts { get; set; }
     public DateTime? LockedUntil { get; set; }
+    /// <summary>Time of the last wrong password; while locked, the attempt that locked the account.</summary>
+    public DateTime? LastFailedLoginAt { get; set; }
     public bool ForcePasswordChange { get; set; }
     public DateTime? PasswordExpiresAt { get; set; }
     public DateTime? LastLoginAt { get; set; }
