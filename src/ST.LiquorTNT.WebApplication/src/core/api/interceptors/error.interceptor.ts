@@ -90,6 +90,11 @@ export function installErrorInterceptor(http: AxiosInstance): void {
         sessionStore.clearActiveSupplierCode();
       }
 
+      if (status === 403 && apiError.code === 'SECURITY_QUESTION_REQUIRED') {
+        logger.info('security question not set for this session; asking the user to choose one', { url: config?.url });
+        sessionStore.requireSecurityQuestion();
+      }
+
       if (status >= 500) {
         logger.error('api error', {
           url: config?.url,

@@ -15,6 +15,7 @@ interface AuthProviderProps {
 
 async function restoreSession() {
   const user = await authApi.me();
+  if (user.securityQuestionRequired) return { user, access: NO_ACCESS };
   const access = await loadAccess().catch((error: unknown) => {
     if (isApiError(error) && error.status === 401) throw error;
     logger.warn('rights could not be loaded; continuing with none until the next reload', { error });

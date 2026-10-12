@@ -4,9 +4,10 @@ import useMediaQuery from '@mui/material/useMediaQuery';
 import { useState } from 'react';
 import { Outlet } from 'react-router';
 
+import { useSessionStore } from '@/core/auth';
 import { RequireAuth } from '@/core/router';
 
-import { SessionExpiredDialog } from '@/features/auth';
+import { SecurityQuestionSetup, SessionExpiredDialog } from '@/features/auth';
 
 import { SessionCountdown } from './SessionCountdown';
 import { Sidebar } from './Sidebar';
@@ -18,6 +19,7 @@ export function AppShell() {
   const isDesktop = useMediaQuery(theme.breakpoints.up('md'));
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const securityQuestionRequired = useSessionStore((s) => s.user?.securityQuestionRequired === true);
 
   const sidebarOpen = isDesktop ? !collapsed : mobileOpen;
 
@@ -28,6 +30,15 @@ export function AppShell() {
     }
     setCollapsed((c) => !c);
   };
+
+  if (securityQuestionRequired) {
+    return (
+      <RequireAuth>
+        <SecurityQuestionSetup />
+        <SessionExpiredDialog />
+      </RequireAuth>
+    );
+  }
 
   return (
     <RequireAuth>

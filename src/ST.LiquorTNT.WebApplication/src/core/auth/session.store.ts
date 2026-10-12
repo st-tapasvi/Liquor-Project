@@ -28,6 +28,7 @@ export interface SessionUser {
   companyId: number | null;
   forcePasswordChange: boolean;
   passwordExpiresAt: IstDateTime | null;
+  securityQuestionRequired: boolean;
   isSuperAdmin: boolean;
   activeSupplierCode: SupplierCodeResponse | null;
   supplierCodes: readonly SupplierCodeResponse[];
@@ -60,6 +61,7 @@ export function toSessionUser(dto: CurrentUserResponse, access: SessionAccess = 
     companyId: dto.companyId,
     forcePasswordChange: dto.forcePasswordChange,
     passwordExpiresAt: dto.passwordExpiresAt,
+    securityQuestionRequired: dto.securityQuestionRequired,
     isSuperAdmin: access.isSuperAdmin,
     activeSupplierCode: access.activeSupplierCode,
     supplierCodes: access.supplierCodes,
@@ -119,4 +121,10 @@ export const sessionStore = {
   get: () => useSessionStore.getState(),
   setAnonymous: (reason: SessionEndReason | null) => useSessionStore.getState().setAnonymous(reason),
   clearActiveSupplierCode: () => useSessionStore.getState().setAccess({ activeSupplierCode: null, granted: [] }),
+  requireSecurityQuestion: () =>
+    useSessionStore.setState((state) =>
+      state.user && !state.user.securityQuestionRequired
+        ? { user: { ...state.user, securityQuestionRequired: true } }
+        : state,
+    ),
 };

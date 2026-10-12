@@ -9,7 +9,7 @@ import { FormProvider, useForm } from 'react-hook-form';
 import { Link as RouterLink, useNavigate } from 'react-router';
 
 import type { LoginRequest } from '@/core/api';
-import { authApi, loadAccess, type SessionAccess, useSessionStore } from '@/core/auth';
+import { authApi, loadAccess, NO_ACCESS, type SessionAccess, useSessionStore } from '@/core/auth';
 import {
   applyServerErrors,
   isApiError,
@@ -79,7 +79,9 @@ export function LoginForm() {
       setAuthenticated(
         result.user,
         { expiresAt: result.expiresAt, idleTimeoutMinutes: result.idleTimeoutMinutes },
-        await accessAfterLogin(result.supplierCodes, result.activeSupplierCode),
+        result.user.securityQuestionRequired
+          ? { ...NO_ACCESS, activeSupplierCode: result.activeSupplierCode, supplierCodes: result.supplierCodes }
+          : await accessAfterLogin(result.supplierCodes, result.activeSupplierCode),
       );
       logger.info('login succeeded', { endedAnotherSession: endSessionId !== undefined });
     } catch (error) {

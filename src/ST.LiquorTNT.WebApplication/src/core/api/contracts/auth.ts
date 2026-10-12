@@ -24,6 +24,7 @@ export interface CurrentUserResponse {
   companyId: number | null;
   forcePasswordChange: boolean;
   passwordExpiresAt: IstDateTime | null;
+  securityQuestionRequired: boolean;
 }
 
 export interface LoginResponse {

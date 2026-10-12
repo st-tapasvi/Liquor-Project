@@ -41,5 +41,18 @@ export const forgotResetSchema = z
   });
 export type ForgotResetFormValues = z.infer<typeof forgotResetSchema>;
 
+export const securityQuestionSchema = z.object({
+  questionId: z
+    .number()
+    .int()
+    .positive()
+    .nullable()
+    .refine((v) => v !== null, 'Choose a question.'),
+  answer: z.string().trim().min(1, 'Answer is required.').max(200, 'Answer is too long.'),
+  currentPassword: passwordSchema,
+});
+export type SecurityQuestionFormInput = z.input<typeof securityQuestionSchema>;
+export type SecurityQuestionFormValues = z.output<typeof securityQuestionSchema>;
+
 export const reauthSchema = z.object({ password: passwordSchema });
 export type ReauthFormValues = z.infer<typeof reauthSchema>;
