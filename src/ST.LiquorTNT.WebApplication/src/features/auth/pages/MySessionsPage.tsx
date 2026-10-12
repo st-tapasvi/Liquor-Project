@@ -95,6 +95,7 @@ export default function MySessionsPage() {
         loading={sessions.isPending}
         error={sessions.error}
         onRetry={() => void sessions.refetch()}
+        fillViewport
       />
     </>
   );

@@ -132,6 +132,7 @@ export function SecurityConfigGrid({ rows, loading, error, onRetry, canEdit, bus
       loading={loading}
       error={error}
       onRetry={onRetry}
+      fillViewport
     />
   );
 }
