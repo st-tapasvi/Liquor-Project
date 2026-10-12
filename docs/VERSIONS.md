@@ -75,6 +75,7 @@ package name.
 | Microsoft.EntityFrameworkCore.Relational | 8.0.10 | Infrastructure |
 | Microsoft.EntityFrameworkCore.Design | 8.0.10 | Infrastructure (PrivateAssets=all) |
 | Pomelo.EntityFrameworkCore.MySql | 8.0.2 | Infrastructure |
+| Microsoft.EntityFrameworkCore.SqlServer | 8.0.10 | Infrastructure |
 
 **Authentication**
 
@@ -123,7 +124,7 @@ package name.
 
 | Setting | Value | File |
 |---|---|---|
-| `Database:Provider` | MySql | `src/ST.LiquorTNT.Api/appsettings.json` |
+| `Database:Provider` | SqlServer (or MySql) | `src/ST.LiquorTNT.Api/appsettings.json` |
 | `Database:ServerVersion` | 8.0.36 | `src/ST.LiquorTNT.Api/appsettings.json` |
 | `Cors:AllowedOrigins` | `http://localhost:5173`, `http://localhost:3000` | `src/ST.LiquorTNT.Api/appsettings.json` |
 | Log files | `logs/stliquortnt-YYYYMMDD.json`, daily roll, 100 MB, keep 30 | `src/ST.LiquorTNT.Api/appsettings.json` |

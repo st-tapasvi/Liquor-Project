@@ -98,8 +98,8 @@ password rules per role.
 
 `src/ST.LiquorTNT.Api/appsettings.json` holds only host settings:
 
-- `ConnectionStrings:Default` - `192.168.1.99 / st_tnt_liquor`
-- `Database:Provider` / `ServerVersion` - MySQL today; SQL Server is a supported target
+- `ConnectionStrings:Default` - `DEVELOPER8\SQLEXPRESS / st_tnt_liquor` (MySQL: `192.168.1.99 / st_tnt_liquor`)
+- `Database:Provider` - `SqlServer` or `MySql`; change it together with the connection string. `ServerVersion` is MySQL only
 - `Jwt:Issuer`, `Jwt:Audience`, `Jwt:SigningKey` - **change the key on every installation**, ≥ 32 characters
 - `Cors:AllowedOrigins` - the React dev server
 - `Serilog` - sinks only (console + `logs/stliquortnt-YYYYMMDD.json`, JSON, IST time). How much is

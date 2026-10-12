@@ -1,16 +1,19 @@
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using MySqlConnector;
 
 namespace ST.LiquorTNT.Infrastructure.Database;
 
 /// <summary>
-/// Provider error-code mapping, in one place (standards §8.3). MySQL today; the SQL Server codes
-/// (2627 / 2601) are added here when that provider is wired, so no caller ever compares raw numbers.
+/// Provider error-code mapping, in one place (standards §8.3), so no caller ever compares raw numbers.
 /// </summary>
 internal static class DbErrors
 {
     private const int MySqlDuplicateKey = 1062;
+    private const int SqlServerUniqueConstraint = 2627;     // PRIMARY KEY / UNIQUE constraint
+    private const int SqlServerUniqueIndex = 2601;          // unique index (incl. the filtered ones)
 
     public static bool IsUniqueViolation(DbUpdateException ex) =>
-        ex.InnerException is MySqlException { Number: MySqlDuplicateKey };
+        ex.InnerException is MySqlException { Number: MySqlDuplicateKey }
+            or SqlException { Number: SqlServerUniqueConstraint or SqlServerUniqueIndex };
 }

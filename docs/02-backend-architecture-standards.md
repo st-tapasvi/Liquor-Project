@@ -417,7 +417,16 @@ public interface IProductionReportQuery
 }
 ```
 
-`Database:ServerVersion` is declared explicitly because `ServerVersion.AutoDetect` would open a connection during startup. The switch on `Database:Provider` exists in exactly one place — `Infrastructure/DependencyInjection.cs`. The `sqlserver` branch throws `NotSupportedException` until the SQL Server provider package is added; the branch is kept so the decision is visible in code.
+SQL Server:
+
+```json
+{
+  "ConnectionStrings": { "Default": "Server=HOST\\SQLEXPRESS;Database=st_tnt_liquor;User ID=...;Password=...;Encrypt=False;TrustServerCertificate=True;" },
+  "Database": { "Provider": "SqlServer" }
+}
+```
+
+Change both values together. Environment variables override the file (`Database__Provider`, `ConnectionStrings__Default`). `Database:ServerVersion` is used only by MySQL. It is declared explicitly because `ServerVersion.AutoDetect` would open a connection during startup. The switch on `Database:Provider` exists in exactly one place: `Infrastructure/DependencyInjection.cs` (`UseMySql` / `UseSqlServer`). The SQL Server schema is `db/mssql/001_st_tnt_liquor_schema.sql`. Unique-key errors of both providers are mapped in `Infrastructure/Database/DbErrors.cs`.
 
 - **MySQL is primary.** Schema, migrations and tuning are designed on MySQL first; SQL Server follows. ⛔ Using a SQL Server feature that has no MySQL equivalent in the shared schema (e.g. `SEQUENCE` objects).
 - Logical schema is **identical** on both providers. Physical partitioning is provider-specific DDL under `Scripts/<Provider>/Partitioning/`.

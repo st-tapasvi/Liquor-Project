@@ -44,11 +44,9 @@ public static class DependencyInjection
                     break;
 
                 case "sqlserver":
-                    // SQL Server is a supported target. Its provider package is added when the first
-                    // SQL Server customer is onboarded; the switch stays here so the decision is visible.
-                    throw new NotSupportedException(
-                        "SQL Server support is not wired yet. Add Microsoft.EntityFrameworkCore.SqlServer " +
-                        "and call options.UseSqlServer(connectionString).");
+                    // Schema: db/mssql/001_st_tnt_liquor_schema.sql (same tables and columns as MySQL).
+                    options.UseSqlServer(connectionString);
+                    break;
 
                 default:
                     throw new InvalidOperationException($"Unknown Database:Provider value '{provider}'.");
