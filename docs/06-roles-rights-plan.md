@@ -99,7 +99,7 @@ business category that grows as data (`LIQUOR_CATEGORY`) gets its own table with
 | Changing an **admin user** (holder of an `IS_ADMIN_ROLE` or Admin role), giving or editing an **admin role**, or giving / removing an **ADMIN-scope** right needs `user.manageadmin` | `403 ADMIN_USER_PROTECTED` |
 | **SYSTEM-scope** rights (supplier code / liquor category add & edit) are never put in a role or given to a user | `403 RIGHT_NOT_GRANTABLE` |
 | Nobody but Admin changes their own roles or rights | `409 CANNOT_CHANGE_OWN_ACCESS` |
-| Admin role is given only by Admin, to a user without a company | `403` / `400` |
+| Admin role is given only by Admin, alone (no other role or group), to a user without a company. On create the new Admin gets no company even when a supplier code is picked | `403` / `400` |
 | A role's supplier code is set on create and never changes; an admin role has none | `400` |
 | A role of a deactivated supplier code cannot be given | `404` |
 | Admin role cannot change; templates are changed by Admin only | `409 ROLE_NOT_EDITABLE` |

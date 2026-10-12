@@ -445,6 +445,9 @@ pick a supplier code, then tick its roles from `GET /api/roles?supplierCodeId=â€
   role; 98 = "Operator RJ CL 772"). The password policy is the strictest of all roles, direct and inside the groups.
 - `companyId`: **only Admin** sends it; when left out it is the company of the picked supplier code. Everyone else's
   users always join their own company.
+- **Creating another Admin** (Admin only): `"roles": [ { "roleId": 1 } ]` alone, no `roleGroupIds`, no `companyId`.
+  The new Admin has `companyId: null` even though a supplier code is picked. Admin role together with any other role or
+  group, or with a `companyId`, â†’ `400` (`errors.roles`). Show the Admin role in the role picker only to an Admin.
 - `userName`: letters, digits and `. _ @ -`, max 50, cannot be changed later.
 - The temporary password must already satisfy the password policy of the chosen roles:
   ```json
