@@ -233,7 +233,30 @@ This happens after **every** login, for **every** user.
 | `USER_INACTIVE` / `USER_BLOCKED` | 403 | "Contact your administrator" |
 | `PASSWORD_CHANGE_REQUIRED` | 403 | "Set new password" (Step 2) |
 | `PASSWORD_EXPIRED` | 403 | "Your password has expired" → "Set new password" (Step 2) |
-| `SESSION_LIMIT_REACHED` | 409 | "Already logged in on the maximum number of devices (default 2). Log out there first." |
+| `SESSION_LIMIT_REACHED` | 409 | "Already logged in on the maximum number of devices (default 2)." + the list of those logins from `sessions` (below) |
+
+**`SESSION_LIMIT_REACHED` tells where the user is logged in.** The password was correct, so the body adds `sessions` — the
+open logins, oldest first — so the screen can say *"You are logged in on: Chrome on Windows, since 14:37, last used 14:38"*:
+```json
+{
+  "type": "https://errors.stliquortnt.local/session_limit_reached",
+  "status": 409,
+  "errorCode": "SESSION_LIMIT_REACHED",
+  "title": "Maximum active sessions reached.",
+  "detail": "This account already has 2 active session(s). Log out of another device first.",
+  "instance": "/api/auth/login",
+  "correlationId": "b45b9ef28239485a8e5db509d14d9302",
+  "sessions": [
+    { "id": 9,  "loginAt": "2026-10-09T14:37:07", "lastActivityAt": "2026-10-09T14:37:07", "expiresAt": "2026-10-09T15:37:07",
+      "ipAddress": "192.168.1.25", "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 … Chrome/141.0 Safari/537.36", "isCurrent": false },
+    { "id": 10, "loginAt": "2026-10-09T14:37:41", "lastActivityAt": "2026-10-09T14:38:55", "expiresAt": "2026-10-09T15:38:55",
+      "ipAddress": "192.168.1.40", "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) … Edg/141.0", "isCurrent": false }
+  ]
+}
+```
+- Show a friendly device name from `userAgent` (e.g. with a small UA parser: "Chrome on Windows"), plus `ipAddress`,
+  `loginAt` and `lastActivityAt`. `expiresAt` = when that login ends by itself if nobody uses it.
+- A wrong password never returns `sessions` (that is `401 INVALID_CREDENTIALS`).
 
 ### Step 2 — Set new password · `POST /api/auth/changepassword` (public)
 
@@ -504,6 +527,8 @@ rights**. Groups are optional; a user needs at least one role or one group.
 ### Save custom rights · `PUT /api/users/{id}/rights` — `user.access` (the FULL list, may be empty)
 Each right is a page action (from `GET /api/pages`, B9 — show the application next to the page name) for one supplier code,
 or `supplierCodeId: null` = all supplier codes. This list always holds the user's custom rights of both applications.
+For a right of one supplier code, load the picker with `GET /api/pages?exciseCode=<that supplier code's exciseCode>`:
+an action of another excise is refused (`400`, `errors.rights`).
 ```json
 // request
 { "rights": [ { "pageActionId": 5, "supplierCodeId": 30 } ] }
@@ -704,10 +729,38 @@ application** (desktop, at the production line). Every page belongs to exactly o
 in both apps has two pages with their own keys (e.g. `batch` WEB, `linebatch` LINE). Today every page is `WEB`; line pages
 will be added by us when the line application is built.
 
+### Pages by excise (state)
+
+Pages of both applications can depend on the excise: some screens exist in every state (User, Role, Settings), some only
+in a few. Every page and every action carries `exciseCodes`:
+
+| `exciseCodes` | Meaning |
+|---|---|
+| `null` on a page | the page exists in every excise |
+| `["RJ","UP"]` on a page | only in RJ and UP |
+| `null` on an action | wherever its page exists |
+| `["RJ"]` on an action | only in RJ (always inside its page's list) |
+
+What the server does with it (the frontend only displays):
+- **Role rights grid** shows only the pages / actions of the role's excise: "Operator RJ CL 772" → common + RJ pages. A
+  **company-level** role (Plant Admin …) works in every excise of the company, so its grid shows common pages + the pages
+  of each of those excises — group them by `exciseCodes` ("All states", "RJ", "JK").
+- **Saving** a role's rights with an action of another excise → `400` (`errors.pageActionIds`: "… do not exist in the
+  excise(s) of this role (RJ)").
+- **Custom right for one supplier code** must exist in that supplier code's excise → otherwise `400` (`errors.rights`).
+  For the picker use `GET /api/pages?exciseCode=RJ` (the supplier code's `exciseCode`). A right for "all supplier codes"
+  is accepted and simply counts only where it exists.
+- **Menu / permissions:** in the picked supplier code, `mypermissions` leaves out rights of pages / actions of other
+  excises (also for Admin), so the menu always fits the state the user works in.
+
+Today every page and action is `["JK","RJ"]` (script 018): the screens exist in Jharkhand and Rajasthan. A supplier code
+of another excise gets no rights or menu until its code is added. State-specific pages come with the production screens.
+
 ### Pages and their actions (seeded by us)
 
 `GET /api/pages` — `role.view`. Rows of the grid; each page has its **own** actions (not a fixed View/Add/Edit/Delete set).
 `GET /api/pages?applicationType=WEB` (or `LINE`) → only that application's pages. Web pages come first.
+`GET /api/pages?exciseCode=RJ` → only the pages and actions that exist in RJ. Both filters can be combined.
 
 | Page (module) — all `WEB` today | Actions → permission key (id) |
 |---|---|
@@ -727,19 +780,20 @@ only, never tickable (show disabled).
 
 ```json
 [
-  { "pageId": 1, "pageKey": "user", "pageName": "User", "moduleName": "Administration", "applicationType": "WEB",
+  { "pageId": 1, "pageKey": "user", "pageName": "User", "moduleName": "Administration", "applicationType": "WEB", "exciseCodes": ["JK","RJ"],
     "actions": [
-      { "pageActionId": 1, "actionKey": "view", "permissionKey": "user.view", "actionName": "View", "grantScope": "ANY", "granted": false },
-      { "pageActionId": 2, "actionKey": "add", "permissionKey": "user.add", "actionName": "Create", "grantScope": "ANY", "granted": false },
+      { "pageActionId": 1, "actionKey": "view", "permissionKey": "user.view", "actionName": "View", "grantScope": "ANY", "exciseCodes": ["JK","RJ"], "granted": false },
+      { "pageActionId": 2, "actionKey": "add", "permissionKey": "user.add", "actionName": "Create", "grantScope": "ANY", "exciseCodes": ["JK","RJ"], "granted": false },
       "…",
-      { "pageActionId": 7, "actionKey": "manageadmin", "permissionKey": "user.manageadmin", "actionName": "Manage admin users", "grantScope": "ADMIN", "granted": false }
+      { "pageActionId": 7, "actionKey": "manageadmin", "permissionKey": "user.manageadmin", "actionName": "Manage admin users", "grantScope": "ADMIN", "exciseCodes": ["JK","RJ"], "granted": false }
     ] },
   "…"
 ]
 ```
 
 ### A role's grid · `GET /api/roles/{id}/rights` — `role.view`
-Same pages, with `granted` ticked. `?applicationType=WEB` or `LINE` → only that application's pages.
+Same pages, with `granted` ticked — only those of the role's excise(s) (see "Pages by excise"). `?applicationType=WEB` or
+`LINE` → only that application's pages.
 ```json
 { "roleId": 98, "roleName": "Operator", "displayName": "Operator RJ CL 772",
   "pages": [ { "pageId": 1, "pageKey": "user", "pageName": "User", "moduleName": "Administration", "applicationType": "WEB",
@@ -901,6 +955,7 @@ export interface PagedResponse<T> { items: T[]; page: number; pageSize: number; 
 export interface ProblemDetails {
   type: string; status: number; errorCode: string; title: string; detail?: string | null;
   instance: string; correlationId: string; errors?: Record<string, string[]>;
+  sessions?: SessionResponse[];        // only on 409 SESSION_LIMIT_REACHED: where the user is logged in
 }
 
 // ---------- auth ----------
@@ -997,9 +1052,17 @@ export interface SaveRoleRequest {
   passwordPolicyId: number;
 }
 export type GrantScope = "ANY" | "ADMIN" | "SYSTEM";
-export interface PageActionResponse { pageActionId: number; actionKey: string; permissionKey: string; actionName: string; grantScope: GrantScope; granted: boolean; }
+export interface PageActionResponse {
+  pageActionId: number; actionKey: string; permissionKey: string; actionName: string; grantScope: GrantScope;
+  exciseCodes: string[] | null;   // excises the action exists in; null = wherever its page exists
+  granted: boolean;
+}
 export type ApplicationType = "WEB" | "LINE";
-export interface PageResponse { pageId: number; pageKey: string; pageName: string; moduleName?: string | null; applicationType: ApplicationType; actions: PageActionResponse[]; }
+export interface PageResponse {
+  pageId: number; pageKey: string; pageName: string; moduleName?: string | null; applicationType: ApplicationType;
+  exciseCodes: string[] | null;   // excises the page exists in, e.g. ["RJ","UP"]; null = every excise
+  actions: PageActionResponse[];
+}
 export interface RoleRightsResponse { roleId: number; roleName: string; displayName: string; pages: PageResponse[]; }
 export interface UpdateRoleRightsRequest {
   pageActionIds: number[];             // ALL ticked ids (of applicationType when sent, else of both applications)

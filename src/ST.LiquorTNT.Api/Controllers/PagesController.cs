@@ -15,9 +15,13 @@ public sealed class PagesController : ControllerBase
 
     public PagesController(IRoleService roles) => _roles = roles;
 
-    /// <summary>Every page with its actions. <c>?applicationType=WEB</c> or <c>LINE</c> → only that application's pages.</summary>
+    /// <summary>
+    /// Every page with its actions. <c>?applicationType=WEB</c> or <c>LINE</c> → only that application's pages;
+    /// <c>?exciseCode=RJ</c> → only the pages and actions that exist in that excise (e.g. for a custom right of an RJ supplier code).
+    /// </summary>
     [HttpGet]
     [HasPermission(Permissions.RoleView)]
-    public async Task<ActionResult<IReadOnlyList<PageResponse>>> GetAsync([FromQuery] string? applicationType, CancellationToken ct)
-        => Ok(await _roles.GetPagesAsync(applicationType, ct));
+    public async Task<ActionResult<IReadOnlyList<PageResponse>>> GetAsync([FromQuery] string? applicationType, [FromQuery] string? exciseCode,
+        CancellationToken ct)
+        => Ok(await _roles.GetPagesAsync(applicationType, exciseCode, ct));
 }

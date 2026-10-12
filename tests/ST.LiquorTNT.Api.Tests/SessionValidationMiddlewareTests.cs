@@ -207,7 +207,7 @@ public sealed class SessionValidationMiddlewareTests
 
         public Task<bool> IsSuperAdminAsync(int userId, CancellationToken ct) => throw new NotSupportedException();
         public Task<IReadOnlyList<string>> GetPermissionKeysAsync(int userId, int supplierCodeId, CancellationToken ct) => throw new NotSupportedException();
-        public Task<IReadOnlyList<string>> GetAllPermissionKeysAsync(CancellationToken ct) => throw new NotSupportedException();
+        public Task<IReadOnlyList<string>> GetAllPermissionKeysAsync(string? exciseCode, CancellationToken ct) => throw new NotSupportedException();
         public Task<IReadOnlyList<SupplierCodeResponse>> GetSupplierCodesForUserAsync(int userId, CancellationToken ct) => throw new NotSupportedException();
         public Task<IReadOnlyList<SupplierCodeResponse>> GetAllSupplierCodesAsync(CancellationToken ct) => throw new NotSupportedException();
     }

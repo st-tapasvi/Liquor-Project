@@ -30,6 +30,8 @@ public sealed class AppDbContext : DbContext
     public DbSet<ROLE_GROUP> ROLE_GROUP => Set<ROLE_GROUP>();
     public DbSet<ROLE_GROUP_ROLES> ROLE_GROUP_ROLES => Set<ROLE_GROUP_ROLES>();
     public DbSet<USER_ROLE_GROUPS> USER_ROLE_GROUPS => Set<USER_ROLE_GROUPS>();
+    public DbSet<PAGE_EXCISES> PAGE_EXCISES => Set<PAGE_EXCISES>();
+    public DbSet<PAGE_ACTION_EXCISES> PAGE_ACTION_EXCISES => Set<PAGE_ACTION_EXCISES>();
     public DbSet<USER_RIGHTS> USER_RIGHTS => Set<USER_RIGHTS>();
 
     // masters

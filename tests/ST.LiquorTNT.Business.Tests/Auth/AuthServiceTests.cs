@@ -237,6 +237,24 @@ public sealed class AuthServiceTests
         ex.Which.ErrorCode.Should().Be(ErrorCodes.SessionLimitReached);
         _sessions.Sessions.Should().HaveCount(2);
         _log.Entries.Should().Contain(e => e.ActionType == UserLogActions.LoginFailed && e.Description!.Contains("sessions"));
+
+        // the error tells the user where they are logged in
+        var open = ex.Which.Extensions["sessions"].Should().BeAssignableTo<IEnumerable<SessionResponse>>().Subject.ToList();
+        open.Select(s => s.Id).Should().BeEquivalentTo(_sessions.Sessions.Select(s => s.Id));
+        open.Should().OnlyContain(s => s.IpAddress == "10.0.0.1" && !s.IsCurrent);
+    }
+
+    [Fact]
+    public async Task Login_WrongPassword_WhileSessionsAreFull_DoesNotRevealTheSessions()
+    {
+        AddUser();
+        await Login();
+        await Login();
+
+        var ex = await _service.Invoking(_ => Login(password: "wrong")).Should().ThrowAsync<UnauthorizedException>();
+
+        ex.Which.ErrorCode.Should().Be(ErrorCodes.InvalidCredentials);
+        ex.Which.Extensions.Should().BeEmpty();
     }
 
     [Fact]

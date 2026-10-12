@@ -1,6 +1,6 @@
 namespace ST.LiquorTNT.Contracts.Companies;
 
-/// <summary>One company (customer) in the Super Admin's company list and dropdowns.</summary>
+/// <summary>One company (customer) in the Admin's company list and dropdowns.</summary>
 public sealed class CompanyResponse
 {
     public int Id { get; set; }

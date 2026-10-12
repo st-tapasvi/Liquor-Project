@@ -308,8 +308,8 @@ public sealed class RoleServiceTests
     {
         _roles.LineActions.Add(UserUnlock);           // pretend user.unlock sits on a LINE page
 
-        var line = await _service.GetPagesAsync("line", CancellationToken.None);
-        var all = await _service.GetPagesAsync(null, CancellationToken.None);
+        var line = await _service.GetPagesAsync("line", null, CancellationToken.None);
+        var all = await _service.GetPagesAsync(null, null, CancellationToken.None);
 
         line.Should().ContainSingle().Which.ApplicationType.Should().Be("LINE");
         line.Single().Actions.Select(a => a.PageActionId).Should().Equal(UserUnlock);
@@ -319,7 +319,7 @@ public sealed class RoleServiceTests
     [Fact]
     public async Task Pages_UnknownApplication_Returns400()
     {
-        var ex = await _service.Invoking(s => s.GetPagesAsync("mobile", CancellationToken.None)).Should().ThrowAsync<ValidationException>();
+        var ex = await _service.Invoking(s => s.GetPagesAsync("mobile", null, CancellationToken.None)).Should().ThrowAsync<ValidationException>();
 
         ex.Which.Errors.Should().ContainKey("applicationType");
     }
@@ -335,6 +335,54 @@ public sealed class RoleServiceTests
 
         _roles.Rights[10].Should().BeEquivalentTo(new[] { RoleView });
         response.Pages.Should().OnlyContain(p => p.ApplicationType == "LINE");
+    }
+
+    // ---------- pages by excise ----------
+
+    [Fact]
+    public async Task Pages_FilteredByExcise_LeaveOutActionsOfOtherExcises()
+    {
+        _roles.ActionExcise[UserUnlock] = new[] { "JK" };        // user.unlock exists only in JK
+
+        var rj = await _service.GetPagesAsync(null, "RJ", CancellationToken.None);
+        var jk = await _service.GetPagesAsync(null, "jk", CancellationToken.None);
+
+        rj.SelectMany(p => p.Actions).Select(a => a.PageActionId).Should().NotContain(UserUnlock).And.Contain(RoleView);
+        jk.SelectMany(p => p.Actions).Select(a => a.PageActionId).Should().Contain(UserUnlock);
+    }
+
+    [Fact]
+    public async Task RightsGrid_ShowsOnlyTheRolesExcise()
+    {
+        _roles.ActionExcise[UserUnlock] = new[] { "JK" };
+        _roles.RoleExcise[12] = new[] { "RJ" };                   // "Operator RJ CL 550"
+
+        var grid = await _service.GetRightsAsync(12, null, CancellationToken.None);
+
+        grid.Pages.SelectMany(p => p.Actions).Select(a => a.PageActionId).Should().NotContain(UserUnlock);
+    }
+
+    [Fact]
+    public async Task UpdateRights_ActionOfAnotherExcise_Returns400()
+    {
+        _roles.ActionExcise[UserUnlock] = new[] { "JK" };
+        _roles.RoleExcise[12] = new[] { "RJ" };
+
+        var ex = await _service.Invoking(s => s.UpdateRightsAsync(12, Rights(RoleView, UserUnlock), CancellationToken.None))
+            .Should().ThrowAsync<ValidationException>();
+
+        ex.Which.Errors["pageActionIds"].Single().Should().Contain("user.unlock").And.Contain("RJ");
+    }
+
+    [Fact]
+    public async Task UpdateRights_CompanyLevelRole_MayHoldActionsOfAnyOfItsExcises()
+    {
+        _roles.ActionExcise[UserUnlock] = new[] { "JK" };
+        _roles.RoleExcise[10] = new[] { "JK", "RJ" };            // company-level role of a company with RJ and JK codes
+
+        await _service.UpdateRightsAsync(10, Rights(RoleView, UserUnlock), CancellationToken.None);
+
+        _roles.Rights[10].Should().BeEquivalentTo(new[] { RoleView, UserUnlock });
     }
 
     [Fact]

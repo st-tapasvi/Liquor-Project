@@ -21,6 +21,9 @@ public interface IRoleService
 
     Task<RoleRightsResponse> UpdateRightsAsync(int id, UpdateRoleRightsRequest request, CancellationToken ct);
 
-    /// <summary>Every page with its actions: the empty rights grid. "WEB" / "LINE" → only that application's pages.</summary>
-    Task<IReadOnlyList<PageResponse>> GetPagesAsync(string? applicationType, CancellationToken ct);
+    /// <summary>
+    /// Every page with its actions: the empty rights grid. "WEB" / "LINE" → only that application's pages; an excise code
+    /// ("RJ") → only the pages and actions that exist in that excise.
+    /// </summary>
+    Task<IReadOnlyList<PageResponse>> GetPagesAsync(string? applicationType, string? exciseCode, CancellationToken ct);
 }

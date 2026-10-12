@@ -136,6 +136,24 @@ public sealed class UserAccessRepository : IUserAccessRepository
         }
     }
 
+    public async Task<IReadOnlyDictionary<int, string>> GetSupplierCodeExcisesAsync(IReadOnlyCollection<int> supplierCodeIds, CancellationToken ct) =>
+        await (from s in _db.SUPPLIER_CODE.AsNoTracking()
+               join e in _db.EXCISE on s.ExciseId equals e.Id
+               where supplierCodeIds.Contains(s.Id)
+               select new { s.Id, e.ExciseCode })
+            .ToDictionaryAsync(x => x.Id, x => x.ExciseCode, ct);
+
+    public async Task<IReadOnlyDictionary<int, (IReadOnlyList<string>? PageCodes, IReadOnlyList<string>? ActionCodes)>> GetActionExciseCodesAsync(
+        IReadOnlyCollection<int> pageActionIds, CancellationToken ct)
+    {
+        var rows = await _db.PAGE_ACTIONS.AsNoTracking().Where(pa => pageActionIds.Contains(pa.Id))
+            .Select(pa => new { pa.Id, pa.PageId }).ToListAsync(ct);
+        var pageCodes = await PageExciseQuery.PageCodesAsync(_db, ct);
+        var actionCodes = await PageExciseQuery.ActionCodesAsync(_db, ct);
+
+        return rows.ToDictionary(r => r.Id, r => (pageCodes.GetValueOrDefault(r.PageId), actionCodes.GetValueOrDefault(r.Id)));
+    }
+
     public async Task<IReadOnlyList<int>> GetRoleGroupIdsAsync(int userId, CancellationToken ct) =>
         await _db.USER_ROLE_GROUPS.AsNoTracking().Where(u => u.UserId == userId).Select(u => u.RoleGroupId).ToListAsync(ct);
 

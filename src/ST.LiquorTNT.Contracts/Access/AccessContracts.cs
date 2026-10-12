@@ -14,7 +14,7 @@ public sealed class SelectSupplierCodeRequest
 /// </summary>
 public sealed class MyPermissionsResponse
 {
-    /// <summary>Super Admin (Sundaram Tech) may do everything; <see cref="Permissions"/> is then the full list.</summary>
+    /// <summary>Admin (Sundaram Tech) may do everything; <see cref="Permissions"/> is then the full list.</summary>
     public bool IsSuperAdmin { get; set; }
 
     /// <summary>The supplier code this session works in; null until one is picked.</summary>

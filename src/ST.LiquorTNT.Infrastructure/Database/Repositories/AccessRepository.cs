@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using ST.LiquorTNT.Business.Access;
 using ST.LiquorTNT.Contracts.SupplierCodes;
+using ST.LiquorTNT.Domain.Rules;
 
 namespace ST.LiquorTNT.Infrastructure.Database.Repositories;
 
@@ -50,11 +51,45 @@ public sealed class AccessRepository : IAccessRepository
                   && (uri.SupplierCodeId == supplierCodeId || (allSupplierCodesCount && uri.SupplierCodeId == null))
             select pa.PermissionKey;
 
-        return await fromRoles.Union(fromUser).ToListAsync(ct);
+        var keys = await fromRoles.Union(fromUser).ToListAsync(ct);
+
+        // A right of a page / action that does not exist in this supplier code's excise does not count here.
+        var exciseCode = await (from s in _db.SUPPLIER_CODE
+                                join e in _db.EXCISE on s.ExciseId equals e.Id
+                                where s.Id == supplierCodeId
+                                select e.ExciseCode).FirstOrDefaultAsync(ct);
+        var inExcise = (await KeysOfExciseAsync(exciseCode, ct)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return keys.Where(inExcise.Contains).ToList();
     }
 
-    public async Task<IReadOnlyList<string>> GetAllPermissionKeysAsync(CancellationToken ct) =>
-        await _db.PAGE_ACTIONS.AsNoTracking().Where(a => a.IsActive).Select(a => a.PermissionKey).ToListAsync(ct);
+    public async Task<IReadOnlyList<string>> GetAllPermissionKeysAsync(string? exciseCode, CancellationToken ct) =>
+        await KeysOfExciseAsync(exciseCode, ct);
+
+    /// <summary>
+    /// Permission keys of the active actions that exist in <paramref name="exciseCode"/> (page AND action cover it);
+    /// null = every active key. PAGES / PAGE_ACTIONS (and their excise rows) are small, so the rule is checked in memory.
+    /// </summary>
+    private async Task<IReadOnlyList<string>> KeysOfExciseAsync(string? exciseCode, CancellationToken ct)
+    {
+        var actions = await (from pa in _db.PAGE_ACTIONS.AsNoTracking()
+                             join p in _db.PAGES on pa.PageId equals p.Id
+                             where pa.IsActive && p.IsActive
+                             select new { pa.Id, pa.PageId, pa.PermissionKey })
+                            .ToListAsync(ct);
+
+        if (exciseCode is null)
+        {
+            return actions.Select(a => a.PermissionKey).ToList();
+        }
+
+        var pageCodes = await PageExciseQuery.PageCodesAsync(_db, ct);
+        var actionCodes = await PageExciseQuery.ActionCodesAsync(_db, ct);
+
+        return actions
+            .Where(a => ExciseScope.ActionCovers(pageCodes.GetValueOrDefault(a.PageId), actionCodes.GetValueOrDefault(a.Id), exciseCode))
+            .Select(a => a.PermissionKey)
+            .ToList();
+    }
 
     public async Task<IReadOnlyList<SupplierCodeResponse>> GetSupplierCodesForUserAsync(int userId, CancellationToken ct)
     {

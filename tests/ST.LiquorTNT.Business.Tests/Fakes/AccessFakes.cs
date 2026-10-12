@@ -51,7 +51,7 @@ internal sealed class FakeAccessRepository : IAccessRepository
     public Task<IReadOnlyList<string>> GetPermissionKeysAsync(int userId, int supplierCodeId, CancellationToken ct) =>
         Task.FromResult<IReadOnlyList<string>>(Keys.TryGetValue((userId, supplierCodeId), out var set) ? set.ToList() : new List<string>());
 
-    public Task<IReadOnlyList<string>> GetAllPermissionKeysAsync(CancellationToken ct) =>
+    public Task<IReadOnlyList<string>> GetAllPermissionKeysAsync(string? exciseCode, CancellationToken ct) =>
         Task.FromResult<IReadOnlyList<string>>(new List<string> { Permissions.UserView, Permissions.UserManageAdmin });
 
     public Task<IReadOnlyList<SupplierCodeResponse>> GetSupplierCodesForUserAsync(int userId, CancellationToken ct) =>
@@ -114,6 +114,20 @@ internal sealed class FakeUserAccessRepository : IUserAccessRepository
         UserRights[userId] = rights.ToList();
         return Task.CompletedTask;
     }
+
+    /// <summary>Excise code per supplier code id (missing = "RJ").</summary>
+    public Dictionary<int, string> SupplierCodeExcise { get; } = new();
+
+    /// <summary>Page / action excise codes per page action id (missing = every excise).</summary>
+    public Dictionary<int, (IReadOnlyList<string>? PageCodes, IReadOnlyList<string>? ActionCodes)> ActionExcise { get; } = new();
+
+    public Task<IReadOnlyDictionary<int, string>> GetSupplierCodeExcisesAsync(IReadOnlyCollection<int> supplierCodeIds, CancellationToken ct) =>
+        Task.FromResult<IReadOnlyDictionary<int, string>>(supplierCodeIds.ToDictionary(id => id, id => SupplierCodeExcise.GetValueOrDefault(id, "RJ")));
+
+    public Task<IReadOnlyDictionary<int, (IReadOnlyList<string>? PageCodes, IReadOnlyList<string>? ActionCodes)>> GetActionExciseCodesAsync(
+        IReadOnlyCollection<int> pageActionIds, CancellationToken ct) =>
+        Task.FromResult<IReadOnlyDictionary<int, (IReadOnlyList<string>? PageCodes, IReadOnlyList<string>? ActionCodes)>>(
+            pageActionIds.ToDictionary(id => id, id => ActionExcise.GetValueOrDefault(id, (null, null))));
 
     /// <summary>Role groups known to the fake.</summary>
     public List<RoleGroupInfo> Groups { get; } = new();

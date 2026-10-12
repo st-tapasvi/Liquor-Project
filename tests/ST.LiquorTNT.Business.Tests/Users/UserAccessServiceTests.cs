@@ -224,6 +224,19 @@ public sealed class UserAccessServiceTests
     }
 
     [Fact]
+    public async Task UpdateRights_ForASupplierCodeOfAnotherExcise_Returns400_ButForAllSupplierCodesIsFine()
+    {
+        _userAccess.ActionExcise[UserUnlock] = (null, new[] { "JK" });    // user.unlock exists only in JK; OwnSupplierCode is RJ
+
+        var ex = await Service().Invoking(s => s.UpdateRightsAsync(5, Rights((UserUnlock, OwnSupplierCode)), CancellationToken.None))
+            .Should().ThrowAsync<ValidationException>();
+        ex.Which.Errors["rights"].Single().Should().Contain("user.unlock (RJ)");
+
+        // for all supplier codes it is accepted: it simply counts only where it exists
+        await Service().UpdateRightsAsync(5, Rights((UserUnlock, null)), CancellationToken.None);
+    }
+
+    [Fact]
     public async Task UpdateRights_SystemRight_Returns403NotGrantable()
     {
         var ex = await Service().Invoking(s => s.UpdateRightsAsync(5, Rights((SupplierAdd, null)), CancellationToken.None))

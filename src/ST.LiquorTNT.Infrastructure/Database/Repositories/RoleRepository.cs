@@ -65,6 +65,25 @@ public sealed class RoleRepository : IRoleRepository
     public Task<bool> IsInRoleGroupAsync(int roleId, CancellationToken ct) =>
         _db.ROLE_GROUP_ROLES.AnyAsync(r => r.RoleId == roleId, ct);
 
+    public async Task<IReadOnlyList<string>?> GetExciseCodesForRoleAsync(ROLES role, CancellationToken ct)
+    {
+        // templates and the Admin role work in no particular excise: no restriction
+        if (role.IsTemplate || role.IsSystem || role.CompanyId is not int companyId)
+        {
+            return null;
+        }
+
+        // a supplier code's role: that supplier code's excise (even if the code was deactivated meanwhile)
+        var codes = role.SupplierCodeId is int supplierCodeId
+            ? _db.SUPPLIER_CODE.Where(s => s.Id == supplierCodeId)
+            : _db.SUPPLIER_CODE.Where(s => s.CompanyId == companyId && s.IsActive);   // company-level: every excise of the company
+
+        return await (from s in codes
+                      join e in _db.EXCISE on s.ExciseId equals e.Id
+                      select e.ExciseCode)
+            .Distinct().OrderBy(c => c).ToListAsync(ct);
+    }
+
     public async Task<IReadOnlyList<int>> GetRightIdsAsync(int roleId, CancellationToken ct) =>
         await _db.ROLE_RIGHTS.AsNoTracking().Where(r => r.RoleId == roleId).Select(r => r.PageActionId).ToListAsync(ct);
 
@@ -88,6 +107,8 @@ public sealed class RoleRepository : IRoleRepository
             .ThenBy(p => p.SortOrder).ThenBy(p => p.PageName).ToListAsync(ct);
         var actions = await _db.PAGE_ACTIONS.AsNoTracking().Where(a => a.IsActive).OrderBy(a => a.SortOrder).ToListAsync(ct);
         var byPage = actions.ToLookup(a => a.PageId);
+        var pageCodes = await PageExciseQuery.PageCodesAsync(_db, ct);
+        var actionCodes = await PageExciseQuery.ActionCodesAsync(_db, ct);
 
         return pages.Select(p => new PageResponse
         {
@@ -96,13 +117,15 @@ public sealed class RoleRepository : IRoleRepository
             PageName = p.PageName,
             ModuleName = p.ModuleName,
             ApplicationType = p.ApplicationType.ToString(),
-            Actions =byPage[p.Id].Select(a => new PageActionResponse
+            ExciseCodes = pageCodes.GetValueOrDefault(p.Id),
+            Actions = byPage[p.Id].Select(a => new PageActionResponse
             {
                 PageActionId = a.Id,
                 ActionKey = a.ActionKey,
                 PermissionKey = a.PermissionKey,
                 ActionName = a.ActionName,
                 GrantScope = a.GrantScope.ToString(),
+                ExciseCodes = actionCodes.GetValueOrDefault(a.Id),
             }).ToList(),
         }).ToList();
     }

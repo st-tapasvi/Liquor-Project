@@ -76,6 +76,15 @@ internal sealed class FakeRoleRepository : IRoleRepository
     /// <summary>Page action ids that belong to a LINE-application page; every other action is on a WEB page.</summary>
     public HashSet<int> LineActions { get; } = new();
 
+    /// <summary>Excise codes of individual actions (missing = every excise).</summary>
+    public Dictionary<int, IReadOnlyList<string>> ActionExcise { get; } = new();
+
+    /// <summary>Excise codes each role works in (missing = no restriction).</summary>
+    public Dictionary<int, IReadOnlyList<string>> RoleExcise { get; } = new();
+
+    public Task<IReadOnlyList<string>?> GetExciseCodesForRoleAsync(ROLES role, CancellationToken ct) =>
+        Task.FromResult<IReadOnlyList<string>?>(RoleExcise.GetValueOrDefault(role.Id));
+
     public Task<IReadOnlyList<PageResponse>> GetPagesAsync(CancellationToken ct) =>
         Task.FromResult<IReadOnlyList<PageResponse>>(new List<PageResponse>
         {
@@ -83,12 +92,13 @@ internal sealed class FakeRoleRepository : IRoleRepository
             Page(2, "line", "LINE", Actions.Where(a => LineActions.Contains(a.Id))),
         });
 
-    private static PageResponse Page(int id, string key, string application, IEnumerable<PAGE_ACTIONS> actions) => new()
+    private PageResponse Page(int id, string key, string application, IEnumerable<PAGE_ACTIONS> actions) => new()
     {
         PageId = id, PageKey = key, PageName = key, ApplicationType = application,
         Actions = actions.Select(a => new PageActionResponse
         {
             PageActionId = a.Id, PermissionKey = a.PermissionKey, GrantScope = a.GrantScope.ToString(),
+            ExciseCodes = ActionExcise.GetValueOrDefault(a.Id),
         }).ToList(),
     };
 

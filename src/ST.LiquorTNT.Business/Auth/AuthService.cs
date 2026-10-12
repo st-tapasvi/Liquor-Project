@@ -100,9 +100,23 @@ public sealed class AuthService : IAuthService
                 "Maximum active sessions reached.", EntityName, user.Id.ToString(), actorUserId: user.Id), ct);
             await _users.SaveChangesAsync(ct);
 
-            throw new BusinessException(ErrorCodes.SessionLimitReached,
+            // Tell the user WHERE they are logged in, so they know which device to log out of. Safe to show: the
+            // password was verified above, so only the account owner gets here.
+            var open = await _sessions.GetActiveForUserAsync(user.Id, now, ct);
+            var limit = new BusinessException(ErrorCodes.SessionLimitReached,
                 "Maximum active sessions reached.",
                 $"This account already has {settings.MaxActiveSessions} active session(s). Log out of another device first.");
+            limit.Extensions["sessions"] = open.OrderBy(s => s.LoginAt).Select(s => new SessionResponse
+            {
+                Id = s.Id,
+                LoginAt = s.LoginAt,
+                LastActivityAt = s.LastActivityAt,
+                ExpiresAt = s.ExpiresAt,
+                IpAddress = s.IpAddress,
+                UserAgent = s.UserAgent,
+                IsCurrent = false,
+            }).ToList();
+            throw limit;
         }
 
         // Hard limit: the JWT and the session end together. Inside it, the session slides with activity.

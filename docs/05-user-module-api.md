@@ -155,8 +155,9 @@ Put this in one place in the app (an Axios response interceptor), not in every s
 
 **"Too many devices"**
 With the default settings, a user can be logged in on 2 devices. A third login gets
-`409 SESSION_LIMIT_REACHED`. The user must log out from another device first. From a logged-in
-device, `GET /api/auth/sessions` + `DELETE /api/auth/sessions/{id}` do this.
+`409 SESSION_LIMIT_REACHED`. The body lists the open logins in `sessions` (login time, last use, IP address,
+browser / device from the user agent), so the user knows where they are logged in. The user must log out from one of
+those devices first. From a logged-in device, `GET /api/auth/sessions` + `DELETE /api/auth/sessions/{id}` do this.
 
 ---
 

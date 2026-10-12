@@ -26,6 +26,7 @@
 | Masters | `COMPANY`, `SUPPLIER_CODE` and `LIQUOR_CATEGORY` are maintained by Admin (they come from the CRM) |
 | Generic actions | A page can have any actions, not only view/add/edit/delete. Approve / reject / cancel etc. are added per page when that page is built |
 | Two applications | Pages belong to the **web** application (server) or the **line** application (desktop at the line) — `PAGES.APPLICATION_TYPE`, never both (a job in both = two pages). Roles and rights are shared; no login restriction per application yet (owner, 2026-10-08) |
+| Pages by excise | Pages and actions can depend on the excise (state): mapping tables `PAGE_EXCISES` / `PAGE_ACTION_EXCISES` with foreign keys to `EXCISE`; no row = every excise (owner, 2026-10-12, scripts 017 / 018: today RJ and JK). A role's grid shows its excise(s) (company-level roles: every excise of the company); rights outside the active supplier code's excise do not count; giving a role / a one-supplier-code custom right an action of another excise is refused |
 
 ---
 
@@ -51,8 +52,10 @@ Admin (the `admin` user, no company)
 | `LIQUOR_CATEGORY` | `CATEGORY_CODE` (unique), `CATEGORY_NAME`, `DESCRIPTION`. Seeded with IMFL, CL, FL |
 | `SUPPLIER_CODE` | One supplier code: `COMPANY_ID`, `FRANCHISE_NAME` (text), `EXCISE_ID`, `SUPPLIER_CODE`, `LIQUOR_CATEGORY_ID`. **Unique (excise, code)** |
 | `COMPANY` | `EXCISE_CODE` and `SUPPLIER_CODE` moved out to `SUPPLIER_CODE`; company name is unique |
-| `PAGES` | One screen (`PAGE_KEY`, `MODULE_NAME`, `SORT_ORDER`, `APPLICATION_TYPE` = `WEB` / `LINE` (013): the web application or the line application). `PAGE_NAME` unique per application, `PAGE_KEY` unique overall |
+| `PAGES` | One screen (`PAGE_KEY`, `MODULE_NAME`, `SORT_ORDER`, `APPLICATION_TYPE` = `WEB` / `LINE` (013)). `PAGE_NAME` unique per application, `PAGE_KEY` unique overall |
+| `PAGE_EXCISES` | (017) Page → excise (FK). No row = the page exists in every excise |
 | `PAGE_ACTIONS` | The actions of a page. `PERMISSION_KEY` = `<page>.<action>` (unique); `GRANT_SCOPE` = `ANY` / `ADMIN` / `SYSTEM` |
+| `PAGE_ACTION_EXCISES` | (017) Action → excise (FK). No row = wherever its page exists; rows stay inside the page's excises (checked by a test) |
 | `ROLES` | + `COMPANY_ID`, `SUPPLIER_CODE_ID` (012; null = company-level), `IS_SYSTEM` (Admin), `IS_TEMPLATE` (default role), `PER_SUPPLIER_CODE` (012; templates copied per supplier code), `IS_ADMIN_ROLE` (Plant Admin, always company-level). Name is unique per company + supplier code |
 | `ROLE_RIGHTS` | Rebuilt: one row = role has one page action |
 | `USER_ROLES` | User → role. Since 012 the supplier code comes from the role (column removed); unique (user, role) |
@@ -175,7 +178,7 @@ Changed for the frontend: `UserResponse` and `CurrentUserResponse` no longer hav
 
 ## 9. Adding a page later (batch, plan …)
 
-1. In the page's SQL script, insert its `PAGES` row (with `APPLICATION_TYPE` `WEB` or `LINE`) and its `PAGE_ACTIONS` (for batch e.g. `view, add, edit, delete, submit, approve,
+1. In the page's SQL script, insert its `PAGES` row (with `APPLICATION_TYPE` `WEB` or `LINE`, plus `PAGE_EXCISES` / `PAGE_ACTION_EXCISES` rows when it exists only in some states, excise ids looked up by code) and its `PAGE_ACTIONS` (for batch e.g. `view, add, edit, delete, submit, approve,
    cancel, approvecancel`) with the right `GRANT_SCOPE`, and give the default templates their rights (e.g. Operator → submit,
    Supervisor → approve, Plant Manager → approvecancel).
 2. Add the keys to `Business/Access/Permissions.cs` and put `[HasPermission(...)]` on each endpoint.

@@ -87,8 +87,9 @@ public sealed class AccessService : IAccessService
     {
         var isSuperAdmin = await _current.IsSuperAdminAsync(ct);
 
+        // Admin: every key; inside a supplier code only the ones that exist in its excise (so the menu fits the state)
         IReadOnlyList<string> keys = isSuperAdmin
-            ? await _access.GetAllPermissionKeysAsync(ct)
+            ? await _access.GetAllPermissionKeysAsync(supplierCode?.ExciseCode, ct)
             : supplierCode is null
                 ? Array.Empty<string>()
                 : await _access.GetPermissionKeysAsync(userId, supplierCode.Id, ct);

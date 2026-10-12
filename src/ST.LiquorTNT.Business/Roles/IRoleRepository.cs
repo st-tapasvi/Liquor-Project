@@ -46,6 +46,12 @@ public interface IRoleRepository
     /// <summary>True when the role is inside at least one role group (it cannot be deleted then).</summary>
     Task<bool> IsInRoleGroupAsync(int roleId, CancellationToken ct);
 
+    /// <summary>
+    /// The excise codes the role works in: its supplier code's excise, or for a company-level role every excise of the
+    /// company's active supplier codes. Null = no restriction (templates, the Admin role).
+    /// </summary>
+    Task<IReadOnlyList<string>?> GetExciseCodesForRoleAsync(ROLES role, CancellationToken ct);
+
     /// <summary>The PAGE_ACTIONS ids the role has.</summary>
     Task<IReadOnlyList<int>> GetRightIdsAsync(int roleId, CancellationToken ct);
 

@@ -43,7 +43,7 @@ public sealed class ExceptionMiddleware
         {
             // An expected refusal: RequestLoggingMiddleware writes it as the call's one entry (with errorCode).
             await WriteAsync(context, ex.StatusCode, ex.Title, ex.Detail, ex.ErrorCode,
-                (ex as ValidationException)?.Errors, exception: null);
+                (ex as ValidationException)?.Errors, exception: null, extensions: ex.Extensions);
         }
         catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
         {
@@ -163,7 +163,8 @@ public sealed class ExceptionMiddleware
         string? detail,
         string errorCode,
         IReadOnlyDictionary<string, string[]>? errors,
-        Exception? exception)
+        Exception? exception,
+        IDictionary<string, object?>? extensions = null)
     {
         if (context.Response.HasStarted)
         {
@@ -195,6 +196,12 @@ public sealed class ExceptionMiddleware
         if (errors is { Count: > 0 })
         {
             payload["errors"] = errors;
+        }
+
+        // extra data the client needs to act on (e.g. "sessions"); the standard keys above always win
+        foreach (var (key, extra) in extensions ?? new Dictionary<string, object?>())
+        {
+            payload.TryAdd(key, extra);
         }
 
         if (exception is not null)

@@ -20,7 +20,7 @@ public sealed class SupplierCodeResponse
 
 public sealed class CreateSupplierCodeRequest
 {
-    /// <summary>The customer the supplier code belongs to (Super Admin creates supplier codes for any company).</summary>
+    /// <summary>The customer the supplier code belongs to (Admin creates supplier codes for any company).</summary>
     public int CompanyId { get; set; }
     public string? FranchiseName { get; set; }
     public int ExciseId { get; set; }

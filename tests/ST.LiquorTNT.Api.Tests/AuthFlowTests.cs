@@ -79,7 +79,17 @@ public sealed class AuthFlowTests
             // 6. session limit (MAX_ACTIVE_SESSIONS = 2, REJECT): third concurrent login is refused
             var s1 = await LoginOk(client, tempName, StrongPassword);
             var s2 = await LoginOk(client, tempName, StrongPassword);
-            (await LoginFail(client, tempName, StrongPassword)).Should().Be((HttpStatusCode.Conflict, "SESSION_LIMIT_REACHED"));
+            var full = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest { UserName = tempName, Password = StrongPassword });
+            full.StatusCode.Should().Be(HttpStatusCode.Conflict);
+            using (var body = await Problem(full))
+            {
+                // the refusal lists where the user is logged in, so they know which device to log out of
+                body.RootElement.GetProperty("errorCode").GetString().Should().Be("SESSION_LIMIT_REACHED");
+                var open = body.RootElement.GetProperty("sessions");
+                open.GetArrayLength().Should().Be(2);
+                open[0].TryGetProperty("loginAt", out _).Should().BeTrue();
+                open[0].TryGetProperty("userAgent", out _).Should().BeTrue();
+            }
 
             var sessions = await GetWithToken<List<SessionResponse>>(client, "/api/auth/sessions", s1.AccessToken);
             sessions.Should().HaveCount(2);

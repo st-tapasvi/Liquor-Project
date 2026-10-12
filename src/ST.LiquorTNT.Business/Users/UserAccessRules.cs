@@ -209,6 +209,31 @@ public sealed class UserAccessRules
         }
 
         await EnsureSupplierCodesBelongToAsync(companyId, assignments.Select(a => a.SupplierCodeId), ct);
+
+        // A new right for one supplier code must exist in that supplier code's excise (an "all supplier codes" right
+        // simply counts only where it exists).
+        var addedForOneCode = assignments
+            .Where(a => a.SupplierCodeId is not null && !currentKeys.Contains((a.PageActionId, a.SupplierCodeId)))
+            .ToList();
+        if (addedForOneCode.Count > 0)
+        {
+            var excises = await _access.GetSupplierCodeExcisesAsync(addedForOneCode.Select(a => a.SupplierCodeId!.Value).Distinct().ToList(), ct);
+            var scopes = await _access.GetActionExciseCodesAsync(addedForOneCode.Select(a => a.PageActionId).Distinct().ToList(), ct);
+            var foreign = addedForOneCode
+                .Where(a => excises.TryGetValue(a.SupplierCodeId!.Value, out var code) && scopes.TryGetValue(a.PageActionId, out var scope)
+                            && !ExciseScope.ActionCovers(scope.PageCodes, scope.ActionCodes, code))
+                .Select(a => $"{actions[a.PageActionId].PermissionKey} ({excises[a.SupplierCodeId!.Value]})")
+                .ToList();
+
+            if (foreign.Count > 0)
+            {
+                throw new ValidationException(new Dictionary<string, string[]>
+                {
+                    ["rights"] = new[] { $"Not available in the excise of the chosen supplier code: {string.Join(", ", foreign)}." },
+                });
+            }
+        }
+
         return assignments;
     }
 

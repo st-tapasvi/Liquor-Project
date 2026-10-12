@@ -228,6 +228,7 @@ public sealed class RoleService : IRoleService
 
         // Only what changes is checked, so saving an unchanged grid never fails on rights the editor cannot grant.
         await EnsureGrantableAsync(added, removed, ct);
+        await EnsureInRoleExcisesAsync(role, added, ct);
 
         await _roles.ReplaceRightsAsync(role.Id, wanted, _clock.IndiaNow, _access.UserId, ct);
         await _log.WriteAsync(UserLogEntry.Success(UserLogActions.RoleRightsChanged, UserLogModules.Roles, EntityName,
@@ -238,8 +239,57 @@ public sealed class RoleService : IRoleService
         return await BuildRightsAsync(role, application, ct);
     }
 
-    public async Task<IReadOnlyList<PageResponse>> GetPagesAsync(string? applicationType, CancellationToken ct) =>
-        OfApplication(await _roles.GetPagesAsync(ct), ParseApplication(applicationType));
+    public async Task<IReadOnlyList<PageResponse>> GetPagesAsync(string? applicationType, string? exciseCode, CancellationToken ct) =>
+        OfExcises(OfApplication(await _roles.GetPagesAsync(ct), ParseApplication(applicationType)),
+            string.IsNullOrWhiteSpace(exciseCode) ? null : new[] { exciseCode.Trim() });
+
+    /// <summary>
+    /// Only the pages and actions that exist in at least one of <paramref name="exciseCodes"/> (null = all). A page restricted
+    /// to other excises disappears; inside a page, so do the actions restricted to other excises.
+    /// </summary>
+    private static IReadOnlyList<PageResponse> OfExcises(IReadOnlyList<PageResponse> pages, IReadOnlyCollection<string>? exciseCodes)
+    {
+        if (exciseCodes is null)
+        {
+            return pages;
+        }
+
+        var kept = pages.Where(p => exciseCodes.Any(code => ExciseScope.Covers(p.ExciseCodes, code))).ToList();
+        foreach (var page in kept)
+        {
+            page.Actions = page.Actions.Where(a => ExciseScope.ActionCoversAny(page.ExciseCodes, a.ExciseCodes, exciseCodes)).ToList();
+        }
+
+        return kept;
+    }
+
+    /// <summary>A role only gets actions of the excise(s) it works in: "Operator RJ CL 772" no JK-only page.</summary>
+    private async Task EnsureInRoleExcisesAsync(ROLES role, IReadOnlyCollection<int> added, CancellationToken ct)
+    {
+        var exciseCodes = added.Count == 0 ? null : await _roles.GetExciseCodesForRoleAsync(role, ct);
+        if (exciseCodes is null)
+        {
+            return;
+        }
+
+        var foreign = (await _roles.GetPagesAsync(ct))
+            .SelectMany(p => p.Actions.Select(a => (Page: p, Action: a)))
+            .Where(x => added.Contains(x.Action.PageActionId)
+                        && !ExciseScope.ActionCoversAny(x.Page.ExciseCodes, x.Action.ExciseCodes, exciseCodes))
+            .Select(x => x.Action.PermissionKey)
+            .ToList();
+
+        if (foreign.Count > 0)
+        {
+            throw new ValidationException(new Dictionary<string, string[]>
+            {
+                ["pageActionIds"] = new[]
+                {
+                    $"{string.Join(", ", foreign)} do not exist in the excise(s) of this role ({string.Join(", ", exciseCodes)}).",
+                },
+            });
+        }
+    }
 
     /// <summary>"WEB" / "LINE" (any case) → the application; empty → null (both). Anything else is a 400.</summary>
     private static ApplicationType? ParseApplication(string? applicationType)
@@ -303,9 +353,12 @@ public sealed class RoleService : IRoleService
 
     private async Task<RoleRightsResponse> BuildRightsAsync(ROLES role, ApplicationType? application, CancellationToken ct)
     {
-        var pages = OfApplication(await _roles.GetPagesAsync(ct), application);
+        // Only the pages of the role's excise(s): "Operator RJ CL 772" sees common + RJ pages; a company-level role every
+        // excise of the company (each page carries its exciseCodes, so the screen can group them).
+        var pages = OfExcises(OfApplication(await _roles.GetPagesAsync(ct), application),
+            await _roles.GetExciseCodesForRoleAsync(role, ct));
 
-        // Super Admin holds every right without rows, so its grid is shown fully ticked.
+        // The Admin role holds every right without rows, so its grid is shown fully ticked.
         var granted = role.IsSystem
             ? pages.SelectMany(p => p.Actions).Select(a => a.PageActionId).ToHashSet()
             : (await _roles.GetRightIdsAsync(role.Id, ct)).ToHashSet();

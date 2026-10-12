@@ -51,7 +51,8 @@ public sealed class CurrentAccess
 
             if (await IsSuperAdminAsync(ct))
             {
-                keys = await _access.GetAllPermissionKeysAsync(ct);
+                // Admin: every key, but inside a picked supplier code only the ones that exist in its excise
+                keys = await _access.GetAllPermissionKeysAsync(_tenant.ExciseCode, ct);
             }
             else if (_tenant.SupplierCodeId is int supplierCode)
             {

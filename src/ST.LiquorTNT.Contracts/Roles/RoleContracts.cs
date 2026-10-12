@@ -4,7 +4,7 @@ public sealed class RoleResponse
 {
     public int Id { get; set; }
 
-    /// <summary>Null for Super Admin and for the default templates.</summary>
+    /// <summary>Null for Admin and for the default templates.</summary>
     public int? CompanyId { get; set; }
 
     /// <summary>The supplier code the role works in. Null = company-level role (every supplier code of the company).</summary>
@@ -20,7 +20,7 @@ public sealed class RoleResponse
     public string DisplayName { get; set; } = string.Empty;
     public string? Description { get; set; }
 
-    /// <summary>Super Admin: cannot be edited, deleted or assigned by a company.</summary>
+    /// <summary>Admin: cannot be edited, deleted or assigned by a company.</summary>
     public bool IsSystem { get; set; }
 
     /// <summary>A default role, copied into new companies / new supplier codes.</summary>
@@ -52,7 +52,7 @@ public sealed class SaveRoleRequest
     /// <summary>Admin role (Plant Admin). Always company-level, so not together with a supplier code.</summary>
     public bool IsAdminRole { get; set; }
 
-    /// <summary>Default templates only (Super Admin): copy this template for every new supplier code. Ignored for company roles.</summary>
+    /// <summary>Default templates only (Admin): copy this template for every new supplier code. Ignored for company roles.</summary>
     public bool PerSupplierCode { get; set; }
     public int PasswordPolicyId { get; set; }
 }
@@ -67,6 +67,9 @@ public sealed class PageResponse
 
     /// <summary>"WEB" (web application) or "LINE" (line application). Group the rights grid by it.</summary>
     public string ApplicationType { get; set; } = string.Empty;
+
+    /// <summary>The excises the page exists in, e.g. ["RJ","UP"]; null = every excise.</summary>
+    public IReadOnlyList<string>? ExciseCodes { get; set; }
     public IReadOnlyCollection<PageActionResponse> Actions { get; set; } = Array.Empty<PageActionResponse>();
 }
 
@@ -77,8 +80,11 @@ public sealed class PageActionResponse
     public string PermissionKey { get; set; } = string.Empty;
     public string ActionName { get; set; } = string.Empty;
 
-    /// <summary>ANY, ADMIN (needs user.manageadmin to grant) or SYSTEM (never grantable; Super Admin only).</summary>
+    /// <summary>ANY, ADMIN (needs user.manageadmin to grant) or SYSTEM (never grantable; Admin only).</summary>
     public string GrantScope { get; set; } = string.Empty;
+
+    /// <summary>The excises the action exists in; null = wherever its page exists.</summary>
+    public IReadOnlyList<string>? ExciseCodes { get; set; }
 
     /// <summary>In a role's or user's rights grid: is this action ticked? Always false in the plain page list.</summary>
     public bool Granted { get; set; }

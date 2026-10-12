@@ -73,6 +73,8 @@ db/mysql/013_page_application_type.sql    PAGES.APPLICATION_TYPE (WEB / LINE app
 db/mysql/014_security_questions.sql       10 security questions; a question in use can never change its text
 db/mysql/015_admin_role_name.sql          the admin user's system role is named "Admin"
 db/mysql/016_role_groups.sql              role groups: ROLE_GROUP, ROLE_GROUP_ROLES, USER_ROLE_GROUPS
+db/mysql/017_page_excises.sql             PAGE_EXCISES, PAGE_ACTION_EXCISES: excises of a page / action (no row = every excise)
+db/mysql/018_page_excise_rj_jk.sql        every page and action: RJ and JK
 db/mysql/new_install_admin.sql            NEW installations only: admin must change Admin@123 and set a question
 db/mysql/demo_globus_spirits.sql          DEV only: demo company, supplier codes, roles and users
 ```

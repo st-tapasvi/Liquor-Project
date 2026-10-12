@@ -32,6 +32,13 @@ public interface IUserAccessRepository
     /// <summary>Makes the user's roles exactly <paramref name="roles"/> (adds what is missing, removes the rest).</summary>
     Task ReplaceRolesAsync(int userId, IReadOnlyCollection<UserRoleAssignment> roles, DateTime now, int? changedBy, CancellationToken ct);
 
+    /// <summary>Excise code of each supplier code in <paramref name="supplierCodeIds"/> ("RJ"), keyed by supplier code id.</summary>
+    Task<IReadOnlyDictionary<int, string>> GetSupplierCodeExcisesAsync(IReadOnlyCollection<int> supplierCodeIds, CancellationToken ct);
+
+    /// <summary>For each page action: the excise codes of its page and of the action itself (null = every excise).</summary>
+    Task<IReadOnlyDictionary<int, (IReadOnlyList<string>? PageCodes, IReadOnlyList<string>? ActionCodes)>> GetActionExciseCodesAsync(
+        IReadOnlyCollection<int> pageActionIds, CancellationToken ct);
+
     /// <summary>The ids of the role groups the user holds.</summary>
     Task<IReadOnlyList<int>> GetRoleGroupIdsAsync(int userId, CancellationToken ct);
 

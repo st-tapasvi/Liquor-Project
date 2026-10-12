@@ -13,13 +13,14 @@ public interface IAccessRepository
     Task<bool> IsSuperAdminAsync(int userId, CancellationToken ct);
 
     /// <summary>
-    /// The user's permission keys inside one supplier code: rights of every role assigned for that supplier code (or for all
-    /// supplier codes), plus custom rights for that supplier code (or for all supplier codes). Distinct keys of active actions.
+    /// The user's permission keys inside one supplier code: rights of the user's roles (direct or through role groups) of
+    /// that supplier code or company-level, plus custom rights for that supplier code (or for all supplier codes).
+    /// Distinct keys of active actions that exist in the supplier code's excise (PAGE_EXCISES / PAGE_ACTION_EXCISES).
     /// </summary>
     Task<IReadOnlyList<string>> GetPermissionKeysAsync(int userId, int supplierCodeId, CancellationToken ct);
 
-    /// <summary>Every active permission key (what Super Admin holds).</summary>
-    Task<IReadOnlyList<string>> GetAllPermissionKeysAsync(CancellationToken ct);
+    /// <summary>Every active permission key (what Admin holds); with an excise code only the keys that exist in that excise.</summary>
+    Task<IReadOnlyList<string>> GetAllPermissionKeysAsync(string? exciseCode, CancellationToken ct);
 
     /// <summary>The active supplier codes the user holds, ordered for the picker.</summary>
     Task<IReadOnlyList<SupplierCodeResponse>> GetSupplierCodesForUserAsync(int userId, CancellationToken ct);

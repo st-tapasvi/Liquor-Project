@@ -16,4 +16,10 @@ public abstract class AppException : Exception
     public int StatusCode { get; }
     public string Title { get; }
     public string? Detail { get; }
+
+    /// <summary>
+    /// Extra fields written into the ProblemDetails body next to the standard ones, for errors where the client needs
+    /// data to act on (e.g. "sessions" on 409 SESSION_LIMIT_REACHED). Keys are camelCase; never put secrets here.
+    /// </summary>
+    public IDictionary<string, object?> Extensions { get; } = new Dictionary<string, object?>();
 }

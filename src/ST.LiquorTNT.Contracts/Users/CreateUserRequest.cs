@@ -6,7 +6,7 @@ public sealed class CreateUserRequest
     public string Password { get; set; } = string.Empty;
 
     /// <summary>
-    /// Only Super Admin sends this (when creating the first user of a company). For everyone else the new user
+    /// Only Admin sends this (when creating the first user of a company). For everyone else the new user
     /// joins the caller's own company and this value is ignored.
     /// </summary>
     public int? CompanyId { get; set; }
