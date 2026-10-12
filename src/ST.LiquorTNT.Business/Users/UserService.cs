@@ -80,9 +80,25 @@ public sealed class UserService : IUserService
         }
 
         // The new user joins the caller's company. Only Super Admin may name another company (or none).
-        var companyId = await _access.IsSuperAdminAsync(ct)
+        var isAdmin = await _access.IsSuperAdminAsync(ct);
+        var companyId = isAdmin
             ? request.CompanyId ?? await _access.CompanyScopeAsync(ct)
             : await _access.CompanyScopeAsync(ct);
+
+        // A new Admin belongs to no company, whatever supplier code the creating Admin has picked. Only when the
+        // request names no company; a company sent together with the Admin role is still refused (400) below.
+        if (isAdmin && request.CompanyId is null && await HasAdminRoleAsync(request.Roles, ct))
+        {
+            if (request.Roles.Select(r => r.RoleId).Distinct().Count() > 1 || request.RoleGroupIds.Count > 0)
+            {
+                throw new Common.Exceptions.ValidationException(new Dictionary<string, string[]>
+                {
+                    ["roles"] = new[] { "The Admin role is given alone: an Admin already holds every right, in every company." },
+                });
+            }
+
+            companyId = null;
+        }
 
         if (companyId.HasValue && !await _lookup.CompanyExistsAsync(companyId.Value, ct))
         {
@@ -129,6 +145,10 @@ public sealed class UserService : IUserService
 
         return response;
     }
+
+    private async Task<bool> HasAdminRoleAsync(IReadOnlyCollection<UserRoleAssignment> requested, CancellationToken ct) =>
+        requested.Count > 0
+        && (await _userAccess.GetRolesAsync(requested.Select(r => r.RoleId).Distinct().ToList(), ct)).Any(r => r.IsSystem);
 
     public async Task<UserResponse> GetByIdAsync(int id, CancellationToken ct) =>
         UserProjections.Map(await _rules.RequireUserAsync(id, ct));

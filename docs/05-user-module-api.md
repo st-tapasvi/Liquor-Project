@@ -326,6 +326,7 @@ Response: `201` with the new user (shape in #14).
 - `roles`: at least one. Each role is for one supplier code (`supplierCodeId`) or for every supplier code of the company (`null`).
   The roles and supplier codes must belong to the caller's company; giving an admin role (Plant Admin) needs `user.manageadmin`.
 - The new user always joins the caller's company. Only Admin may send `companyId` (to create the first user of a company).
+- **A new Admin:** only Admin gives the Admin role (id `1`, `403 ADMIN_USER_PROTECTED` for anyone else). Send it **alone** (no other role, no group) and without `companyId`. The new Admin gets no company, whatever supplier code the creating Admin has picked. The Admin role with another role or a group, or with a `companyId`, gives `400` (`errors.roles`).
 - `password` must follow the password rules of the user's roles (with several roles, the strictest value of each rule).
 - `forcePasswordChange` is `true` by default: the user must set their own password at first login.
 - `fullName`, `email`, `phone`, `employeeCode` are optional.

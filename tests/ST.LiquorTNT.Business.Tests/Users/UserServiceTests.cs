@@ -26,6 +26,7 @@ public sealed class UserServiceTests
     private const int NoPolicyRole = 3;      // exists, no policy
     private const int PlantAdminRole = 4;    // admin role, HARD policy
     private const int OtherCompanyRole = 5;
+    private const int AdminRole = 9;         // system role "Admin": no company
 
     private readonly FakeUserRepository _users = new();
     private readonly FakeUserAccessRepository _userAccess = new();
@@ -47,12 +48,14 @@ public sealed class UserServiceTests
         _policies.ByRole[PlantManagerRole] = hard;
         _policies.ByRole[OperatorRole] = TestData.Policy(id: 1, name: "EASY", minLength: 6, number: true);
         _policies.ByRole[PlantAdminRole] = hard;
+        _policies.ByRole[AdminRole] = hard;
 
         _userAccess.Roles.Add(AccessRows.Role(PlantManagerRole, Company, "Plant Manager", supplierCodeId: OwnSupplierCode));
         _userAccess.Roles.Add(AccessRows.Role(OperatorRole, Company, "Operator", supplierCodeId: OwnSupplierCode));
         _userAccess.Roles.Add(AccessRows.Role(NoPolicyRole, Company, "Viewer"));
         _userAccess.Roles.Add(AccessRows.Role(PlantAdminRole, Company, "Plant Admin", isAdminRole: true));
         _userAccess.Roles.Add(AccessRows.Role(OtherCompanyRole, OtherCompany, "Operator"));
+        _userAccess.Roles.Add(AccessRows.Role(AdminRole, null, "Admin", isSystem: true));
         _userAccess.SupplierCodeCompany[OwnSupplierCode] = Company;
         _userAccess.SupplierCodeCompany[OtherSupplierCode] = OtherCompany;
 
@@ -223,6 +226,51 @@ public sealed class UserServiceTests
         var response = await _service.CreateAsync(ValidCreate(roleId: PlantAdminRole), CancellationToken.None);
 
         response.Id.Should().BeGreaterThan(0);
+    }
+
+    [Fact]
+    public async Task Create_AdminCreatesAnotherAdmin_WithASupplierCodePicked_NewAdminHasNoCompany()
+    {
+        _access.SuperAdmins.Add(CallerId);                     // the caller picked RJ CL 550 of company 1
+
+        var response = await _service.CreateAsync(ValidCreate("admin2", AdminRole), CancellationToken.None);
+
+        response.CompanyId.Should().BeNull();
+        _users.Users.Single(u => u.UserName == "admin2").CompanyId.Should().BeNull();
+        _userAccess.UserRoles[response.Id].Should().ContainSingle(r => r.RoleId == AdminRole);
+    }
+
+    [Fact]
+    public async Task Create_AdminRoleTogetherWithAnotherRole_Returns400()
+    {
+        _access.SuperAdmins.Add(CallerId);
+        var request = ValidCreate("admin2", AdminRole);
+        request.Roles.Add(new UserRoleAssignment { RoleId = OperatorRole });
+
+        (await _service.Invoking(s => s.CreateAsync(request, CancellationToken.None)).Should().ThrowAsync<ValidationException>())
+            .Which.Errors.Should().ContainKey("roles");
+        _users.Users.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Create_AdminRoleWithACompanyNamed_Returns400()
+    {
+        _access.SuperAdmins.Add(CallerId);
+        var request = ValidCreate("admin2", AdminRole);
+        request.CompanyId = Company;
+
+        await _service.Invoking(s => s.CreateAsync(request, CancellationToken.None)).Should().ThrowAsync<ValidationException>();
+        _users.Users.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Create_AdminRole_ByANonAdmin_Returns403()
+    {
+        _access.Grant(CallerId, OwnSupplierCode, Permissions.UserManageAdmin);   // even a Plant Admin cannot
+
+        (await _service.Invoking(s => s.CreateAsync(ValidCreate("admin2", AdminRole), CancellationToken.None))
+            .Should().ThrowAsync<ForbiddenException>()).Which.ErrorCode.Should().Be(ErrorCodes.AdminUserProtected);
+        _users.Users.Should().BeEmpty();
     }
 
     [Fact]
