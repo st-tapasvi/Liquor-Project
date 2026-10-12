@@ -72,7 +72,8 @@ public sealed class AuthServiceTests
     [Fact]
     public async Task Login_UnknownUser_401_SameCodeAsWrongPassword_AuditedWithoutUserId()
     {
-        await LoginShouldFail<UnauthorizedException>(ErrorCodes.InvalidCredentials, userName: "nobody");
+        var ex = await LoginShouldFail<UnauthorizedException>(ErrorCodes.InvalidCredentials, userName: "nobody");
+        ex.Extensions["attemptsLeft"].Should().Be(2);        // the same as a first wrong password of a real user
 
         var entry = _log.Entries.Single();
         entry.ActionType.Should().Be(UserLogActions.LoginFailed);
@@ -104,8 +105,9 @@ public sealed class AuthServiceTests
     {
         var user = AddUser();
 
-        await LoginShouldFail<UnauthorizedException>(ErrorCodes.InvalidCredentials, password: "wrong");
+        var ex = await LoginShouldFail<UnauthorizedException>(ErrorCodes.InvalidCredentials, password: "wrong");
 
+        ex.Extensions["attemptsLeft"].Should().Be(2);
         user.FailedLoginAttempts.Should().Be(1);
         user.LockedUntil.Should().BeNull();
         _users.SaveCount.Should().Be(1);
@@ -119,11 +121,13 @@ public sealed class AuthServiceTests
         var user = AddUser();
         await LoginShouldFail<UnauthorizedException>(ErrorCodes.InvalidCredentials, password: "wrong");
         _clock.Advance(TimeSpan.FromMinutes(5));
-        await LoginShouldFail<UnauthorizedException>(ErrorCodes.InvalidCredentials, password: "wrong");
+        var second = await LoginShouldFail<UnauthorizedException>(ErrorCodes.InvalidCredentials, password: "wrong");
+        second.Extensions["attemptsLeft"].Should().Be(1);
         _clock.Advance(TimeSpan.FromMinutes(5));
 
         var ex = await LoginShouldFail<ForbiddenException>(ErrorCodes.UserLocked, password: "wrong");
 
+        ex.Extensions["attemptsLeft"].Should().Be(0);
         user.FailedLoginAttempts.Should().Be(3);
         user.LockedUntil.Should().Be(_clock.IndiaNow.AddMinutes(1440));
         ex.Title.Should().Be("Account locked after 3 failed attempts.");
@@ -145,6 +149,7 @@ public sealed class AuthServiceTests
         var ex = await LoginShouldFail<ForbiddenException>(ErrorCodes.UserLocked, password: "wrong");
 
         ex.Title.Should().Be("This account is already locked.");
+        ex.Extensions["attemptsLeft"].Should().Be(0);
         ex.Detail.Should().Contain(lockedUntil!.Value.ToString("yyyy-MM-dd HH:mm"));
         user.LockedUntil.Should().Be(lockedUntil);          // more guesses never extend the lock
         user.FailedLoginAttempts.Should().Be(3);
@@ -196,7 +201,8 @@ public sealed class AuthServiceTests
 
         for (var i = 0; i < 6; i++)
         {
-            await LoginShouldFail<UnauthorizedException>(ErrorCodes.InvalidCredentials, password: "wrong");
+            var ex = await LoginShouldFail<UnauthorizedException>(ErrorCodes.InvalidCredentials, password: "wrong");
+            ex.Extensions.Should().NotContainKey("attemptsLeft");    // no limit, nothing to count down
         }
 
         user.FailedLoginAttempts.Should().Be(6);
@@ -254,7 +260,7 @@ public sealed class AuthServiceTests
         var ex = await _service.Invoking(_ => Login(password: "wrong")).Should().ThrowAsync<UnauthorizedException>();
 
         ex.Which.ErrorCode.Should().Be(ErrorCodes.InvalidCredentials);
-        ex.Which.Extensions.Should().BeEmpty();
+        ex.Which.Extensions.Should().NotContainKey("sessions").And.ContainKey("attemptsLeft");
     }
 
     [Fact]

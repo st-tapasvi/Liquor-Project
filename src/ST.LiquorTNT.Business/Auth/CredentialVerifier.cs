@@ -47,7 +47,9 @@ public sealed class CredentialVerifier
             await _users.SaveChangesAsync(ct);
             CallTrace.Fail(Layer, "CredentialVerifier.VerifyAsync", ErrorCodes.InvalidCredentials, "Unknown user name");
             step?.Output("throw INVALID_CREDENTIALS");
-            throw new UnauthorizedException(ErrorCodes.InvalidCredentials, "User name or password is incorrect.");
+
+            // Same shape as a first wrong password of a real user, so the count does not reveal that the name is unknown.
+            throw WrongCredentials(settings.FailedLoginLockEnabled ? settings.MaxFailedLoginAttempts - 1 : null);
         }
 
         await EnsureMayAuthenticateAsync(user, now, ct);
@@ -68,7 +70,9 @@ public sealed class CredentialVerifier
 
             throw locked
                 ? JustLockedException(user)
-                : new UnauthorizedException(ErrorCodes.InvalidCredentials, "User name or password is incorrect.");
+                : WrongCredentials(settings.FailedLoginLockEnabled
+                    ? Math.Max(settings.MaxFailedLoginAttempts - user.FailedLoginAttempts, 0)
+                    : null);
         }
 
         step?.Output($"password matched, user id {user.Id}");
@@ -162,15 +166,36 @@ public sealed class CredentialVerifier
         step?.Output(new { attempts = user.FailedLoginAttempts, locked = lockedNow });
     }
 
+    /// <summary>
+    /// 401 INVALID_CREDENTIALS with <c>attemptsLeft</c>: wrong tries left today before the lock.
+    /// Left out when the failed-login lock is switched off (there is no limit to count down to).
+    /// </summary>
+    private static UnauthorizedException WrongCredentials(int? attemptsLeft)
+    {
+        var ex = new UnauthorizedException(ErrorCodes.InvalidCredentials, "User name or password is incorrect.");
+        if (attemptsLeft is not null)
+        {
+            ex.Extensions["attemptsLeft"] = attemptsLeft;
+        }
+
+        return ex;
+    }
+
     /// <summary>This wrong attempt reached the limit and locked the account.</summary>
     public static ForbiddenException JustLockedException(USERS user) =>
-        new(ErrorCodes.UserLocked, $"Account locked after {user.FailedLoginAttempts} failed attempts.",
-            $"Try again after {user.LockedUntil:yyyy-MM-dd HH:mm} or ask an administrator to unlock.");
+        Locked(new(ErrorCodes.UserLocked, $"Account locked after {user.FailedLoginAttempts} failed attempts.",
+            $"Try again after {user.LockedUntil:yyyy-MM-dd HH:mm} or ask an administrator to unlock."));
 
     /// <summary>The account was locked before this attempt; the attempt was not checked or counted.</summary>
     public static ForbiddenException AlreadyLockedException(USERS user) =>
-        new(ErrorCodes.UserLocked, "This account is already locked.",
-            $"Locked until {user.LockedUntil:yyyy-MM-dd HH:mm}. Ask an administrator to unlock it, or try again after that time.");
+        Locked(new(ErrorCodes.UserLocked, "This account is already locked.",
+            $"Locked until {user.LockedUntil:yyyy-MM-dd HH:mm}. Ask an administrator to unlock it, or try again after that time."));
+
+    private static ForbiddenException Locked(ForbiddenException ex)
+    {
+        ex.Extensions["attemptsLeft"] = 0;
+        return ex;
+    }
 
     private async Task FailAsync(USERS user, string reason, CancellationToken ct)
     {

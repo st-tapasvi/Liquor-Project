@@ -228,8 +228,8 @@ This happens after **every** login, for **every** user.
 | Error | Status | Screen action |
 |---|---|---|
 | `VALIDATION_FAILED` | 400 | empty fields |
-| `INVALID_CREDENTIALS` | 401 | "User name or password is incorrect." (wrong attempts are counted) |
-| `USER_LOCKED` | 403 | show `detail` (contains the unlock time). Default: 3 wrong passwords in a day → locked 24 h |
+| `INVALID_CREDENTIALS` | 401 | "User name or password is incorrect." (wrong attempts are counted). Show `attemptsLeft` from the body: "2 attempts left". Not sent when the lock is off |
+| `USER_LOCKED` | 403 | show `detail` (contains the unlock time). Default: 3 wrong passwords in a day → locked 24 h. `attemptsLeft: 0` |
 | `USER_INACTIVE` / `USER_BLOCKED` | 403 | "Contact your administrator" |
 | `PASSWORD_CHANGE_REQUIRED` | 403 | "Set new password" (Step 2) |
 | `PASSWORD_EXPIRED` | 403 | "Your password has expired" → "Set new password" (Step 2) |

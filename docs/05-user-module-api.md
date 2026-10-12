@@ -188,8 +188,8 @@ Checks the user name and password. On success it opens a session and returns a t
 | Error | When |
 |---|---|
 | 400 `VALIDATION_FAILED` | User name or password empty, or too long |
-| 401 `INVALID_CREDENTIALS` | Wrong user name **or** wrong password. Both get the same answer on purpose, so nobody can find out which user names exist. |
-| 403 `USER_LOCKED` | Too many wrong passwords today. The attempt that locks the account says *"Account locked after 3 failed attempts."*; any later attempt says *"This account is already locked."*. In both, `detail` gives the unlock time. |
+| 401 `INVALID_CREDENTIALS` | Wrong user name **or** wrong password. Both get the same answer on purpose, so nobody can find out which user names exist. The body has `"attemptsLeft": 2`: wrong tries left today before the lock (an unknown user name gets the same number as a first wrong password). Left out when the lock is switched off. |
+| 403 `USER_LOCKED` | Too many wrong passwords today. The attempt that locks the account says *"Account locked after 3 failed attempts."*; any later attempt says *"This account is already locked."*. In both, `detail` gives the unlock time and the body has `"attemptsLeft": 0`. |
 | 403 `USER_INACTIVE` / `USER_BLOCKED` | Admin has turned the user off or blocked them |
 | 403 `PASSWORD_CHANGE_REQUIRED` / `PASSWORD_EXPIRED` | The password is right, but a new one must be set first (see §3) |
 | 409 `SESSION_LIMIT_REACHED` | Already logged in on the maximum number of devices |
