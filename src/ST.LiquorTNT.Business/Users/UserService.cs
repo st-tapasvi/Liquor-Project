@@ -24,6 +24,7 @@ public sealed class UserService : IUserService
     private readonly IUserRepository _users;
     private readonly IUserAccessRepository _userAccess;
     private readonly ISessionRepository _sessions;
+    private readonly ISecurityQuestionRepository _questions;
     private readonly IReferenceLookup _lookup;
     private readonly UserAccessRules _rules;
     private readonly CurrentAccess _access;
@@ -33,11 +34,13 @@ public sealed class UserService : IUserService
     private readonly IUserLogWriter _log;
     private readonly IValidator<CreateUserRequest> _createValidator;
     private readonly IValidator<UpdateUserRequest> _updateValidator;
+    private readonly IValidator<ResetUserPasswordRequest> _resetPasswordValidator;
 
     public UserService(
         IUserRepository users,
         IUserAccessRepository userAccess,
         ISessionRepository sessions,
+        ISecurityQuestionRepository questions,
         IReferenceLookup lookup,
         UserAccessRules rules,
         CurrentAccess access,
@@ -46,11 +49,13 @@ public sealed class UserService : IUserService
         IClock clock,
         IUserLogWriter log,
         IValidator<CreateUserRequest> createValidator,
-        IValidator<UpdateUserRequest> updateValidator)
+        IValidator<UpdateUserRequest> updateValidator,
+        IValidator<ResetUserPasswordRequest> resetPasswordValidator)
     {
         _users = users;
         _userAccess = userAccess;
         _sessions = sessions;
+        _questions = questions;
         _lookup = lookup;
         _rules = rules;
         _access = access;
@@ -60,6 +65,7 @@ public sealed class UserService : IUserService
         _log = log;
         _createValidator = createValidator;
         _updateValidator = updateValidator;
+        _resetPasswordValidator = resetPasswordValidator;
     }
 
     public async Task<UserResponse> CreateAsync(CreateUserRequest request, CancellationToken ct)
@@ -211,6 +217,51 @@ public sealed class UserService : IUserService
             UserLogActions.AccountUnlocked, UserLogModules.Users, EntityName, user.Id.ToString(),
             $"User '{user.UserName}' unlocked by administrator."), ct);
         await _users.SaveChangesAsync(ct);
+
+        return UserProjections.Map(user);
+    }
+
+    /// <summary>
+    /// The user cannot get in (forgot the password, or the password and the security answer). The administrator sets a
+    /// temporary password: the user must change it at the next login and then choose a new security question, because
+    /// the old one is deleted. Open sessions and forgot-password requests end; a failed-login lock is cleared (a block is
+    /// not, that stays with unlock). Everything is written in one commit.
+    /// </summary>
+    public async Task<UserResponse> ResetPasswordAsync(int id, ResetUserPasswordRequest request, CancellationToken ct)
+    {
+        (await _resetPasswordValidator.ValidateAsync(request, ct)).EnsureValid();
+
+        if (id == _access.UserId)
+        {
+            throw new BusinessException(ErrorCodes.CannotResetOwnPassword,
+                "You cannot reset your own password here.", "Use change password (POST /api/auth/changepassword).");
+        }
+
+        var user = await _rules.RequireUserAsync(id, ct);
+        await _rules.EnsureCanManageUserAsync(user, ct);
+
+        var policy = await _passwordRules.EnsureAcceptableForUserAsync(user, request.NewPassword, ct);
+
+        var now = _clock.IndiaNow;
+        user.SetPassword(_hasher.Hash(request.NewPassword), policy.ExpiryFrom(now), forceChange: true, now, _access.UserId);
+        user.ClearTemporaryLock(now, _access.UserId);
+
+        await _questions.RemoveAllForUserAsync(user.Id, ct);
+
+        foreach (var reset in await _questions.GetOpenResetRequestsAsync(user.Id, ct))
+        {
+            reset.MarkExpired(now);
+        }
+
+        foreach (var session in await _sessions.GetActiveForUserAsync(user.Id, now, ct))
+        {
+            session.Revoke(now);
+        }
+
+        await _log.WriteAsync(UserLogEntry.Success(
+            UserLogActions.PasswordResetByAdmin, UserLogModules.Users, EntityName, user.Id.ToString(),
+            $"Temporary password set for '{user.UserName}' by administrator; security question removed."), ct);
+        await _users.SaveChangesAsync(ct);      // one DbContext: user, questions, requests, sessions and the log row together
 
         return UserProjections.Map(user);
     }

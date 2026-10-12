@@ -3,7 +3,7 @@
 For the React team (and the AI assistant you use). It covers everything needed for the first set of screens:
 
 1. Login, first-login password change, security question, forgot password
-2. Users: list, create (with a temporary password), edit, activate / deactivate, unlock
+2. Users: list, create (with a temporary password), edit, activate / deactivate, unlock, reset password (temporary password)
 3. User access: master roles + custom rights
 4. Master roles: create, edit, delete, and the rights grid
 5. Settings: the security settings page (and password policies)
@@ -463,6 +463,19 @@ Profile fields only (send all four; roles and status have their own APIs):
 ### Activate / deactivate / unlock — `user.status` / `user.unlock`
 `POST /api/users/{id}/deactivate`, `POST /api/users/{id}/activate`, `POST /api/users/{id}/unlock` → `UserResponse`
 (deactivating also ends the user's sessions; unlock clears `lockedUntil`, the wrong-attempt count and an `isBlocked` block).
+
+### Reset password (temporary password): `user.unlock`
+`POST /api/users/{id}/resetpassword` with `{ "newPassword": "Temp@5678" }` → `UserResponse` with `forcePasswordChange: true`.
+What happens:
+- The user is logged out everywhere.
+- The user's security question is deleted.
+- At the next login the user must change the password, then choose a new security question. This is the same screens as a new user.
+- A failed-login lock is cleared too. A block is not cleared; that needs unlock.
+
+| Error | Status | Meaning |
+|---|---|---|
+| `VALIDATION_FAILED` | 400 | the password breaks the user's password policy (`errors.newPassword` lists the rules) |
+| `CANNOT_RESET_OWN_PASSWORD` | 409 | own account: use change password |
 
 | Error | Status | Meaning |
 |---|---|---|

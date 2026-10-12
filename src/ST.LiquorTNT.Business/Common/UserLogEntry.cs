@@ -55,6 +55,7 @@ public static class UserLogActions
     public const string PasswordChanged = "PASSWORD_CHANGED";
     public const string PasswordResetRequested = "PASSWORD_RESET_REQUESTED";
     public const string PasswordResetSuccess = "PASSWORD_RESET_SUCCESS";
+    public const string PasswordResetByAdmin = "PASSWORD_RESET_BY_ADMIN";
     public const string PasswordResetFailed = "PASSWORD_RESET_FAILED";
     public const string SecurityQuestionChanged = "SECURITY_QUESTION_CHANGED";
 

@@ -21,6 +21,7 @@ public static class ErrorCodes
     public const string UserNameTaken               = "USERNAME_TAKEN";
     public const string PasswordPolicyNotConfigured = "PASSWORD_POLICY_NOT_CONFIGURED";
     public const string CannotDeactivateSelf        = "CANNOT_DEACTIVATE_SELF";
+    public const string CannotResetOwnPassword      = "CANNOT_RESET_OWN_PASSWORD";
 
     // roles and rights
     public const string PermissionDenied       = "PERMISSION_DENIED";        // the caller lacks the permission key of this API

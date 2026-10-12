@@ -30,6 +30,7 @@ public sealed class UserServiceTests
     private readonly FakeUserRepository _users = new();
     private readonly FakeUserAccessRepository _userAccess = new();
     private readonly FakeSessionRepository _sessions = new();
+    private readonly FakeSecurityQuestionRepository _questions = new();
     private readonly FakeReferenceLookup _lookup = new();
     private readonly FakePasswordPolicyRepository _policies;
     private readonly FakeAccessRepository _access = new();
@@ -60,8 +61,8 @@ public sealed class UserServiceTests
         var rules = new UserAccessRules(_users, _userAccess, current);
         var passwordRules = new PasswordRules(_policies, _users, new PasswordPolicyValidator(hasher), _clock);
 
-        _service = new UserService(_users, _userAccess, _sessions, _lookup, rules, current, passwordRules, hasher, _clock, _log,
-            new CreateUserRequestValidator(), new UpdateUserRequestValidator());
+        _service = new UserService(_users, _userAccess, _sessions, _questions, _lookup, rules, current, passwordRules, hasher, _clock, _log,
+            new CreateUserRequestValidator(), new UpdateUserRequestValidator(), new ResetUserPasswordRequestValidator());
     }
 
     private static CreateUserRequest ValidCreate(string userName = "bob", int roleId = PlantManagerRole) => new()
@@ -78,6 +79,7 @@ public sealed class UserServiceTests
         var user = TestData.User(id: id, userName: "user" + id, companyId: companyId);
         _users.Users.Add(user);
         _userAccess.UserRoles[id] = roles.Select(r => new UserRoleAssignment { RoleId = r }).ToList();
+        _policies.UserRoles[id] = roles.ToList();
         return user;
     }
 
@@ -436,5 +438,59 @@ public sealed class UserServiceTests
         response.FailedLoginAttempts.Should().Be(0);
         response.IsBlocked.Should().BeFalse();
         _log.Has(UserLogActions.AccountUnlocked).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ResetPassword_SetsTemporaryPassword_DeletesSecurityQuestion_EndsSessionsAndRecovery()
+    {
+        var user = AddUser(5, Company, OperatorRole);
+        user.RegisterFailedLogin(TestData.Now, true, 1, 1440);                 // locked: the new password must work at once
+        _questions.UserQuestions.Add(USER_SECURITY_QUESTION.Create(5, 3, "H:delhi", TestData.Now));
+        _questions.UserQuestions.Add(USER_SECURITY_QUESTION.Create(6, 3, "H:other", TestData.Now));   // someone else's
+        var recovery = PASSWORD_RESET_REQUEST.Create(5, "TH:reset", TestData.Now, TestData.Now.AddMinutes(15));
+        _questions.ResetRequests.Add(recovery);
+        var session = USER_SESSION.Create(5, "TH:tok", TestData.Now, 60, TestData.Now.AddHours(8), null, null);
+        _sessions.Sessions.Add(session);
+
+        var response = await _service.ResetPasswordAsync(5, new ResetUserPasswordRequest { NewPassword = "temp123" }, CancellationToken.None);
+
+        user.PasswordHash.Should().Be("H:temp123");
+        user.ForcePasswordChange.Should().BeTrue();                            // must be changed at the next login
+        response.ForcePasswordChange.Should().BeTrue();
+        user.LockedUntil.Should().BeNull();
+        _questions.UserQuestions.Should().ContainSingle(q => q.UserId == 6);   // only this user's question is gone
+        recovery.IsOpen.Should().BeFalse();
+        session.IsActiveAt(TestData.Now).Should().BeFalse();
+        _log.Has(UserLogActions.PasswordResetByAdmin).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ResetPassword_FollowsTheUsersPasswordPolicy()
+    {
+        AddUser(5, Company, PlantManagerRole);                                 // HARD: 12 characters and more
+
+        await _service.Invoking(s => s.ResetPasswordAsync(5, new ResetUserPasswordRequest { NewPassword = "temp123" }, CancellationToken.None))
+            .Should().ThrowAsync<ValidationException>();
+    }
+
+    [Fact]
+    public async Task ResetPassword_OwnAccount_Refused()
+    {
+        AddUser(CallerId, Company, PlantAdminRole);
+
+        (await _service.Invoking(s => s.ResetPasswordAsync(CallerId, new ResetUserPasswordRequest { NewPassword = "Str0ng!Passw0rd#" }, CancellationToken.None))
+            .Should().ThrowAsync<BusinessException>()).Which.ErrorCode.Should().Be(ErrorCodes.CannotResetOwnPassword);
+    }
+
+    [Fact]
+    public async Task ResetPassword_UserOfAnotherCompany_Refused()
+    {
+        var user = AddUser(6, OtherCompany, OtherCompanyRole);
+        _questions.UserQuestions.Add(USER_SECURITY_QUESTION.Create(6, 3, "H:x", TestData.Now));
+
+        await _service.Invoking(s => s.ResetPasswordAsync(6, new ResetUserPasswordRequest { NewPassword = "temp123" }, CancellationToken.None))
+            .Should().ThrowAsync<AppException>();
+        _questions.UserQuestions.Should().HaveCount(1);
+        user.ForcePasswordChange.Should().BeFalse();
     }
 }

@@ -58,6 +58,12 @@ public sealed class UsersController : ControllerBase
     public async Task<ActionResult<UserResponse>> UnlockAsync(int id, CancellationToken ct)
         => Ok(await _users.UnlockAsync(id, ct));
 
+    /// <summary>Temporary password from the administrator; the user changes it at the next login and chooses a new security question.</summary>
+    [HttpPost("{id:int}/resetpassword")]
+    [HasPermission(Permissions.UserUnlock)]
+    public async Task<ActionResult<UserResponse>> ResetPasswordAsync(int id, ResetUserPasswordRequest request, CancellationToken ct)
+        => Ok(await _users.ResetPasswordAsync(id, request, ct));
+
     // ---- roles (per supplier code) and custom rights of a user ----
 
     [HttpGet("{id:int}/access")]

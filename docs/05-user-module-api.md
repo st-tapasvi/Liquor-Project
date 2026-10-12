@@ -113,6 +113,7 @@ server log.
 | 16 | `POST /api/users/{id}/activate` | 🛡️ | Turn a user back on |
 | 17 | `POST /api/users/{id}/deactivate` | 🛡️ | Turn a user off (logs them out everywhere) |
 | 18 | `POST /api/users/{id}/unlock` | 🛡️ | Remove a lock or block |
+| 18a | `POST /api/users/{id}/resetpassword` | 🛡️ | Admin sets a temporary password; the security question is deleted |
 | 19 | `GET /api/securityconfig` | 🛡️ | Read security settings |
 | 20 | `PUT /api/securityconfig/{key}` | 🛡️ | Change one security setting |
 | 21 | `GET /api/passwordpolicies` | 🛡️ | Read password rules (EASY / MEDIUM / HARD) |
@@ -140,8 +141,8 @@ password) → `login`. The `requestToken` from step 1 is used in steps 2 and 3.
 
 **Too many wrong passwords**
 With the default settings, 3 wrong passwords in one day lock the account for 24 hours. While
-locked, even the right password gets `403 USER_LOCKED`. The lock goes away when it expires, when an
-admin calls `unlock`, or when the user completes forgot password.
+locked, even the right password gets `403 USER_LOCKED`, and forgot password is refused too. The lock goes
+away when it expires or when an admin calls `unlock`. After that the user logs in, or uses forgot password.
 
 **Session ends while the user is working (hard limit)**
 Put this in one place in the app (an Axios response interceptor), not in every screen:
@@ -381,6 +382,20 @@ reactivated. Nothing is deleted. The response shows `isActive: false`.
 Removes the failed-login lock **and** an admin block, and sets the failed-attempt count back to 0.
 The response shows `lockedUntil: null`, `isBlocked: false`, `failedLoginAttempts: 0`. Calling it on
 a user who is not locked is harmless.
+
+#### 18a. `POST /api/users/{id}/resetpassword` (right `user.unlock`)
+For a user who cannot get in: forgot the password, or the password and the security answer.
+```json
+{ "newPassword": "Temp@5678" }
+```
+- The password must pass the user's password policy and history (`400 VALIDATION_FAILED` otherwise).
+- It is a **temporary** password: `forcePasswordChange: true`. The user's next login gets `403 PASSWORD_CHANGE_REQUIRED`.
+- The user's security question is **deleted**. After the password change, login returns `securityQuestionRequired: true` and the user chooses a new one.
+- These also end: every open session of the user, and any open forgot-password request.
+- A failed-login lock is cleared. An admin block (`isBlocked`) is not; that needs `unlock`.
+- Logged in `USER_LOG` as `PASSWORD_RESET_BY_ADMIN`. The password itself is never logged.
+
+Response: `200` with the user (`forcePasswordChange: true`). `409 CANNOT_RESET_OWN_PASSWORD` means an admin tried it on their own account; use change password instead. Company scope and `ADMIN_USER_PROTECTED` work as for `unlock`.
 
 ### 4.5 Security settings and password rules (🛡️ rights: `securityconfig.view/edit`, `passwordpolicy.view/edit`)
 

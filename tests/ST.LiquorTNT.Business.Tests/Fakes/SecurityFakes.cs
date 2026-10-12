@@ -62,6 +62,12 @@ internal sealed class FakeSecurityQuestionRepository : ISecurityQuestionReposito
         return Task.CompletedTask;
     }
 
+    public Task RemoveAllForUserAsync(int userId, CancellationToken ct)
+    {
+        UserQuestions.RemoveAll(q => q.UserId == userId);
+        return Task.CompletedTask;
+    }
+
     public Task<IReadOnlyList<PASSWORD_RESET_REQUEST>> GetOpenResetRequestsAsync(int userId, CancellationToken ct) =>
         Task.FromResult<IReadOnlyList<PASSWORD_RESET_REQUEST>>(ResetRequests.Where(r => r.UserId == userId && r.IsOpen).ToList());
 

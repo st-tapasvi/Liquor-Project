@@ -18,4 +18,7 @@ public interface IUserService
     Task<UserResponse> DeactivateAsync(int id, CancellationToken ct);
 
     Task<UserResponse> UnlockAsync(int id, CancellationToken ct);
+
+    /// <summary>Admin gives the user a temporary password; the user's security question is removed.</summary>
+    Task<UserResponse> ResetPasswordAsync(int id, ResetUserPasswordRequest request, CancellationToken ct);
 }

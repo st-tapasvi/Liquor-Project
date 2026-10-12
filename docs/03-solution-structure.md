@@ -80,7 +80,7 @@ The `USERS`, `ROLES`, `PAGES`, `COMPANY`, `EXCISE`, `ALLOTEDPLANTS`, `USER_LOG` 
 | `Controllers/AuthController.cs` | `api/auth`: `login` (token in the body + the two cookies), `logout` (ends the header's or cookie's session, clears the cookies), `me`, `changepassword` (anonymous, password-verified), `sessions`, `sessions/{id}`, `mysuppliercodes`, `selectsuppliercode`, `mypermissions` |
 | `Controllers/PasswordResetController.cs` | `api/auth/forgotpassword`: `start`, `verify`, `reset` (anonymous) |
 | `Controllers/SecurityQuestionsController.cs` | `api/securityquestions`: list (anonymous), `mine` (PUT) |
-| `Controllers/UsersController.cs` | `api/users`: create (201 + Location), get, paged list, update, activate, deactivate, unlock, `{id}/access`, `{id}/roles`, `{id}/rights` |
+| `Controllers/UsersController.cs` | `api/users`: create (201 + Location), get, paged list, update, activate, deactivate, unlock, resetpassword, `{id}/access`, `{id}/roles`, `{id}/rights` |
 | `Controllers/RolesController.cs` · `PagesController.cs` | `api/roles` (CRUD + `{id}/rights` grid), `api/pages` (every page with its actions; `?applicationType=WEB` or `LINE`) |
 | `Controllers/SupplierCodesController.cs` · `LiquorCategoriesController.cs` | `api/suppliercodes`, `api/liquorcategories`: list / get for the company; create / edit / activate for Admin |
 | `Controllers/CompaniesController.cs` · `ExcisesController.cs` | `api/companies` (Admin, `company.view`), `api/excises` (`suppliercode.view`) — dropdown lists |

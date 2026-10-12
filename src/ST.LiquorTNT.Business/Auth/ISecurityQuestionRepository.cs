@@ -16,6 +16,9 @@ public interface ISecurityQuestionRepository
 
     Task AddUserQuestionAsync(USER_SECURITY_QUESTION question, CancellationToken ct);
 
+    /// <summary>Deletes every question row of the user (active or not), staged for the next SaveChanges.</summary>
+    Task RemoveAllForUserAsync(int userId, CancellationToken ct);
+
     Task<IReadOnlyList<PASSWORD_RESET_REQUEST>> GetOpenResetRequestsAsync(int userId, CancellationToken ct);
 
     Task<PASSWORD_RESET_REQUEST?> GetResetRequestByTokenHashAsync(string tokenHash, CancellationToken ct);

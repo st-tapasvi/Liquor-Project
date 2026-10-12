@@ -25,6 +25,9 @@ public sealed class SecurityQuestionRepository : ISecurityQuestionRepository
     public async Task AddUserQuestionAsync(USER_SECURITY_QUESTION question, CancellationToken ct) =>
         await _db.USER_SECURITY_QUESTION.AddAsync(question, ct);
 
+    public async Task RemoveAllForUserAsync(int userId, CancellationToken ct) =>
+        _db.USER_SECURITY_QUESTION.RemoveRange(await _db.USER_SECURITY_QUESTION.Where(q => q.UserId == userId).ToListAsync(ct));
+
     public async Task<IReadOnlyList<PASSWORD_RESET_REQUEST>> GetOpenResetRequestsAsync(int userId, CancellationToken ct) =>
         await _db.PASSWORD_RESET_REQUEST
             .Where(r => r.UserId == userId
