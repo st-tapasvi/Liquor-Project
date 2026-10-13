@@ -236,7 +236,7 @@ function UserMenu() {
           </ListItemIcon>
           My sessions
         </MenuItem>
-        <MenuItem onClick={() => go(PATHS.changePassword)}>
+        <MenuItem onClick={() => go(PATHS.settings.password)}>
           <ListItemIcon>
             <LockResetOutlined fontSize="small" />
           </ListItemIcon>

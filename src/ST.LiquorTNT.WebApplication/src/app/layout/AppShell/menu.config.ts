@@ -48,6 +48,7 @@ export const MENU: readonly MenuItem[] = [
       { label: 'Security settings', to: PATHS.settings.security, permission: ['securityconfig.view'] },
       { label: 'Password policies', to: PATHS.settings.passwordPolicies, permission: ['passwordpolicy.view'] },
       { label: 'My sessions', to: PATHS.settings.sessions },
+      { label: 'Change password', to: PATHS.settings.password },
     ],
   },
 ];

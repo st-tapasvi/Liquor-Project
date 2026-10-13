@@ -27,6 +27,7 @@ export const PATHS = {
     security: '/settings/security',
     passwordPolicies: '/settings/password-policies',
     sessions: '/settings/sessions',
+    password: '/settings/password',
   },
 } as const;
 

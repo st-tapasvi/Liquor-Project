@@ -13,4 +13,8 @@ export const authProtectedRoutes: RouteObject[] = [
     path: PATHS.settings.sessions,
     page: () => import('./pages/MySessionsPage'),
   }),
+  createProtectedRoute({
+    path: PATHS.settings.password,
+    page: () => import('./pages/AccountPasswordPage'),
+  }),
 ];
