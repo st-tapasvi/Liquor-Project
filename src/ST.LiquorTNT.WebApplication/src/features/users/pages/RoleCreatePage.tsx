@@ -246,10 +246,15 @@ export default function RoleCreatePage() {
                   <Chip
                     key={s.id}
                     size="small"
-                    variant="outlined"
-                    color="warning"
-                    sx={{ borderRadius: 1, borderStyle: trimmedName ? 'solid' : 'dashed' }}
-                    label={`${trimmedName || 'Role name'} ${s.displayName}`}
+                    variant={trimmedName ? 'filled' : 'outlined'}
+                    sx={{
+                      borderRadius: 1,
+                      fontWeight: 600,
+                      color: 'text.primary',
+                      border: '1px solid #C5C6CA',
+                      ...(trimmedName ? { bgcolor: '#EDEEF0' } : { bgcolor: 'transparent', borderStyle: 'dashed' }),
+                    }}
+                    label={`${trimmedName || 'Role name'} - ${s.displayName}`}
                   />
                 ))}
               </Stack>
@@ -299,7 +304,7 @@ function OutcomeList({ outcomes, roleName }: { outcomes: readonly CreateRoleOutc
       </AlertTitle>
       {outcomes.map((o) => (
         <Typography key={o.supplierCode.id} variant="body2">
-          {`${roleName} ${o.supplierCode.displayName}: `}
+          {`${roleName} - ${o.supplierCode.displayName}: `}
           {o.error === null
             ? 'created.'
             : o.role

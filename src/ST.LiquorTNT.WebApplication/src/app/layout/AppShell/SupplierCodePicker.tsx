@@ -178,9 +178,13 @@ export function SupplierCodePicker() {
                                 {franchise && (
                                   <Chip
                                     size="small"
-                                    color="warning"
-                                    variant="outlined"
                                     label={`Franchise · ${franchise}`}
+                                    sx={{
+                                      bgcolor: 'primary.main',
+                                      color: 'primary.contrastText',
+                                      fontWeight: 600,
+                                      '& .MuiChip-icon': { color: 'inherit', fontSize: 16 },
+                                    }}
                                   />
                                 )}
                               </Stack>
