@@ -9,6 +9,7 @@ import { RequireAuth } from '@/core/router';
 
 import { SecurityQuestionSetup, SessionExpiredDialog } from '@/features/auth';
 
+import { AppBreadcrumbs } from './AppBreadcrumbs';
 import { SessionCountdown } from './SessionCountdown';
 import { Sidebar } from './Sidebar';
 import { SupplierCodePicker } from './SupplierCodePicker';
@@ -53,6 +54,7 @@ export function AppShell() {
           <TopBar onMenuClick={toggle} sidebarOpen={sidebarOpen} />
           <Box component="main" sx={{ flexGrow: 1, px: { xs: 2, sm: 3 }, pt: 2.25, pb: 3 }}>
             <SessionCountdown />
+            <AppBreadcrumbs />
             <Outlet />
           </Box>
         </Box>
