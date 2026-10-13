@@ -160,7 +160,7 @@ public sealed class UserService : IUserService
         var search = string.IsNullOrWhiteSpace(request.Search) ? null : request.Search.Trim();
 
         // Company users see their own company only; Super Admin without a supplier code sees everyone.
-        return await _users.GetPageAsync(await _access.CompanyScopeAsync(ct), search, page, pageSize, ct);
+        return await _users.GetPageAsync(await _access.ListScopeAsync(ct), search, page, pageSize, ct);
     }
 
     public async Task<UserResponse> UpdateAsync(int id, UpdateUserRequest request, CancellationToken ct)

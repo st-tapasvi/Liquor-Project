@@ -51,7 +51,7 @@ public sealed class RoleService : IRoleService
     }
 
     public async Task<IReadOnlyList<RoleResponse>> GetListAsync(int? supplierCodeId, CancellationToken ct) =>
-        await _roles.GetListAsync(await _access.CompanyScopeAsync(ct), supplierCodeId, ct);
+        await _roles.GetListAsync(await _access.ListScopeAsync(ct), supplierCodeId, ct);
 
     public async Task<RoleResponse> GetByIdAsync(int id, CancellationToken ct)
     {
@@ -63,8 +63,13 @@ public sealed class RoleService : IRoleService
     {
         (await _saveValidator.ValidateAsync(request, ct)).EnsureValid();
 
-        // A company user creates roles in their own company; Super Admin without a supplier code creates a template.
-        var companyId = await _access.CompanyScopeAsync(ct);
+        // A company user creates roles in their own company. Super Admin: a supplier code's role goes to that supplier
+        // code's company, whatever supplier code is active; without a supplier code it is a template.
+        int? companyId = await _access.IsSuperAdminAsync(ct)
+            ? request.SupplierCodeId is int superAdminCodeId
+                ? (await _roles.GetSupplierCodeAsync(superAdminCodeId, ct) ?? throw new NotFoundException("Supplier code")).CompanyId
+                : (int?)null
+            : await _access.CompanyScopeAsync(ct);
         var name = request.RoleName.Trim();
 
         if (request.IsAdminRole)

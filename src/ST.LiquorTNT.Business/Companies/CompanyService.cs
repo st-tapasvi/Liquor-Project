@@ -20,5 +20,5 @@ public sealed class CompanyService : ICompanyService
     }
 
     public async Task<IReadOnlyList<CompanyResponse>> GetListAsync(CancellationToken ct) =>
-        await _companies.GetListAsync(await _access.CompanyScopeAsync(ct), ct);
+        await _companies.GetListAsync(await _access.ListScopeAsync(ct), ct);
 }

@@ -121,6 +121,13 @@ public sealed class CurrentAccess
     /// Super Admin without a picked supplier code gets null, meaning "not limited to one company".
     /// Everyone else always has a company; a user without one is refused.
     /// </summary>
+    /// <summary>
+    /// The company filter for master lists (users, roles, companies, supplier codes). Super Admin sees every company,
+    /// whatever supplier code is active (null = not limited); everyone else is limited to <see cref="CompanyScopeAsync"/>.
+    /// </summary>
+    public async Task<int?> ListScopeAsync(CancellationToken ct) =>
+        await IsSuperAdminAsync(ct) ? null : await CompanyScopeAsync(ct);
+
     public async Task<int?> CompanyScopeAsync(CancellationToken ct)
     {
         if (await IsSuperAdminAsync(ct))

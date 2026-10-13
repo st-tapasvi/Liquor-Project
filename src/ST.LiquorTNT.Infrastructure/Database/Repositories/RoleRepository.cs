@@ -21,7 +21,7 @@ public sealed class RoleRepository : IRoleRepository
     public async Task<IReadOnlyList<RoleResponse>> GetListAsync(int? companyId, int? supplierCodeId, CancellationToken ct)
     {
         var roles = _db.ROLES.AsNoTracking()
-            .Where(r => r.CompanyId == companyId);                // EF turns this into IS NULL when companyId is null
+            .Where(r => companyId == null || r.CompanyId == companyId);   // null = Super Admin: every company and the templates
 
         if (supplierCodeId is not null)
         {

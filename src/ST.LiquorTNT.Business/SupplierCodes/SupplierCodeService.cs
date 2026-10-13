@@ -60,7 +60,7 @@ public sealed class SupplierCodeService : ISupplierCodeService
         var pageSize = request.PageSize < 1 ? DefaultPageSize : Math.Min(request.PageSize, MaxPageSize);
         var search = string.IsNullOrWhiteSpace(request.Search) ? null : request.Search.Trim();
 
-        return await _supplierCodes.GetPageAsync(await _access.CompanyScopeAsync(ct), search, page, pageSize, ct);
+        return await _supplierCodes.GetPageAsync(await _access.ListScopeAsync(ct), search, page, pageSize, ct);
     }
 
     public async Task<SupplierCodeResponse> GetByIdAsync(int id, CancellationToken ct)
