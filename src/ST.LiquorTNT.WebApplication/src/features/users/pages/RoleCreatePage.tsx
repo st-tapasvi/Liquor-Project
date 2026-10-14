@@ -20,6 +20,7 @@ import { Section } from '@/shared/components/layout';
 import { PageHeader } from '@/shared/components/ui';
 import { useSnackbar } from '@/shared/hooks';
 import type { Option } from '@/shared/types';
+import { emptyToNull } from '@/shared/utils';
 
 import { type CreateRoleOutcome, useCreateRoles } from '../api/users.mutations';
 import {
@@ -79,7 +80,14 @@ export default function RoleCreatePage() {
 
   const form = useForm<CreateRoleFormInput, unknown, CreateRoleFormValues>({
     resolver: zodResolver(createRoleSchema),
-    defaultValues: { roleName: '', companyId: null, exciseId: null, supplierCode: null, passwordPolicyId: null },
+    defaultValues: {
+      roleName: '',
+      companyId: null,
+      exciseId: null,
+      supplierCode: null,
+      passwordPolicyId: null,
+      description: '',
+    },
   });
   const [roleName, companyId, exciseId, supplierCode, passwordPolicyId] = useWatch({
     control: form.control,
@@ -150,7 +158,7 @@ export default function RoleCreatePage() {
       const result = await create.mutateAsync({
         request: {
           roleName: values.roleName,
-          description: null,
+          description: emptyToNull(values.description),
           companyId: values.companyId,
           isAdminRole: false,
           perSupplierCode: false,
@@ -167,7 +175,11 @@ export default function RoleCreatePage() {
         return;
       }
       const single = result.length === 1 ? result[0] : undefined;
-      if (single?.role === null && applyServerErrors(form.setError, single.error, { fields: ['roleName'] })) return;
+      if (
+        single?.role === null &&
+        applyServerErrors(form.setError, single.error, { fields: ['roleName', 'description'] })
+      )
+        return;
       setOutcomes(result);
     } catch (error) {
       form.setError('root.submit', { type: 'server', message: describeError(error) });
@@ -234,6 +246,16 @@ export default function RoleCreatePage() {
                   options={supplierOptions}
                   disabled={exciseId === null || supplierOptions.length <= 1}
                   helperText={supplierCodes.isError ? 'Supplier codes could not be loaded.' : undefined}
+                />
+              </Grid>
+              <Grid size={{ xs: 12 }}>
+                <FormTextField<CreateRoleFormInput>
+                  name="description"
+                  label="Description"
+                  autoComplete="off"
+                  multiline
+                  minRows={2}
+                  slotProps={{ htmlInput: { maxLength: 255 } }}
                 />
               </Grid>
             </Grid>

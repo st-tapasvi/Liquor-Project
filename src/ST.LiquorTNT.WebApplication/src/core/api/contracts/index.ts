@@ -27,6 +27,8 @@ export type {
   UserRoleResponse,
   UserRightResponse,
   UpdateUserRolesRequest,
+  UserRoleGroupResponse,
+  UpdateUserRoleGroupsRequest,
   UpdateUserRightsRequest,
 } from './users';
 export type {
@@ -46,6 +48,10 @@ export type {
   PageResponse,
   RoleRightsResponse,
   UpdateRoleRightsRequest,
+  RoleGroupResponse,
+  RoleGroupRoleResponse,
+  SaveRoleGroupRequest,
+  UpdateRoleGroupRolesRequest,
 } from './access';
 export type {
   SecurityConfigResponse,

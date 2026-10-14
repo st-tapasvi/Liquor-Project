@@ -36,6 +36,8 @@ public sealed class SaveRoleGroupRequest
 {
     public string GroupName { get; set; } = string.Empty;
     public string? Description { get; set; }
+
+    public int? CompanyId { get; set; }
 }
 
 /// <summary>The FULL list of roles of the group. Anything not in it is taken out — for every user of the group.</summary>

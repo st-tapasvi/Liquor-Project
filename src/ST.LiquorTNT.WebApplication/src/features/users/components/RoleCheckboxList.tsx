@@ -78,6 +78,7 @@ export function RoleCheckboxList({
             key={o.id}
             label={o.label}
             disabled={disabled || o.locked === true}
+            sx={{ '& .MuiFormControlLabel-label.Mui-disabled': { color: 'text.primary' } }}
             control={
               <Checkbox size="small" checked={selected.has(o.id)} onChange={(e) => toggle(o.id, e.target.checked)} />
             }

@@ -86,7 +86,20 @@ export interface UserAccessResponse {
   userId: number;
   userName: string;
   roles: UserRoleResponse[];
+  roleGroups: UserRoleGroupResponse[];
   rights: UserRightResponse[];
+}
+
+/** A role profile the user holds, with the roles inside it. */
+export interface UserRoleGroupResponse {
+  roleGroupId: number;
+  groupName: string;
+  roles: UserRoleResponse[];
+}
+
+/** PUT /api/users/{id}/rolegroups – the FULL list; anything not in it is taken away. */
+export interface UpdateUserRoleGroupsRequest {
+  roleGroupIds: number[];
 }
 
 /** PUT /api/users/{id}/roles – the FULL list; anything not in it is taken away. */

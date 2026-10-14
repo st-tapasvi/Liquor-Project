@@ -19,6 +19,7 @@ import { FormActions, FormRootError, FormSelect, FormTextField } from '@/shared/
 import { Section } from '@/shared/components/layout';
 import { PageHeader, StatusChip } from '@/shared/components/ui';
 import type { Option } from '@/shared/types';
+import { emptyToNull } from '@/shared/utils';
 
 import { useSaveRole } from '../api/users.mutations';
 import { usePasswordPolicyOptions, useRole, useRoleRights, useSupplierCodeOptions } from '../api/users.queries';
@@ -85,7 +86,11 @@ function RoleEditor({
 
   const form = useForm<EditRoleFormInput, unknown, EditRoleFormValues>({
     resolver: zodResolver(editRoleSchema),
-    defaultValues: { roleName: role.roleName, passwordPolicyId: role.passwordPolicyId },
+    defaultValues: {
+      roleName: role.roleName,
+      passwordPolicyId: role.passwordPolicyId,
+      description: role.description ?? '',
+    },
   });
 
   const supplierCode = (canViewSupplierCodes ? supplierCodes.data : me.supplierCodes)?.find(
@@ -103,7 +108,11 @@ function RoleEditor({
   }
 
   const submit = form.handleSubmit(async (values) => {
-    const detailsChanged = values.roleName !== role.roleName || values.passwordPolicyId !== role.passwordPolicyId;
+    const description = emptyToNull(values.description);
+    const detailsChanged =
+      values.roleName !== role.roleName ||
+      values.passwordPolicyId !== role.passwordPolicyId ||
+      description !== role.description;
     const rightsChanged = changeCount(rights.pages, selected, baseline) > 0;
     if (!detailsChanged && !rightsChanged) {
       void navigate(PATHS.users.roleView(role.id));
@@ -114,7 +123,7 @@ function RoleEditor({
         request: detailsChanged
           ? {
               roleName: values.roleName,
-              description: role.description,
+              description,
               supplierCodeId: role.supplierCodeId,
               isAdminRole: role.isAdminRole,
               perSupplierCode: role.perSupplierCode,
@@ -125,7 +134,7 @@ function RoleEditor({
       });
       void navigate(PATHS.users.roles);
     } catch (error) {
-      if (applyServerErrors(form.setError, error, { fields: ['roleName', 'passwordPolicyId'] })) return;
+      if (applyServerErrors(form.setError, error, { fields: ['roleName', 'passwordPolicyId', 'description'] })) return;
       form.setError('root.submit', { type: 'server', message: describeError(error) });
     }
   });
@@ -190,6 +199,16 @@ function RoleEditor({
                     value={role.supplierCodeName ?? 'All supplier codes of the company'}
                     disabled
                     helperText={readOnly ? undefined : 'The supplier code of a role cannot be changed.'}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12 }}>
+                  <FormTextField<EditRoleFormInput>
+                    name="description"
+                    label="Description"
+                    autoComplete="off"
+                    multiline
+                    minRows={2}
+                    slotProps={{ htmlInput: { maxLength: 255 } }}
                   />
                 </Grid>
               </Grid>

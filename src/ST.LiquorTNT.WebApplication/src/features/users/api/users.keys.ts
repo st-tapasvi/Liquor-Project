@@ -9,5 +9,7 @@ export const userKeys = {
   roles: (scope: number) => ['roles', scope] as const,
   role: (scope: number, id: number) => [...userKeys.roles(scope), 'detail', id] as const,
   roleRights: (scope: number, id: number) => [...userKeys.roles(scope), 'rights', id] as const,
+  roleGroups: (scope: number) => ['rolegroups', scope] as const,
+  roleGroup: (scope: number, id: number) => [...userKeys.roleGroups(scope), 'detail', id] as const,
   pages: () => ['pages'] as const,
 };

@@ -6,13 +6,17 @@ import {
   type PageResponse,
   type PasswordPolicyResponse,
   type ResetUserPasswordRequest,
+  type RoleGroupResponse,
   type RoleResponse,
   type RoleRightsResponse,
   type CompanyResponse,
+  type SaveRoleGroupRequest,
   type SaveRoleRequest,
   type SupplierCodeResponse,
   type UpdateUserRequest,
+  type UpdateRoleGroupRolesRequest,
   type UpdateRoleRightsRequest,
+  type UpdateUserRoleGroupsRequest,
   type UpdateUserRolesRequest,
   type UserAccessResponse,
   type UserListParams,
@@ -62,6 +66,36 @@ export const usersApi = {
   updateRoles: async (id: number, request: UpdateUserRolesRequest): Promise<UserAccessResponse> => {
     const { data } = await http.put<UserAccessResponse>(`/users/${encodeURIComponent(id)}/roles`, request);
     return data;
+  },
+  updateRoleGroups: async (id: number, request: UpdateUserRoleGroupsRequest): Promise<UserAccessResponse> => {
+    const { data } = await http.put<UserAccessResponse>(`/users/${encodeURIComponent(id)}/rolegroups`, request);
+    return data;
+  },
+};
+
+export const roleGroupsApi = {
+  list: async (): Promise<RoleGroupResponse[]> => {
+    const { data } = await http.get<RoleGroupResponse[]>('/rolegroups');
+    return data;
+  },
+  get: async (id: number): Promise<RoleGroupResponse> => {
+    const { data } = await http.get<RoleGroupResponse>(`/rolegroups/${encodeURIComponent(id)}`);
+    return data;
+  },
+  create: async (request: SaveRoleGroupRequest): Promise<RoleGroupResponse> => {
+    const { data } = await http.post<RoleGroupResponse>('/rolegroups', request);
+    return data;
+  },
+  update: async (id: number, request: SaveRoleGroupRequest): Promise<RoleGroupResponse> => {
+    const { data } = await http.put<RoleGroupResponse>(`/rolegroups/${encodeURIComponent(id)}`, request);
+    return data;
+  },
+  updateRoles: async (id: number, request: UpdateRoleGroupRolesRequest): Promise<RoleGroupResponse> => {
+    const { data } = await http.put<RoleGroupResponse>(`/rolegroups/${encodeURIComponent(id)}/roles`, request);
+    return data;
+  },
+  remove: async (id: number): Promise<void> => {
+    await http.delete(`/rolegroups/${encodeURIComponent(id)}`);
   },
 };
 

@@ -11,8 +11,8 @@ public interface IRoleGroupRepository
 {
     Task<ROLE_GROUP?> GetByIdAsync(int id, CancellationToken ct);
 
-    /// <summary>The groups of one company with their roles and user count, by name.</summary>
-    Task<IReadOnlyList<RoleGroupResponse>> GetListAsync(int companyId, CancellationToken ct);
+    /// <summary>The groups of one company (null = every company) with their roles and user count, by name.</summary>
+    Task<IReadOnlyList<RoleGroupResponse>> GetListAsync(int? companyId, CancellationToken ct);
 
     /// <summary>One group projected like the list.</summary>
     Task<RoleGroupResponse?> GetResponseAsync(int id, CancellationToken ct);

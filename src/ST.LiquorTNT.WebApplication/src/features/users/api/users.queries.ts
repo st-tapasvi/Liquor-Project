@@ -3,7 +3,7 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import type { UserListParams } from '@/core/api';
 import { useCompanyScope } from '@/core/auth';
 
-import { rolesApi, userLookupsApi, usersApi } from './users.api';
+import { roleGroupsApi, rolesApi, userLookupsApi, usersApi } from './users.api';
 import { userKeys } from './users.keys';
 
 export function useUsers(params: UserListParams) {
@@ -34,6 +34,20 @@ export function useUserAccess(id: number) {
 export function useRoles(enabled = true) {
   const scope = useCompanyScope();
   return useQuery({ queryKey: userKeys.roles(scope), queryFn: rolesApi.list, enabled });
+}
+
+export function useRoleGroups(enabled = true) {
+  const scope = useCompanyScope();
+  return useQuery({ queryKey: userKeys.roleGroups(scope), queryFn: roleGroupsApi.list, enabled });
+}
+
+export function useRoleGroup(id: number | undefined) {
+  const scope = useCompanyScope();
+  return useQuery({
+    queryKey: userKeys.roleGroup(scope, id ?? -1),
+    queryFn: () => roleGroupsApi.get(id ?? -1),
+    enabled: id !== undefined,
+  });
 }
 
 export function useCompanyOptions(enabled: boolean) {

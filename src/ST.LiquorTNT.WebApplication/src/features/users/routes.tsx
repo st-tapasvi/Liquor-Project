@@ -43,4 +43,24 @@ export const userRoutes: RouteObject[] = [
     page: () => import('./pages/RoleEditPage'),
     permission: 'role.edit',
   }),
+  createProtectedRoute({
+    path: PATHS.users.roleProfiles,
+    page: () => import('./pages/RoleProfileListPage'),
+    permission: 'role.view',
+  }),
+  createProtectedRoute({
+    path: PATHS.users.roleProfileNew,
+    page: () => import('./pages/RoleProfileEditPage'),
+    permission: 'role.add',
+  }),
+  createProtectedRoute({
+    path: PATHS.users.roleProfileView(),
+    page: () => import('./pages/RoleProfileEditPage'),
+    permission: 'role.view',
+  }),
+  createProtectedRoute({
+    path: PATHS.users.roleProfileEdit(),
+    page: () => import('./pages/RoleProfileEditPage'),
+    permission: 'role.edit',
+  }),
 ];

@@ -38,6 +38,7 @@ export const MENU: readonly MenuItem[] = [
     children: [
       { label: 'Users', to: PATHS.users.list, permission: ['user.view'] },
       { label: 'Roles', to: PATHS.users.roles, permission: ['role.view'] },
+      { label: 'Role profiles', to: PATHS.users.roleProfiles, permission: ['role.view'] },
     ],
   },
   {

@@ -140,3 +140,36 @@ export interface UpdateRoleRightsRequest {
   pageActionIds: number[];
   applicationType?: ApplicationType | null;
 }
+
+/** GET /api/rolegroups – a role profile: a named bundle of roles of one company, given to users as one piece. */
+export interface RoleGroupResponse {
+  id: number;
+  companyId: number;
+  groupName: string;
+  description: string | null;
+  isActive: boolean;
+  hasAdminRole: boolean;
+  userCount: number;
+  roles: RoleGroupRoleResponse[];
+}
+
+export interface RoleGroupRoleResponse {
+  roleId: number;
+  roleName: string;
+  displayName: string;
+  supplierCodeId: number | null;
+  supplierCodeName: string | null;
+  isAdminRole: boolean;
+}
+
+/** POST and PUT /api/rolegroups */
+export interface SaveRoleGroupRequest {
+  groupName: string;
+  description: string | null;
+  companyId?: number | null;
+}
+
+/** PUT /api/rolegroups/{id}/roles – the FULL list of roles of the group. */
+export interface UpdateRoleGroupRolesRequest {
+  roleIds: number[];
+}

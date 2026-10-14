@@ -45,6 +45,12 @@ export const resetPasswordSchema = z
   });
 export type ResetPasswordFormValues = z.infer<typeof resetPasswordSchema>;
 
+export const roleProfileSchema = z.object({
+  groupName: z.string().trim().min(1, 'Role profile name is required.').max(100, 'At most 100 characters.'),
+  description: optionalText(255),
+});
+export type RoleProfileFormValues = z.infer<typeof roleProfileSchema>;
+
 export function toCreateRequest(values: CreateUserFormValues): CreateUserRequest {
   return {
     userName: values.userName,
@@ -96,6 +102,7 @@ export const createRoleSchema = z.object({
     .nullable()
     .refine((v) => v !== null, 'Supplier code is required.'),
   passwordPolicyId: requiredId('Password policy is required.'),
+  description: z.string().trim().max(255, 'At most 255 characters.'),
 });
 export type CreateRoleFormInput = z.input<typeof createRoleSchema>;
 export type CreateRoleFormValues = z.output<typeof createRoleSchema>;
@@ -103,6 +110,7 @@ export type CreateRoleFormValues = z.output<typeof createRoleSchema>;
 export const editRoleSchema = z.object({
   roleName: z.string().trim().min(1, 'Role name is required.').max(100, 'At most 100 characters.'),
   passwordPolicyId: requiredId('Password policy is required.'),
+  description: z.string().trim().max(255, 'At most 255 characters.'),
 });
 export type EditRoleFormInput = z.input<typeof editRoleSchema>;
 export type EditRoleFormValues = z.output<typeof editRoleSchema>;

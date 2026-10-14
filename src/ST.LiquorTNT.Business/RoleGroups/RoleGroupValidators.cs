@@ -9,6 +9,7 @@ public sealed class SaveRoleGroupRequestValidator : AbstractValidator<SaveRoleGr
     {
         RuleFor(x => x.GroupName).NotEmpty().MaximumLength(100);
         RuleFor(x => x.Description).MaximumLength(255);
+        RuleFor(x => x.CompanyId).GreaterThan(0).When(x => x.CompanyId.HasValue);
     }
 }
 

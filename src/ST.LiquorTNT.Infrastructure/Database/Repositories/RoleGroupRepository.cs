@@ -17,8 +17,8 @@ public sealed class RoleGroupRepository : IRoleGroupRepository
     public Task<ROLE_GROUP?> GetByIdAsync(int id, CancellationToken ct) =>
         _db.ROLE_GROUP.FirstOrDefaultAsync(g => g.Id == id, ct);
 
-    public async Task<IReadOnlyList<RoleGroupResponse>> GetListAsync(int companyId, CancellationToken ct) =>
-        await ProjectAsync(_db.ROLE_GROUP.AsNoTracking().Where(g => g.CompanyId == companyId), ct);
+    public async Task<IReadOnlyList<RoleGroupResponse>> GetListAsync(int? companyId, CancellationToken ct) =>
+        await ProjectAsync(_db.ROLE_GROUP.AsNoTracking().Where(g => companyId == null || g.CompanyId == companyId), ct);
 
     public async Task<RoleGroupResponse?> GetResponseAsync(int id, CancellationToken ct) =>
         (await ProjectAsync(_db.ROLE_GROUP.AsNoTracking().Where(g => g.Id == id), ct)).FirstOrDefault();

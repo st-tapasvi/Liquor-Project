@@ -15,6 +15,10 @@ export const PATHS = {
     roleNew: '/roles/new',
     roleView: (id: string | number = ':id') => `/roles/${id}`,
     roleEdit: (id: string | number = ':id') => `/roles/${id}/edit`,
+    roleProfiles: '/role-profiles',
+    roleProfileNew: '/role-profiles/new',
+    roleProfileView: (id: string | number = ':id') => `/role-profiles/${id}`,
+    roleProfileEdit: (id: string | number = ':id') => `/role-profiles/${id}/edit`,
   },
 
   company: {

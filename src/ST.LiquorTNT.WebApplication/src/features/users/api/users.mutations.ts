@@ -3,18 +3,21 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type {
   CreateUserRequest,
   ResetUserPasswordRequest,
+  RoleGroupResponse,
   RoleResponse,
+  SaveRoleGroupRequest,
   SaveRoleRequest,
   SupplierCodeResponse,
   UpdateUserRequest,
   UpdateUserRolesRequest,
+  UserAccessResponse,
   UserResponse,
 } from '@/core/api';
 import { useCompanyScope } from '@/core/auth';
 
 import { useSnackbar } from '@/shared/hooks';
 
-import { rolesApi, usersApi } from './users.api';
+import { roleGroupsApi, rolesApi, usersApi } from './users.api';
 import { userKeys } from './users.keys';
 
 function useUserMutation<TVariables>(
@@ -70,6 +73,105 @@ export function useUpdateUserRoles(id: number) {
     onSuccess: (access) => {
       qc.setQueryData(userKeys.access(scope, id), access);
       snackbar.success(`Roles of ${access.userName} saved.`);
+    },
+  });
+}
+
+export interface UserAccessChange {
+  roleIds: readonly number[] | null;
+  roleGroupIds: readonly number[] | null;
+}
+
+export function useUpdateUserAccess(id: number) {
+  const qc = useQueryClient();
+  const snackbar = useSnackbar();
+  const scope = useCompanyScope();
+  return useMutation({
+    mutationKey: ['users', 'access'],
+    mutationFn: async ({ roleIds, roleGroupIds }: UserAccessChange) => {
+      const saveRoles = () => usersApi.updateRoles(id, { roles: (roleIds ?? []).map((roleId) => ({ roleId })) });
+      const saveGroups = () => usersApi.updateRoleGroups(id, { roleGroupIds: [...(roleGroupIds ?? [])] });
+      let access: UserAccessResponse | null = null;
+      if (roleGroupIds !== null && roleGroupIds.length > 0) {
+        access = await saveGroups();
+        if (roleIds !== null) access = await saveRoles();
+      } else {
+        if (roleIds !== null) access = await saveRoles();
+        if (roleGroupIds !== null) access = await saveGroups();
+      }
+      return access ?? usersApi.access(id);
+    },
+    onSuccess: async (access) => {
+      qc.setQueryData(userKeys.access(scope, id), access);
+      await qc.invalidateQueries({ queryKey: userKeys.roleGroups(scope) });
+      snackbar.success(`Roles of ${access.userName} saved.`);
+    },
+    onError: async () => {
+      await qc.invalidateQueries({ queryKey: userKeys.access(scope, id) });
+    },
+  });
+}
+
+export class RoleGroupRolesError extends Error {
+  constructor(
+    readonly groupId: number,
+    readonly reason: unknown,
+  ) {
+    super('The role profile was created, but its roles could not be saved.');
+    this.name = 'RoleGroupRolesError';
+  }
+}
+
+export interface SaveRoleGroupInput {
+  request: SaveRoleGroupRequest | null;
+  roleIds: readonly number[] | null;
+}
+
+export function useSaveRoleGroup(id?: number) {
+  const qc = useQueryClient();
+  const snackbar = useSnackbar();
+  const scope = useCompanyScope();
+  return useMutation({
+    mutationKey: ['rolegroups', id === undefined ? 'create' : 'update'],
+    meta: { silent: true },
+    mutationFn: async ({ request, roleIds }: SaveRoleGroupInput): Promise<RoleGroupResponse | null> => {
+      let group: RoleGroupResponse | null = null;
+      let groupId = id;
+      if (request) {
+        group =
+          groupId === undefined ? await roleGroupsApi.create(request) : await roleGroupsApi.update(groupId, request);
+        groupId = group.id;
+      }
+      if (roleIds && groupId !== undefined && (id !== undefined || roleIds.length > 0)) {
+        try {
+          group = await roleGroupsApi.updateRoles(groupId, { roleIds: [...roleIds] });
+        } catch (error) {
+          if (id === undefined) throw new RoleGroupRolesError(groupId, error);
+          throw error;
+        }
+      }
+      return group;
+    },
+    onSettled: async () => {
+      await qc.invalidateQueries({ queryKey: userKeys.roleGroups(scope) });
+    },
+    onSuccess: (group) => {
+      snackbar.success(group ? `Role profile ${group.groupName} saved.` : 'Role profile saved.');
+    },
+  });
+}
+
+export function useDeleteRoleGroup() {
+  const qc = useQueryClient();
+  const snackbar = useSnackbar();
+  const scope = useCompanyScope();
+  return useMutation({
+    mutationKey: ['rolegroups', 'delete'],
+    mutationFn: (group: Pick<RoleGroupResponse, 'id' | 'groupName'>) => roleGroupsApi.remove(group.id),
+    onSuccess: async (_data, group) => {
+      qc.removeQueries({ queryKey: userKeys.roleGroup(scope, group.id) });
+      await qc.invalidateQueries({ queryKey: userKeys.roleGroups(scope) });
+      snackbar.success(`Role profile ${group.groupName} deleted.`);
     },
   });
 }

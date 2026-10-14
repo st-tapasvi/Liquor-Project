@@ -56,9 +56,7 @@ public sealed class RoleGroupService : IRoleGroupService
 
     public async Task<IReadOnlyList<RoleGroupResponse>> GetListAsync(CancellationToken ct)
     {
-        // Admin without a picked supplier code works in no company, and groups always belong to one.
-        var companyId = await _access.CompanyScopeAsync(ct);
-        return companyId is int id ? await _groups.GetListAsync(id, ct) : Array.Empty<RoleGroupResponse>();
+        return await _groups.GetListAsync(await _access.ListScopeAsync(ct), ct);
     }
 
     public async Task<RoleGroupResponse> GetByIdAsync(int id, CancellationToken ct)
@@ -71,10 +69,12 @@ public sealed class RoleGroupService : IRoleGroupService
     {
         (await _saveValidator.ValidateAsync(request, ct)).EnsureValid();
 
-        var companyId = await _access.CompanyScopeAsync(ct) ?? throw new ValidationException(new Dictionary<string, string[]>
-        {
-            ["groupName"] = new[] { "A role group belongs to a company: pick a supplier code of that company first." },
-        });
+        var companyId = (await _access.IsSuperAdminAsync(ct) ? request.CompanyId : null)
+            ?? await _access.CompanyScopeAsync(ct)
+            ?? throw new ValidationException(new Dictionary<string, string[]>
+            {
+                ["companyId"] = new[] { "A role group belongs to a company: choose the company." },
+            });
 
         var name = request.GroupName.Trim();
         await EnsureNameFreeAsync(companyId, name, excludeGroupId: null, ct);
